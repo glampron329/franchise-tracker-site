@@ -21,12 +21,13 @@
     return null;
   }
   // résumé : appelé après le premier rendu avec les données (ou après une erreur)
-  function report(label) {
-    var nav = navInfo(), total = Math.round(now()), out = { label: label || 'load', total_ms: total, nav: nav, steps: rows.slice() };
+  // since : début du chargement (clic sur « Connexion » ou ouverture avec session) ; load_ms = durée depuis ce moment, sans le temps de saisie du mot de passe
+  function report(label, since) {
+    var nav = navInfo(), total = Math.round(now()), load = since == null ? null : Math.round(now() - since), out = { label: label || 'load', total_ms: total, load_ms: load, nav: nav, steps: rows.slice() };
     root.__ftperf = out;
     try {
       if (root.console && console.groupCollapsed) {
-        console.groupCollapsed('[ft-perf] ' + out.label + ' : ' + total + ' ms depuis la navigation' + (nav ? ' (page ' + nav.html_ko + ' Ko, HTML reçu à ' + nav.html_ms + ' ms)' : ''));
+        console.groupCollapsed('[ft-perf] ' + out.label + ' : ' + (load != null ? load + ' ms depuis le début du chargement, ' : '') + total + ' ms depuis l\'ouverture de la page' + (nav ? ' (page ' + nav.html_ko + ' Ko, HTML reçu à ' + nav.html_ms + ' ms)' : ''));
         if (console.table) console.table(rows.map(function (r) { return { step: r.step, start_ms: r.start, ms: r.ms, extra: r.extra }; })); console.groupEnd();
       }
     } catch (e) { /* ignore */ }
@@ -39,12 +40,12 @@
     var el = d.getElementById('ft-perf'); if (!el) { el = d.createElement('div'); el.id = 'ft-perf'; d.body.appendChild(el); }
     el.setAttribute('style', 'position:fixed;right:8px;bottom:8px;z-index:9999;max-height:45vh;overflow:auto;font:11px/1.35 ui-monospace,Menlo,Consolas,monospace;background:rgba(20,22,30,.92);color:#e8e8e8;padding:6px 8px;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,.3)');
     var max = out.steps.reduce(function (m, r) { return Math.max(m, r.start + r.ms); }, 1);
-    el.innerHTML = '<details' + (el.dataset.open === '0' ? '' : ' open') + '><summary style="cursor:pointer">perf · ' + esc(out.label) + ' · ' + out.total_ms + ' ms' + (out.nav ? ' · html ' + out.nav.html_ko + ' Ko' : '') + '</summary><table style="border-collapse:collapse;margin-top:4px">' +
+    el.innerHTML = '<details' + (el.dataset.open === '0' ? '' : ' open') + '><summary style="cursor:pointer">perf · ' + esc(out.label) + ' · ' + (out.load_ms != null ? 'chargement ' + out.load_ms + ' ms · ouverture ' : '') + out.total_ms + ' ms' + (out.nav ? ' · html ' + out.nav.html_ko + ' Ko' : '') + '</summary><table style="border-collapse:collapse;margin-top:4px">' +
       out.steps.map(function (r) { var l = Math.round(r.start / max * 120), w = Math.max(1, Math.round(r.ms / max * 120)); return '<tr><td style="padding-right:8px">' + esc(r.step) + '</td><td style="text-align:right;padding-right:6px">' + r.ms + '</td><td><span style="display:inline-block;width:120px;height:6px;position:relative;background:rgba(255,255,255,.08)"><span style="position:absolute;left:' + l + 'px;width:' + w + 'px;height:6px;background:#5dade2"></span></span></td><td style="padding-left:6px;color:#aaa">' + esc(r.extra) + '</td></tr>'; }).join('') + '</table></details>';
     var det = el.querySelector('details'); det.addEventListener('toggle', function () { el.dataset.open = det.open ? '1' : '0'; });
   }
   function reset() { rows = []; }
-  var api = { span: span, report: report, reset: reset, rows: function () { return rows; }, enabled: panelOn };
+  var api = { now: now, span: span, report: report, reset: reset, rows: function () { return rows; }, enabled: panelOn };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.FTPERF = api;
 })(typeof window !== 'undefined' ? window : this);
 
@@ -724,7 +725,8 @@
       ui.busy = false; var dR = pspan('rendu'); draw(); dR();
     }
     function fmt(key, params) { var x = app.t(key); (params || []).forEach(function (p, i) { x = x.replace('{' + i + '}', p); }); return x; }
-    function report(label) { var P = perfApi(); if (P) P.report(label); }
+    function report(label) { var P = perfApi(); if (P) P.report(label, ui.t0); }
+    function perfNow() { var P = perfApi(); return P && P.now ? P.now() : Date.now(); }
     function merge(base, fresh) { var R = Object.assign({}, base || {}); Object.keys(fresh).forEach(function (k) { R[k] = fresh[k]; }); return R; }
     function save(fid) { if (cache && RAW) { var d = pspan('cache:écriture'); var t = {}; Object.keys(RAW).forEach(function (k) { if (k !== '__franchise_id') t[k] = RAW[k]; }); cache.write(userId(), fid, t, VERS).then(function () { d(); }); } }
     async function versions(fid) { var d = pspan('versions'); try { var v = await FTLIVE.loadVersions(client, fid); d(v ? Object.keys(v).length + ' tables' : 'absent'); return v; } catch (e) { d('erreur'); return null; } }
@@ -737,6 +739,10 @@
       save(fid); return need.length;
     }
     async function loadLive(force) {
+      if (ui.t0 == null) ui.t0 = perfNow();          // début du chargement (déjà fixé au clic sur « Connexion »)
+      try { return await loadLive0(force); } finally { ui.t0 = null; }
+    }
+    async function loadLive0(force) {
       ui.busy = true; ui.error = ''; if (app) { app.sync.busy = true; app.sync.msg = ''; } draw();
       var page = pageName();
       try {
@@ -774,7 +780,7 @@
       if (b.dataset.themeSet) { try { store.set('ft_theme', b.dataset.themeSet); } catch (e2) { /* ignore */ } applyTheme(); rootEl.querySelectorAll('[data-theme-set]').forEach(function (x) { x.setAttribute('aria-pressed', String(x.dataset.themeSet === b.dataset.themeSet)); }); return; }
       var act = b.dataset.sb; if (!act) return;
       if (act === 'login') {
-        var em = document.getElementById('sb-email').value.trim(), pw = document.getElementById('sb-pw').value; ui.busy = true; ui.error = ''; if (app) app.sync.busy = true; draw();
+        ui.t0 = perfNow(); var em = document.getElementById('sb-email').value.trim(), pw = document.getElementById('sb-pw').value; ui.busy = true; ui.error = ''; if (app) app.sync.busy = true; draw();
         client.signIn(em, pw).then(function () { return loadLive(); }).catch(function (err) { ui.busy = false; fail(err); });
       } else if (act === 'logout') {
         client.signOut(); if (DATA0.__lite) app = null; else { app.sync.user = null; app.sync.msg = ''; } draw();

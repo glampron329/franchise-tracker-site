@@ -74,6 +74,7 @@
       var all = await client.select('franchise', 'select=*&order=id'), fid = client.franchiseId();
       if (fid == null) { var created = all.filter(function (x) { return !known[x.id]; }); if (created.length === 1) { fid = created[0].id; client.setFranchise(fid); if (store) store.set('ft_franchise', String(fid)); } }
       DATA.franchiseIds = all.map(function (x) { return x.id; });
+      DATA.franchises = all.map(function (x) { return { id: x.id, name: x.name, code: x.abbreviation, colors: [x.color_primary, x.color_secondary], first: x.first_season_start_year, current: x.current_season_start_year }; });
       var f = all.filter(function (x) { return x.id === fid; })[0];
       if (f) { DATA.franchise = { id: f.id, name: f.name, code: f.abbreviation, colors: [f.color_primary, f.color_secondary], first: f.first_season_start_year, current: f.current_season_start_year, locale: f.ui_locale, games: f.games_per_season || 82 }; DATA.hasFranchise = true; state.first = f.first_season_start_year; state.games = f.games_per_season || 82; }
     }
@@ -250,14 +251,33 @@
         '<h4>' + esc(t('setup.guide_err_title')) + '</h4><ul class="errs"><li' + hot('blocked') + '>' + esc(t('setup.guide_err_blocked')) + '</li><li' + hot('failed') + '>' + esc(t('setup.guide_err_failed')) + '</li><li>' + esc(t('setup.guide_err_stuck')) + '</li><li>' + esc(t('setup.guide_err_names')) + '</li></ul></section>';
     }
 
+    // ---- franchise active (maquette docs/maquettes/franchise_active.html, validée le 2026-11-12) : tuiles avec logo ; une seule franchise : son nom et ses saisons ----
+    function franchiseList() {
+      var src = DATA.franchises || (DATA.hasFranchise && DATA.franchise ? [DATA.franchise] : []);
+      return src.map(function (f) { var tm = (DATA.teams || []).filter(function (x) { return x.code === f.code; })[0]; return { id: f.id, name: f.name, code: f.code, colors: f.colors || ['#AF1E2D', '#192168'], first: f.first, current: f.current || f.first, logo: tm && tm.logo }; });
+    }
+    function fraCrest(f) { var c = String(f.code || '').toUpperCase().replace(/[^A-Z]/g, ''); if (c === 'VEG') c = 'VGK'; return f.logo ? '<span class="crest logo"><img src="' + esc(f.logo) + '" alt=""></span>' : '<span class="crest logo"><img src="https://assets.nhle.com/logos/nhl/svg/' + esc(c) + '_light.svg" alt="" onerror="this.parentNode.className=\'crest\';this.remove()"></span>'; }
+    function fraSeasons(f) { return f.first === f.current ? fmt('setup.active_season1', [sl(f.first)]) : fmt('setup.active_seasons', [sl(f.first), sl(f.current)]); }
+    function fraVars(f) { return '--o1:' + esc(f.colors[0]) + ';--o2:' + esc(f.colors[1] || f.colors[0]); }
+    function activeHTML(fs, activeId) {
+      if (!fs.length) return '';
+      if (fs.length === 1) { var f = fs[0]; return '<div class="fra"><span class="fra-lbl">' + esc(t('setup.active')) + '</span><div class="fra-one" style="' + fraVars(f) + '">' + fraCrest(f) + '<div class="fra-txt"><div class="fra-name">' + esc(f.name) + '</div><div class="fra-meta">' + esc(fraSeasons(f)) + '</div></div></div></div>'; }
+      return '<div class="fra"><fieldset class="fra-list" aria-describedby="fra-help"><legend class="fra-lbl">' + esc(t('setup.active')) + '</legend><div class="fra-opts">' +
+        fs.map(function (f) { return '<label class="fra-opt" style="' + fraVars(f) + '"><input type="radio" name="ft-active" id="fra-' + f.id + '" value="' + f.id + '"' + (f.id === activeId ? ' checked' : '') + '>' + fraCrest(f) + '<span class="fra-txt"><span class="fra-name">' + esc(f.name) + '</span><span class="fra-meta">' + esc(fraSeasons(f)) + '</span></span></label>'; }).join('') +
+        '</div></fieldset><p class="note muted" id="fra-help">' + esc(t('setup.active_help')) + '</p>' + (state.activeMsg ? '<p class="ok" role="status">' + esc(state.activeMsg) + '</p>' : '') + '</div>';
+    }
+    // choix d'une autre franchise active (comptes à plusieurs franchises) : mémorisée, puis la page relit ses données
+    function chooseActive(client, id) {
+      var f = franchiseList().filter(function (x) { return x.id === +id; })[0]; if (!f || !client) return false;
+      client.chooseFranchise(f.id); state.activeMsg = fmt('setup.active_set', [f.name]); return true;
+    }
     function view() {
       var f = DATA.franchise, h = '<header class="top"><div class="brand"><span class="crest"></span><div><div class="fr">' + esc(f ? f.name : 'Franchise Tracker') + '</div><div class="sub">' + esc(t('setup.title')) + '</div></div></div>' +
         '<div class="ctl"><a class="navlink" href="history_edit.html">' + esc(t('nav.hist')) + '</a><div class="seg" role="group"><button data-lang="fr" aria-pressed="' + (state.lang === 'fr') + '">FR</button><button data-lang="en" aria-pressed="' + (state.lang === 'en') + '">EN</button></div></div></header>';
       h += '<main class="entry">' + FTP.panel(t, esc, sync, { noPush: true });
       var locked = !!(DATA.hasFranchise && f), cur = locked ? f.code : state.team, list = DATA.teams.filter(function (x) { return x.active !== 0; });
       if (locked && !list.some(function (x) { return x.code === f.code; })) list.push({ code: f.code, en: f.name, fr: f.name });
-      h += '<div class="setup-grid' + (!DATA.hasFranchise && leagueOn() ? '' : ' no-league') + '"><div class="ar a-fr"><section class="card"><h3>' + esc(t('setup.franchise')) + '</h3><p class="muted">' + esc(t('setup.intro')) + '</p>';
-      if (locked) h += '<p><strong>' + esc(fmt('setup.exists', [f.name, f.first, String((f.first + 1) % 100).padStart(2, '0')])) + '</strong></p>';
+      h += '<div class="setup-grid' + (!DATA.hasFranchise && leagueOn() ? '' : ' no-league') + '"><div class="ar a-fr"><section class="card"><h3>' + esc(t('setup.franchise')) + '</h3>' + activeHTML(franchiseList(), f && f.id) + '<p class="muted">' + esc(t('setup.intro')) + '</p>';
       var lt = !locked && leagueOn() ? leagueTeams(state.first) : null, firstSel = '<label class="fld">' + esc(t(locked ? 'setup.load_before' : 'setup.first')) + (locked || !leagueOn() ? '<input id="setup-first" type="number" min="1917"' + (locked ? ' max="' + f.first + '"' : '') + ' value="' + state.first + '">' : '<select id="setup-first">' + seasonChoices().map(function (y) { return '<option value="' + y + '"' + (y === state.first ? ' selected' : '') + '>' + esc(sl(y)) + '</option>'; }).join('') + '</select>') + '</label>';
       var teamList = lt ? lt.map(function (x) { return { code: x.code, name: x.name }; }) : list.map(function (x) { return { code: x.code, name: state.lang === 'fr' ? x.fr : x.en }; }), curTeam = teamList.filter(function (x) { return x.code === cur; })[0];
       var teamOpts = TC.datalist('setup-teams', teamList.slice().sort(function (a, b) { return a.name.localeCompare(b.name, state.lang); }), function (x) { return x.name; }, esc);
@@ -279,7 +299,7 @@
         (hasJob() && st === 'done' ? '<p><a href="history_edit.html">' + esc(t('setup.edit_link')) + '</a></p>' : '') + '</section></div><div class="ar a-gd">' + guideHTML() + '</div></div></main>';
       return h;
     }
-    return { teamChoices: teamChoices, confCounts: confCounts, lotterySize: lotterySize, conferencesOk: conferencesOk, leagueSizeOk: leagueSizeOk, preview: preview, openForm: openForm, setForm: setForm, setFormLogo: setFormLogo, saveForm: saveForm, validateForm: validateForm, removeCustom: removeCustom, setDivision: setDivision, resetDivisions: resetDivisions, defunctFranchises: defunctFranchises, divCounts: divCounts, payload: payload, hasHistory: hasHistory, leagueTeams: leagueTeams, inLeague: inLeague, seasonChoices: seasonChoices, loadLeague: loadLeague, guideHTML: guideHTML, saveGames: saveGames, gamesOk: gamesOk, saveLang: saveLang, sync: sync, state: state, view: view, t: t, fmt: fmt, setField: setField, poll: poll, start: start, resume: resume, doPull: doPull, doLogin: doLogin, doLogout: doLogout, active: active, counts: counts };
+    return { chooseActive: chooseActive, franchiseList: franchiseList, teamChoices: teamChoices, confCounts: confCounts, lotterySize: lotterySize, conferencesOk: conferencesOk, leagueSizeOk: leagueSizeOk, preview: preview, openForm: openForm, setForm: setForm, setFormLogo: setFormLogo, saveForm: saveForm, validateForm: validateForm, removeCustom: removeCustom, setDivision: setDivision, resetDivisions: resetDivisions, defunctFranchises: defunctFranchises, divCounts: divCounts, payload: payload, hasHistory: hasHistory, leagueTeams: leagueTeams, inLeague: inLeague, seasonChoices: seasonChoices, loadLeague: loadLeague, guideHTML: guideHTML, saveGames: saveGames, gamesOk: gamesOk, saveLang: saveLang, sync: sync, state: state, view: view, t: t, fmt: fmt, setField: setField, poll: poll, start: start, resume: resume, doPull: doPull, doLogin: doLogin, doLogout: doLogout, active: active, counts: counts };
   }
 
   var api = { makeSetupApp: makeSetupApp, esc: esc };
@@ -294,6 +314,7 @@
       if (el.dataset && el.dataset.cf) { var cf = el.dataset.cf, text = el.tagName === 'INPUT' && el.type !== 'checkbox' && el.type !== 'radio' && el.type !== 'color'; a.setForm(cf, el.type === 'checkbox' ? el.checked : el.value); if (!text) host.draw(); return; }   // champs de texte : pas de redessin (il ferait perdre le curseur)
       if (el.dataset && el.dataset.div) { a.setDivision(el.dataset.div, el.value); host.draw(); return; }
       if (el.id === 'cust-logo') { readLogo(el.files && el.files[0], a); return; }
+      if (el.name === 'ft-active') { var fid = +el.value; if (a.chooseActive(host.client, fid)) host.reload().then(function () { var r = document.getElementById('fra-' + fid); if (r) r.focus(); }); return; }
       if (el.id === 'setup-team') { var tl = a.teamChoices(), code = TC.resolve(el.value, tl); a.setField('team', code === null ? (a.state.team || '') : code); host.draw(); } else if (el.id === 'setup-first') { a.setField('first', el.value); host.draw(); }   // l'année change les équipes proposées : on redessine
       else if (el.id === 'setup-games') { a.setField('games', el.value); a.saveGames(host.client).then(function () { host.draw(); }); }
       else if (el.id === 'setup-lang') { a.setField('lang', el.value); host.draw(); a.saveLang(host.client).then(function () { host.draw(); }); }
