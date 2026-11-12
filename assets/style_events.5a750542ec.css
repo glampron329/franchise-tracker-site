@@ -10,7 +10,7 @@ td.d{color:var(--muted);background:color-mix(in srgb,var(--line) 35%,transparent
 .badge{display:inline-block;min-width:18px;padding:0 6px;border-radius:9px;background:#d68910;color:#fff;font-size:12px;text-align:center}.badge.bad{background:#c0392b}
 .foot{display:flex;gap:18px;flex-wrap:wrap;padding:10px 4px;font-size:13px;border-top:1px solid var(--line);margin-top:6px}.foot .bad{color:#c0392b;font-weight:600}.foot .ok{color:#1e8449;font-weight:600}
 select.cell{width:auto;min-width:96px;text-align:left}input.cell.text,input.cell.player,input.cell.date{text-align:left}input.cell.date{width:104px}input.cell.player{width:170px}input.cell.int{width:84px}
-a.navlink{color:#fff;text-decoration:underline;align-self:center;font-size:14px}.x{border:0;background:transparent;color:var(--muted);font-size:18px;cursor:pointer}.x:hover{color:#c0392b}
+a.navlink{color:var(--on-base1);text-decoration:underline;align-self:center;font-size:14px}.x{border:0;background:transparent;color:var(--muted);font-size:18px;cursor:pointer}.x:hover{color:#c0392b}
 details.base{margin-bottom:12px}details.base summary{cursor:pointer;color:var(--muted);font-size:13px}.tabs{flex-wrap:wrap}
 table.ev th{white-space:nowrap}table.ev td.ci{padding:0 2px}
 .acts.left{margin-left:0;align-items:center}p.ok{color:#1e8449;font-weight:600}p.bad{color:#c0392b;font-weight:600}p.warn{color:#b9770e;font-weight:600}
@@ -46,7 +46,7 @@ tr.grphead th,table.ratings tr.grphead th{position:static!important;height:30px;
 .up{color:#1e8449;font-weight:700}.down{color:#c0392b;font-weight:700}.flat{color:var(--muted)}
 .summary{display:flex;align-items:center;gap:16px;margin:10px 0;font-size:14px;flex-wrap:wrap}.summary .bar{flex:1 1 200px;max-width:380px;margin:0}
 .toolbar{display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;margin:6px 0 10px}.fld.sm{margin:0;font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:3px}.fld.sm input{font:inherit;font-size:14px;padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--fg);width:220px}
-.btn.small{padding:0 14px;height:34px;font-size:13px}.btn.on{background:var(--c1);color:#fff;border-color:var(--c1)}
+.btn.small{padding:0 14px;height:34px;font-size:13px}.btn.on{background:var(--c1);color:var(--on-c1);border-color:var(--c1)}
 /* calendrier : colonnes Match et Écart étroites, logo de l'adversaire */
 table.grid.ev.sched th.pl{min-width:56px;width:56px;text-align:center;font-weight:600}
 table.grid.ev.sched th.d.gap,table.grid.ev.sched td.gap{width:64px;min-width:64px}table.grid.ev.sched th.d.logo,table.grid.ev.sched td.logo{width:46px;min-width:46px;padding:0}
@@ -78,14 +78,14 @@ table.grid.ev.ratings th.pl{min-width:200px}
 .cust-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px 16px;align-items:end;margin:8px 0}.cust-grid .fld{margin:0;max-width:none}.colrow{display:flex;gap:6px;align-items:center}.colrow input[type=color]{width:38px;height:32px;padding:0;border:1px solid var(--line);border-radius:6px;background:var(--panel)}.colrow input:not([type=color]){width:100px}
 .logo-prev img{width:64px;height:64px;object-fit:contain;background:#fff;border-radius:50%;padding:4px;border:1px solid var(--line)}.chk{display:flex;gap:8px;align-items:center;margin:8px 0}
 .divs{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;margin:8px 0}.div{border:1px solid var(--line);border-radius:10px;padding:8px 10px}.div h5{margin:0 0 6px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}.div .cnt{background:var(--line);border-radius:9px;padding:0 8px;margin-left:4px}
-.dv{display:flex;justify-content:space-between;align-items:center;gap:6px;padding:2px 0;font-size:13px}.dv.cust span{font-weight:700;color:var(--c1)}.dv.moved span{text-decoration:underline dotted}.dv select{font:inherit;font-size:12px;padding:1px 4px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--fg)}
+.dv{display:flex;justify-content:space-between;align-items:center;gap:6px;padding:2px 0;font-size:13px}.dv.cust span{font-weight:700;color:var(--ink1)}.dv.moved span{text-decoration:underline dotted}.dv select{font:inherit;font-size:12px;padding:1px 4px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--fg)}
 
 /* écran Franchise : franchise | ligue, puis création et importation (compacte) | mode d'emploi (compact) */
 main.entry>.setup-grid{grid-column:1/-1;display:grid;gap:16px;grid-template-columns:1fr;align-items:start}.setup-grid .ar>.card{margin:0}
 @media (min-width:1000px){.setup-grid{grid-template-columns:minmax(340px,4fr) minmax(0,6fr);grid-template-areas:"fr lg" "im gd"}.setup-grid.no-league{grid-template-areas:"fr im" "gd gd"}.setup-grid .a-fr{grid-area:fr}.setup-grid .a-lg{grid-area:lg}.setup-grid .a-im{grid-area:im}.setup-grid .a-gd{grid-area:gd}}
 .card.compact{padding:10px 14px}.card.compact h3{font-size:13px;margin:0 0 6px}.card.compact p{margin:4px 0;font-size:13px}.card.compact .note{font-size:12px}.card.compact .bar{height:6px;margin:6px 0}.card.compact .btn{padding:6px 12px;font-size:13px}.card.compact .acts{margin-top:6px}
 .guide-card{padding:10px 14px}.guide-card h3{font-size:13px;margin:0 0 6px}.guide-card h4{font-size:12px;margin:10px 0 4px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
-.steps{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px}.steps li{display:flex;gap:8px;align-items:flex-start;font-size:12.5px;line-height:1.35}.steps b{flex:none;width:20px;height:20px;border-radius:50%;background:var(--c1);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:12px}
+.steps{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px}.steps li{display:flex;gap:8px;align-items:flex-start;font-size:12.5px;line-height:1.35}.steps b{flex:none;width:20px;height:20px;border-radius:50%;background:var(--c1);color:var(--on-c1);display:inline-flex;align-items:center;justify-content:center;font-size:12px}
 .errs{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:6px 14px}.errs li{font-size:12.5px;line-height:1.35;padding:4px 8px;border-left:3px solid var(--line)}.errs li.hot{border-left-color:#d68910;background:color-mix(in srgb,#d68910 14%,transparent);font-weight:600}
 
 /* écran Franchise : divisions sur une seule rangée, textes d'introduction plus petits */
@@ -139,7 +139,7 @@ table.grid.ev.awards td:hover .tip,table.grid.ev.awards td:focus-within .tip{dis
 .lineups{display:grid;grid-template-columns:repeat(auto-fit,minmax(520px,1fr));gap:18px}
 .lineup{border:1px solid var(--line);border-radius:14px;padding:12px 16px 16px;background:linear-gradient(180deg,color-mix(in srgb,var(--c1) 7%,var(--panel)),var(--panel))}.lineup h4{margin:0 0 12px;text-align:center;font-size:13px;letter-spacing:.1em;text-transform:uppercase}
 .lrow{display:flex;justify-content:center;gap:14px;margin-top:12px}.lrow.d2{padding:0 16%}.lrow.g1{padding:0 30%}
-.slot{flex:1;min-width:0;display:flex;flex-direction:column;gap:5px;align-items:stretch}.slbl{align-self:center;font-weight:800;font-size:12px;letter-spacing:.08em;color:var(--c1);border-bottom:2px solid var(--c1);padding:0 10px 1px}
+.slot{flex:1;min-width:0;display:flex;flex-direction:column;gap:5px;align-items:stretch}.slbl{align-self:center;font-weight:800;font-size:12px;letter-spacing:.08em;color:var(--ink1);border-bottom:2px solid var(--c1);padding:0 10px 1px}
 .slot input.cell,.slot select.cell{width:100%}.slot .steam{display:flex;align-items:center;gap:6px}.slot .steam select.cell{flex:1;min-width:0}.slot .steam .tlogo{width:30px;height:30px}.slot.empty .slbl{color:var(--muted);border-color:var(--line)}
 /* ===== bandeau du gagnant ===== */
 .winband{display:flex;align-items:center;gap:18px;border-radius:12px;padding:12px 22px;margin:0 0 14px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.45)}.winband .wlogo{display:inline-flex;background:rgba(255,255,255,.92);border-radius:50%;padding:8px}.winband .wlogo .tlogo{width:72px;height:72px}

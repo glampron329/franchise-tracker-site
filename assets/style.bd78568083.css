@@ -4,14 +4,14 @@
 :root[data-theme="dark"]{--bg:#0e1116;--panel:#171b23;--fg:#eef0f5;--muted:#9ba4b5;--line:#2a303c;--c1:color-mix(in srgb,var(--base1) 72%,#fff);--c2:color-mix(in srgb,var(--base2) 40%,#fff);color-scheme:dark}
 *{box-sizing:border-box}html,body{margin:0}
 body{background:var(--bg);color:var(--fg);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-.top{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;padding:14px 22px;background:var(--base1);color:#fff;border-bottom:4px solid var(--base2)}
-.brand{display:flex;gap:12px;align-items:center}.crest{width:34px;height:34px;border-radius:8px;background:#fff;box-shadow:inset 0 0 0 5px var(--base2),inset 0 0 0 11px #fff}
-.brand .fr{font-weight:700;font-size:18px;letter-spacing:.2px}.brand .sub{opacity:.85;font-size:13px}
+.top{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;padding:14px 22px;background:var(--base1);color:var(--on-base1);border-bottom:4px solid var(--base2)}
+.brand{display:flex;gap:12px;align-items:center}.crest{width:34px;height:34px;border-radius:8px;background:#fff;box-shadow:inset 0 0 0 5px var(--base2),inset 0 0 0 11px #fff,0 0 0 2px var(--on-base1)}
+.brand .fr{font-weight:700;font-size:18px;letter-spacing:.2px}.brand .sub{font-size:13px}
 .ctl{display:flex;flex-wrap:wrap;gap:10px}
-.seg{display:inline-flex;background:rgba(255,255,255,.16);border-radius:10px;padding:3px}
-.seg button{border:0;background:transparent;color:#fff;padding:6px 12px;border-radius:8px;font:inherit;cursor:pointer}
-.seg button[aria-pressed=true]{background:#fff;color:var(--base1);font-weight:700}
-.seg button:focus-visible{outline:3px solid var(--base2);outline-offset:2px}
+.seg{display:inline-flex;background:transparent;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--on-base1) 45%,transparent);border-radius:10px;padding:3px}
+.seg button{border:0;background:transparent;color:var(--on-base1);padding:6px 12px;border-radius:8px;font:inherit;cursor:pointer}
+.seg button[aria-pressed=true]{background:var(--on-base1);color:var(--base1);font-weight:700}
+.seg button:focus-visible{outline:3px solid var(--on-base1);outline-offset:2px}
 /* Focus des champs (D1, 2026-11-11) : double anneau, sans décalage de mise en page.
    --focus = couleur principale de l'équipe, assombrie en thème clair et éclaircie en thème sombre pour rester à 3:1 au moins contre le fond ;
    le halo --focus-halo (couleur du panneau) sépare l'anneau du champ et de ce qui l'entoure, quel que soit le fond. */
@@ -22,6 +22,15 @@ body{background:var(--bg);color:var(--fg);font:15px/1.45 system-ui,-apple-system
 @supports (color:oklch(from red l c h)){:root{--focus:oklch(from var(--base1) min(l,.5) c h)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--focus:oklch(from var(--base1) max(l,.75) min(c,.12) h)}}
 :root[data-theme="dark"]{--focus:oklch(from var(--base1) max(l,.75) min(c,.12) h)}}
+/* Texte sur la couleur de l'équipe (2026-11-12) : --on-base1 = texte posé sur --base1 (en-tête, pilule active) et --on-c1-dark = texte posé sur --c1 en sombre,
+   calculés par live_mount.js:theme() (3e couleur de l'équipe si elle atteint 4,5:1, sinon noir ou blanc, le meilleur). --on-c1 = texte posé sur --c1.
+   --ink1 = couleur de l'équipe employée comme texte sur le panneau : assombrie (clair) ou éclaircie (sombre), même méthode que --focus. */
+:root{--on-base1:#fff;--on-c1:var(--on-base1);--ink1:color-mix(in srgb,var(--base1) 45%,#000)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--on-c1:var(--on-c1-dark,#fff);--ink1:color-mix(in srgb,var(--base1) 45%,#fff)}}
+:root[data-theme="dark"]{--on-c1:var(--on-c1-dark,#fff);--ink1:color-mix(in srgb,var(--base1) 45%,#fff)}
+@supports (color:oklch(from red l c h)){:root{--ink1:oklch(from var(--base1) min(l,.5) c h)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--ink1:oklch(from var(--base1) max(l,.75) min(c,.12) h)}}
+:root[data-theme="dark"]{--ink1:oklch(from var(--base1) max(l,.75) min(c,.12) h)}}
 :is(input,select,textarea):focus-visible,:is(input.cell,select.cell,textarea):focus{outline:2px solid var(--focus);outline-offset:1px;box-shadow:0 0 0 4px var(--focus-halo)}
 main{max-width:1120px;margin:0 auto;padding:18px;display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px}
 .pick{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:14px;align-items:end}
@@ -32,7 +41,7 @@ main{max-width:1120px;margin:0 auto;padding:18px;display:grid;grid-template-colu
 .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 18px;min-width:0}.card.wide{grid-column:1/-1}
 h2{margin:0;font-size:24px}h3{margin:0 0 10px;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);display:flex;gap:12px;align-items:center;flex-wrap:wrap}
 .keyl{font-size:12px;text-transform:none;letter-spacing:0;display:inline-flex;gap:6px;align-items:center}
-.who{display:flex;gap:12px;align-items:center;margin-bottom:12px}.pos{background:var(--c1);color:#fff;font-weight:700;border-radius:8px;padding:3px 10px;font-size:13px}
+.who{display:flex;gap:12px;align-items:center;margin-bottom:12px}.pos{background:var(--c1);color:var(--on-c1);font-weight:700;border-radius:8px;padding:3px 10px;font-size:13px}
 dl{margin:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px 16px}dt{font-size:12px;color:var(--muted)}dd{margin:0;font-weight:600}
 .muted{color:var(--muted)}.note{font-size:12px;margin:6px 0 0}
 .rec{display:grid;grid-template-columns:46px 1fr auto;gap:2px 12px;align-items:center;margin:9px 0}
@@ -53,9 +62,9 @@ tr.total td{font-weight:700;border-top:2px solid var(--line)}
 tr.me td{background:color-mix(in srgb,var(--c1) 14%,transparent);font-weight:600}
 
 /* Logo de l'équipe à la place du carré : pastille blanche, repli sur le carré si l'image ne charge pas */
-.crest.logo{width:58px;height:58px;border-radius:50%;background:#fff;box-shadow:none;padding:5px;flex:none;display:inline-flex;align-items:center;justify-content:center;overflow:hidden}.crest.logo img{width:100%;height:100%;object-fit:contain;display:block}
+.crest.logo{width:58px;height:58px;border-radius:50%;background:#fff;box-shadow:none;padding:5px;flex:none;display:inline-flex;align-items:center;justify-content:center;overflow:hidden}.crest.logo img{width:100%;height:100%;object-fit:contain;display:block}.top .crest.logo{box-shadow:0 0 0 2px var(--on-base1)}
 /* Sélecteurs en pilules (langue, thème, type de données, période) : même composant partout ; « page » = sur le fond de la page */
-.seg.page{background:var(--line)}.seg.page button{color:var(--fg)}.seg.page button[aria-pressed=true]{background:var(--panel);color:var(--c1);box-shadow:0 1px 3px rgba(0,0,0,.18)}
+.seg.page{background:var(--line);box-shadow:none}.seg.page button{color:var(--fg)}.seg.page button[aria-pressed=true]{background:var(--panel);color:var(--ink1);box-shadow:0 1px 3px rgba(0,0,0,.18)}
 .slicer{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)}.slicer .lbl{padding-left:2px}
 
 /* Boutons et champs de base (communs à toutes les pages) */
@@ -66,14 +75,15 @@ tr.me td{background:color-mix(in srgb,var(--c1) 14%,transparent);font-weight:600
 .card.sb h3{margin:0;flex:none}.card.sb p{margin:0;font-size:13px;flex:1 1 160px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.card.sb .acts,.card.sb .acts.left{margin:0;gap:8px;align-items:center}
 .card.sb input{font:inherit;font-size:14px;padding:6px 10px;width:165px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--fg)}.card.sb .btn{padding:6px 12px}
 /* Navigation entre les pages en pilules (liens dans le même composant que FR/EN) */
-.seg a{color:#fff;padding:6px 12px;border-radius:8px;font:inherit;text-decoration:none;cursor:pointer;white-space:nowrap}.seg a:hover{background:rgba(255,255,255,.22)}.seg a:focus-visible{outline:3px solid var(--base2);outline-offset:2px}
+.seg a{color:var(--on-base1);padding:6px 12px;border-radius:8px;font:inherit;text-decoration:none;cursor:pointer;white-space:nowrap}.seg a:hover{box-shadow:inset 0 0 0 1px currentColor}.seg a:focus-visible{outline:3px solid var(--on-base1);outline-offset:2px}
 .seg[role=navigation]{flex-wrap:wrap}
  
 /* En-tête fixe aux couleurs de l'équipe pendant le défilement */
 header.top{position:sticky;top:0;z-index:60;box-shadow:0 2px 8px rgba(0,0,0,.18)}
 /* Navigation : la page en cours est une pilule sélectionnée, comme FR / EN */
-.seg a[aria-pressed=true]{background:#fff;color:var(--base1);font-weight:700;box-shadow:0 1px 3px rgba(0,0,0,.18)}.seg a.home{font-weight:600}
-.seg.page a{color:var(--fg)}.seg.page a[aria-pressed=true]{background:var(--panel);color:var(--c1)}
+.seg a[aria-pressed=true]{background:var(--on-base1);color:var(--base1);font-weight:700;box-shadow:0 1px 3px rgba(0,0,0,.18)}.seg a.home{font-weight:600}
+.seg.page a{color:var(--fg)}.seg.page a[aria-pressed=true]{background:var(--panel);color:var(--ink1)}
+.seg.page button:focus-visible,.seg.page a:focus-visible{outline-color:var(--focus)}
 
 /* En-tête compact (il reste affiché pendant le défilement) */
 header.top{padding:8px 22px;gap:6px 18px}header.top .seg button,header.top .seg a{padding:5px 11px;font-size:13px}header.top .brand .fr{font-size:18px}header.top .crest.logo{width:56px;height:56px}

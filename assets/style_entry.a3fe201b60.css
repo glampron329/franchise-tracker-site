@@ -15,7 +15,7 @@ table.grid thead tr.cols.has-grp th{top:34px}
 table.grid th.grp{text-align:center;color:var(--fg);font-weight:700;border-left:1px solid var(--line);border-right:1px solid var(--line)}
 .scroll-top{overflow-x:auto;overflow-y:hidden;height:14px;margin:0 0 2px}.scroll-top>div{height:1px}
 .btn.two{display:inline-flex;flex-direction:column;align-items:flex-start;line-height:1.25;gap:0}.btn.two .b2{font-size:11px;color:var(--muted)}
-.linkbtn{background:none;border:none;color:var(--c1);text-decoration:underline;cursor:pointer;font:inherit;padding:0}
+.linkbtn{background:none;border:none;color:var(--ink1);text-decoration:underline;cursor:pointer;font:inherit;padding:0}
 .glossary dt{font-weight:700;min-width:70px}.glossary dd{margin:0;color:var(--fg);font-weight:400}.glossary dt{color:var(--fg)}
 .tag{display:inline-block;font-size:10px;padding:0 6px;border-radius:8px;background:color-mix(in srgb,var(--line) 70%,transparent);color:var(--muted)}
 td.ci{padding:0}input.cell{width:56px;height:32px;box-sizing:border-box;font:inherit;font-size:13px;text-align:right;padding:5px 6px;border:1px solid transparent;border-radius:6px;background:transparent;color:var(--fg);font-variant-numeric:tabular-nums}
@@ -24,7 +24,7 @@ td.ci.err input.cell{border-color:#c0392b;background:color-mix(in srgb,#c0392b 1
 td.d{color:var(--muted);background:color-mix(in srgb,var(--line) 35%,transparent)}th.d{color:var(--muted)}
 .badge{display:inline-block;min-width:18px;padding:0 6px;border-radius:9px;background:#d68910;color:#fff;font-size:12px;text-align:center}.badge.bad{background:#c0392b}
 .foot{display:flex;gap:18px;flex-wrap:wrap;padding:10px 4px;font-size:13px;border-top:1px solid var(--line);margin-top:6px}.foot .bad{color:#c0392b;font-weight:600}.foot .ok{color:#1e8449;font-weight:600}
-a.navlink{color:#fff;text-decoration:underline;align-self:center;font-size:14px}
+a.navlink{color:var(--on-base1);text-decoration:underline;align-self:center;font-size:14px}
 .acts.left{margin-left:0;align-items:center}p.ok{color:#1e8449;font-weight:600}p.bad{color:#c0392b;font-weight:600}p.warn{color:#b9770e;font-weight:600}
 
 /* Titres de colonnes centrés avec les cellules de saisie ; valeurs centrées aussi */
@@ -38,5 +38,5 @@ table.grid th.num{min-width:60px}
 /* En-tête de la grille fixe : la liste défile dans son cadre, le titre des colonnes reste visible ; le cadre s'arrête sous l'en-tête de page */
 #scrollmain{max-height:calc(100vh - 210px);min-height:260px;overflow:auto}
 /* Glisser-déposer des joueurs */
-.dh{cursor:grab;color:var(--muted);font-size:15px;line-height:1;padding:0 4px;user-select:none}.dh:active{cursor:grabbing}.dh:hover,.dh:focus-visible{color:var(--c1)}
+.dh{cursor:grab;color:var(--muted);font-size:15px;line-height:1;padding:0 4px;user-select:none}.dh:active{cursor:grabbing}.dh:hover,.dh:focus-visible{color:var(--ink1)}
 tr.dragging{opacity:.45}tr.drop-before>th,tr.drop-before>td{box-shadow:inset 0 3px 0 var(--c1)}tr.drop-after>th,tr.drop-after>td{box-shadow:inset 0 -3px 0 var(--c1)}

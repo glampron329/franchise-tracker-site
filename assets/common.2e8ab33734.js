@@ -291,7 +291,7 @@
   // le total (count=exact) est demandé sur la première page pour lire les suivantes en parallèle ; ailleurs, aucun comptage.
   var TABLES = [
     ['franchise', 'select=id,name,abbreviation,color_primary,color_secondary,color_tertiary,first_season_start_year,current_season_start_year,ui_locale,games_per_season,current_game_date&order=id'],
-    ['team', 'select=id,code,name_en,name_fr,is_active,conference,color_1,color_2,franchise_code,logo&order=id'],
+    ['team', 'select=id,code,name_en,name_fr,is_active,conference,color_1,color_2,color_3,franchise_code,logo&order=id'],
     ['player', 'select=id,legacy_key,full_name,first_name,last_name,origin,birth_date,height_in,weight_lb,handedness,country,draft_year,draft_round,draft_pick,draft_team,position_original,position_current,player_type,nhl_id,hr_id&order=id', 1],
     ['skater_season_stats', 'select=id,player_id,season,game_type,origin,manual,age,gp,g,a,pts,plus_minus,pim,shots,gwg,ppg,shg,ppp,shp,toi_minutes,fow,fot,hits,blocks,giveaways,takeaways,oa_end&order=id', 1],
     ['goalie_season_stats', 'select=id,player_id,season,game_type,origin,manual,gp,w,l,otl,so,saves,shots_against,goals_against,minutes,pim,g,a,oa_end&order=id', 1],
@@ -457,7 +457,7 @@
     var contracted = {}; R.v_contract_year_level.forEach(function (v) { var a = contracted[String(v.season)] = contracted[String(v.season)] || []; if (a.indexOf(v.player_id) < 0) a.push(v.player_id); });
     var roster = {}; R.v_contract_year_level.filter(function (v) { return v.level === 'NHL'; }).forEach(function (v) { var a = roster[String(v.season)] = roster[String(v.season)] || []; if (a.indexOf(v.player_id) < 0) a.push(v.player_id); });
     var lastOa = {}; sortBy(R.skater_season_stats.concat(R.goalie_season_stats).filter(function (s) { return s.origin === 'franchise' && s.game_type === 'RS' && s.oa_end != null; }), function (s) { return [s.season]; }).forEach(function (s) { lastOa[s.player_id] = s.oa_end; });
-    return { franchise: { name: f.name, code: f.abbreviation, colors: [f.color_primary, f.color_secondary], first: f.first_season_start_year, current: f.current_season_start_year, locale: f.ui_locale, games: f.games_per_season || 82 }, skaters: skaters, goalies: goalies, sk: sk, gk: gk, tm: tm, roster: roster, contracted: contracted, last_oa: lastOa, ratings: (function () { var o = {}; (R.player_rating || []).forEach(function (r) { (o[String(r.season)] = o[String(r.season)] || {})[String(r.player_id)] = r.oa; }); return o; })(), teams: teams(R), labels: labels(R), games: 82 };
+    return { franchise: { name: f.name, code: f.abbreviation, colors: [f.color_primary, f.color_secondary, f.color_tertiary], first: f.first_season_start_year, current: f.current_season_start_year, locale: f.ui_locale, games: f.games_per_season || 82 }, skaters: skaters, goalies: goalies, sk: sk, gk: gk, tm: tm, roster: roster, contracted: contracted, last_oa: lastOa, ratings: (function () { var o = {}; (R.player_rating || []).forEach(function (r) { (o[String(r.season)] = o[String(r.season)] || {})[String(r.player_id)] = r.oa; }); return o; })(), teams: teams(R), labels: labels(R), games: 82 };
   }
 
   // ---------- événements (events.html) ----------
@@ -468,7 +468,7 @@
     var clauseBy = {}; R.contract_year.forEach(function (y) { (clauseBy[y.contract_id] = clauseBy[y.contract_id] || {})[y.season] = y.clause || ''; });
     var assetsBy = {}; R.trade_asset.forEach(function (a) { (assetsBy[a.trade_id] = assetsBy[a.trade_id] || []).push(a); });
     return {
-      franchise: { name: f.name, code: f.abbreviation, colors: [f.color_primary, f.color_secondary], first: f.first_season_start_year, current: f.current_season_start_year, date: f.current_game_date, games: f.games_per_season || 82 }, players: players,
+      franchise: { name: f.name, code: f.abbreviation, colors: [f.color_primary, f.color_secondary, f.color_tertiary], first: f.first_season_start_year, current: f.current_season_start_year, date: f.current_game_date, games: f.games_per_season || 82 }, players: players,
       cap: R.salary_cap_season.map(function (c) { return [c.season, c.cap, c.floor, c.player_min, c.player_max_one_way]; }), teams: teams(R, true, true),
       roster: (function () {
         var sb = {}, pb = {}; R.player_stint.slice().sort(function (a, b) { return String(a.acquired_on).localeCompare(String(b.acquired_on)); }).forEach(function (s) { (sb[s.player_id] = sb[s.player_id] || []).push(s); });
@@ -503,7 +503,7 @@
     R.playoff_series.forEach(function (x) { (seriesBy[String(x.season)] = seriesBy[String(x.season)] || {})[x.round + '|' + x.conference + '|' + x.slot] = [x.wins_a, x.wins_b]; });
     var series = {}; Object.keys(seriesBy).forEach(function (k) { series[k] = ORDER.map(function (o) { return seriesBy[k][o.join('|')] || null; }); });
     return {
-      hist_awards: (function () { var o = {}; (R.historical_award_counts || []).forEach(function (x) { o[x.award_code] = typeof x.counts === 'string' ? JSON.parse(x.counts) : x.counts; }); return o; })(), league: leagueInfo(R), franchise: { name: f.name, code: f.abbreviation, colors: [f.color_primary, f.color_secondary], first: f.first_season_start_year, current: f.current_season_start_year, date: f.current_game_date, games: f.games_per_season || 82 }, players: players, teams: teams(R, true).map(function (x) { var t0 = R.team.filter(function (t) { return t.code === x.code; })[0]; x.c1 = t0 ? t0.color_1 || null : null; x.c2 = t0 ? t0.color_2 || null : null; var mem = leagueMembers(R); x.active = mem ? (mem[x.code] ? 1 : 0) : (t0 && (t0.is_active === true || t0.is_active === 1) ? 1 : 0); return x; }),
+      hist_awards: (function () { var o = {}; (R.historical_award_counts || []).forEach(function (x) { o[x.award_code] = typeof x.counts === 'string' ? JSON.parse(x.counts) : x.counts; }); return o; })(), league: leagueInfo(R), franchise: { name: f.name, code: f.abbreviation, colors: [f.color_primary, f.color_secondary, f.color_tertiary], first: f.first_season_start_year, current: f.current_season_start_year, date: f.current_game_date, games: f.games_per_season || 82 }, players: players, teams: teams(R, true).map(function (x) { var t0 = R.team.filter(function (t) { return t.code === x.code; })[0]; x.c1 = t0 ? t0.color_1 || null : null; x.c2 = t0 ? t0.color_2 || null : null; x.c3 = t0 ? t0.color_3 || null : null; var mem = leagueMembers(R); x.active = mem ? (mem[x.code] ? 1 : 0) : (t0 && (t0.is_active === true || t0.is_active === 1) ? 1 : 0); return x; }),
       cap: R.salary_cap_season.map(function (c) { return [c.season, c.cap, c.floor, c.player_min, c.player_max_one_way, c.player_max_two_way, c.ahl_exemption, c.effective_on]; }), ranks: ranks,
       base: {
         series: series, roles: roles, ratings: ratings, oa_end: (function () { var o = {}; R.skater_season_stats.concat(R.goalie_season_stats).filter(function (s) { return s.origin === 'franchise' && s.game_type === 'RS' && s.oa_end != null; }).forEach(function (s) { (o[String(s.season)] = o[String(s.season)] || {})[String(s.player_id)] = s.oa_end; }); return o; })(), schedule: group(R.schedule_game, function (g) { return g.season; }, function (g) { return [g.game_no, g.game_date, g.opponent_code]; }),
@@ -530,7 +530,7 @@
       ex.sk[s.player_id + '|' + s.season + '|' + s.game_type] = { gp: s.gp, g: s.g, a: s.a, plus_minus: s.plus_minus, pim: s.pim, shots: s.shots, gwg: s.gwg, ppg: s.ppg, shg: s.shg, toi_minutes: s.toi_minutes, ppp: s.ppp, shp: s.shp, hits: s.hits, blocks: s.blocks, giveaways: s.giveaways, takeaways: s.takeaways, fow: s.fow, fot: s.fot }; });
     R.goalie_season_stats.filter(function (s) { return s.origin === 'historical'; }).forEach(function (s) {
       ex.gk[s.player_id + '|' + s.season + '|' + s.game_type] = { gp: s.gp, w: s.w, l: s.l, otl: s.otl, so: s.so, saves: s.saves, shots_against: s.shots_against, goals_against: s.goals_against, minutes: s.minutes, pim: s.pim, g: s.g, a: s.a }; });
-    return { franchise: { name: f.name, code: f.abbreviation, colors: [f.color_primary, f.color_secondary], first: f.first_season_start_year, current: f.current_season_start_year },
+    return { franchise: { name: f.name, code: f.abbreviation, colors: [f.color_primary, f.color_secondary, f.color_tertiary], first: f.first_season_start_year, current: f.current_season_start_year },
              players: R.player.map(function (p) { return { id: p.id, key: pkey(p), nhl_id: p.nhl_id == null ? null : p.nhl_id, hr_id: p.hr_id == null ? null : p.hr_id, origin: p.origin }; }), existing: ex, labels: labels(R) };
   }
 
@@ -538,8 +538,8 @@
   // ---------- franchise et historique (setup.html) ----------
   function assembleSetup(R) {
     var f = activeFranchise(R);
-    var tm = sortBy(R.team.filter(function (t) { return t.code !== 'NHL'; }), function (t) { return [t.name_en]; }).map(function (t) { var o = { code: t.code, en: t.name_en, fr: t.name_fr || t.name_en, active: t.is_active === true || t.is_active === 1 ? 1 : 0, fc: t.franchise_code || t.code, c1: t.color_1 || null, c2: t.color_2 || null }; if (t.logo) o.logo = t.logo; return o; });
-    return { franchise: f ? { id: f.id, name: f.name, code: f.abbreviation, colors: [f.color_primary, f.color_secondary], first: f.first_season_start_year, current: f.current_season_start_year, locale: f.ui_locale, games: f.games_per_season || 82 } : null, hasFranchise: !!f, teams: tm, labels: labels(R) };
+    var tm = sortBy(R.team.filter(function (t) { return t.code !== 'NHL'; }), function (t) { return [t.name_en]; }).map(function (t) { var o = { code: t.code, en: t.name_en, fr: t.name_fr || t.name_en, active: t.is_active === true || t.is_active === 1 ? 1 : 0, fc: t.franchise_code || t.code, c1: t.color_1 || null, c2: t.color_2 || null, c3: t.color_3 || null }; if (t.logo) o.logo = t.logo; return o; });
+    return { franchise: f ? { id: f.id, name: f.name, code: f.abbreviation, colors: [f.color_primary, f.color_secondary, f.color_tertiary], first: f.first_season_start_year, current: f.current_season_start_year, locale: f.ui_locale, games: f.games_per_season || 82 } : null, hasFranchise: !!f, teams: tm, labels: labels(R) };
   }
 
   // ---------- corrections de l'historique (history_edit.html) : lignes d'origine « historical », avec leur identifiant et l'indicateur « modifié à la main » ----------
@@ -547,7 +547,7 @@
   function assembleHistory(R) {
     var f = franchise(R), pl = {}; R.player.forEach(function (p) { pl[p.id] = { name: p.full_name, pos: pkey(p).charAt(0) }; });
     function rows(list, cols) { return list.filter(function (s) { return s.origin === 'historical'; }).map(function (s) { return [s.id, s.player_id, s.season, s.game_type, s.manual === true || s.manual === 1 ? 1 : 0].concat(cols.map(function (c) { return r2(s[c]); })); }); }
-    return { franchise: f.id ? { name: f.name, code: f.abbreviation, colors: [f.color_primary, f.color_secondary], first: f.first_season_start_year, current: f.current_season_start_year } : null,
+    return { franchise: f.id ? { name: f.name, code: f.abbreviation, colors: [f.color_primary, f.color_secondary, f.color_tertiary], first: f.first_season_start_year, current: f.current_season_start_year } : null,
              players: pl, sk: rows(R.skater_season_stats, HSK), gk: rows(R.goalie_season_stats, HGK), pl: (function () {
         var span = {}; R.skater_season_stats.concat(R.goalie_season_stats).forEach(function (x) { var a = span[x.player_id] = span[x.player_id] || { lo: 99999, hi: 0, n: {} }; a.lo = Math.min(a.lo, x.season); a.hi = Math.max(a.hi, x.season); a.n[x.season] = 1; });
         return R.player.map(function (p) { var a = span[p.id]; return [p.id, p.full_name, pkey(p).charAt(0), p.hr_id || '', p.origin, a ? a.lo : 0, a ? a.hi : 0, a ? Object.keys(a.n).length : 0]; });
@@ -588,6 +588,23 @@
   // o : { DATA0, store, cfg, rootEl, makeApp(data), assemble(raw) }
   function perfApi() { return typeof FTPERF !== 'undefined' ? FTPERF : root.FTPERF; }
   function pspan(n) { var P = perfApi(); return P ? P.span(n) : function () {}; }
+  // ---- Texte lisible sur une couleur d'équipe (2026-11-12) : la 3e couleur de l'équipe si elle atteint 4,5:1 contre le fond,
+  //      sinon le noir ou le blanc, celui qui contraste le plus (l'un des deux atteint toujours au moins 4,58:1). Copie courte dans make_site.py (index).
+  var HEX = /^#[0-9A-Fa-f]{6}$/;
+  function lum(hex) {   // luminance relative WCAG 2.x
+    var n = parseInt(hex.slice(1), 16), k = [0.2126, 0.7152, 0.0722];
+    return [n >> 16 & 255, n >> 8 & 255, n & 255].reduce(function (s, v, i) { v /= 255; return s + k[i] * (v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)); }, 0);
+  }
+  function contrast(a, b) { var x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); }
+  function mixHex(a, b, p) {   // = CSS color-mix(in srgb, a p*100 %, b)
+    var x = parseInt(a.slice(1), 16), y = parseInt(b.slice(1), 16);
+    return '#' + [16, 8, 0].map(function (s) { var v = Math.round(p * (x >> s & 255) + (1 - p) * (y >> s & 255)); return (v < 16 ? '0' : '') + v.toString(16); }).join('').toUpperCase();
+  }
+  function onColor(bg, third) {
+    if (!HEX.test(bg || '')) return '#FFFFFF';
+    if (HEX.test(third || '') && contrast(bg, third) >= 4.5) return third.toUpperCase();
+    return contrast(bg, '#FFFFFF') >= contrast(bg, '#000000') ? '#FFFFFF' : '#000000';
+  }
   function run(o) {
     var rootEl = o.rootEl, store = o.store, DATA0 = o.DATA0, saved = {};
     try { saved = JSON.parse(store.get('ft_cfg') || '{}'); } catch (e) { saved = {}; }
@@ -646,7 +663,15 @@
       html = html.replace('<div class="ctl">', function (m) { return m + navHTML(); });
       return ui.team ? html.replace(/<span class="crest"><\/span>/g, function () { return crestHTML(ui.team); }) : html;
     }
-    function theme(d, noPersist) { var c = (d && d.franchise && d.franchise.colors) || ['#AF1E2D', '#192168'], st = document.documentElement.style; st.setProperty('--base1', c[0] || '#AF1E2D'); st.setProperty('--base2', c[1] || '#192168'); if (!noPersist && d && d.franchise && d.franchise.colors) { try { store.set('ft_colors', JSON.stringify(c)); } catch (e) { /* ignore */ } } }
+    // Couleurs de l'équipe : --base1, --base2 et la couleur du texte posé dessus (--on-base1 ; --on-c1-dark pour --c1 éclairci du thème sombre).
+    // colors[2] = 3e couleur de l'équipe (null ou 'n/a' possibles) ; ft_colors garde les 3 couleurs (l'index les relit).
+    function theme(d, noPersist) {
+      var c = (d && d.franchise && d.franchise.colors) || ['#AF1E2D', '#192168'], st = document.documentElement.style, b1 = c[0] || '#AF1E2D';
+      st.setProperty('--base1', b1); st.setProperty('--base2', c[1] || '#192168');
+      if (HEX.test(b1)) { st.setProperty('--on-base1', onColor(b1, c[2])); st.setProperty('--on-c1-dark', onColor(mixHex(b1, '#FFFFFF', 0.72), c[2])); }   // --c1 sombre = color-mix(base1 72 %, #fff)
+      else { st.removeProperty('--on-base1'); st.removeProperty('--on-c1-dark'); }
+      if (!noPersist && d && d.franchise && d.franchise.colors) { try { store.set('ft_colors', JSON.stringify([c[0], c[1], c[2] == null ? null : c[2]])); } catch (e) { /* ignore */ } }
+    }
     // ---- libellés d'une page hébergée : ceux de la base (cache local, table label) ; repli : fichier partagé labels.js (cfg.labels) ----
     // Le fichier est chargé en arrière-plan ; tant qu'il manque et qu'aucune donnée n'est affichée, l'écran reste vide (pas de clés brutes).
     var labelsState = 0;      // 0 : pas demandé, 1 : en cours, 2 : chargé (ou impossible)
@@ -798,6 +823,6 @@
       }
     };
   }
-  var api = { run: run };
+  var api = { run: run, onColor: onColor, contrast: contrast, mixHex: mixHex };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.FTLM = api;
 })(typeof window !== 'undefined' ? window : this);

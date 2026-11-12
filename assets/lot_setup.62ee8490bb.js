@@ -74,9 +74,9 @@
       var all = await client.select('franchise', 'select=*&order=id'), fid = client.franchiseId();
       if (fid == null) { var created = all.filter(function (x) { return !known[x.id]; }); if (created.length === 1) { fid = created[0].id; client.setFranchise(fid); if (store) store.set('ft_franchise', String(fid)); } }
       DATA.franchiseIds = all.map(function (x) { return x.id; });
-      DATA.franchises = all.map(function (x) { return { id: x.id, name: x.name, code: x.abbreviation, colors: [x.color_primary, x.color_secondary], first: x.first_season_start_year, current: x.current_season_start_year }; });
+      DATA.franchises = all.map(function (x) { return { id: x.id, name: x.name, code: x.abbreviation, colors: [x.color_primary, x.color_secondary, x.color_tertiary], first: x.first_season_start_year, current: x.current_season_start_year }; });
       var f = all.filter(function (x) { return x.id === fid; })[0];
-      if (f) { DATA.franchise = { id: f.id, name: f.name, code: f.abbreviation, colors: [f.color_primary, f.color_secondary], first: f.first_season_start_year, current: f.current_season_start_year, locale: f.ui_locale, games: f.games_per_season || 82 }; DATA.hasFranchise = true; state.first = f.first_season_start_year; state.games = f.games_per_season || 82; }
+      if (f) { DATA.franchise = { id: f.id, name: f.name, code: f.abbreviation, colors: [f.color_primary, f.color_secondary, f.color_tertiary], first: f.first_season_start_year, current: f.current_season_start_year, locale: f.ui_locale, games: f.games_per_season || 82 }; DATA.hasFranchise = true; state.first = f.first_season_start_year; state.games = f.games_per_season || 82; }
     }
     // Crée la franchise si besoin, puis lance l'importation (la base fait le reste toute seule)
     // ---- format de la ligue selon l'année de début (2014-15 et après) ----
@@ -154,8 +154,8 @@
     function preview() {
       if (DATA.hasFranchise || !state.team) return null;
       var c = customByCode(state.team), tm = teamRec(state.team);
-      if (c) return { colors: [c.color_1, c.color_2], team: c.code, logo: c.logo || '' };
-      return tm && HEX_RE.test(tm.c1 || '') ? { colors: [tm.c1, HEX_RE.test(tm.c2 || '') ? tm.c2 : tm.c1], team: tm.code, logo: '' } : null;
+      if (c) return { colors: [c.color_1, c.color_2].concat(HEX_RE.test(c.color_3 || '') ? [c.color_3] : []), team: c.code, logo: c.logo || '' };
+      return tm && HEX_RE.test(tm.c1 || '') ? { colors: [tm.c1, HEX_RE.test(tm.c2 || '') ? tm.c2 : tm.c1].concat(HEX_RE.test(tm.c3 || '') ? [tm.c3] : []), team: tm.code, logo: '' } : null;
     }
     function confCounts() { var o = { EAST: 0, WEST: 0 }; leagueTeams(state.first).forEach(function (x) { o[x.conference]++; }); return o; }
     function lotterySize() { return leagueTeams(state.first).length >= 32 ? 16 : 15; }
