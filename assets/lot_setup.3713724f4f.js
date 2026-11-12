@@ -52,7 +52,13 @@
     function counts() { var p = (state.job && state.job.pages) || {}, total = 0; Object.keys(p).forEach(function (k) { total += p[k]; }); return { total: total, done: (p.done || 0) + (p.skipped || 0) }; }
     function active() { return !!(state.job && (state.job.status === 'queued' || state.job.status === 'running')); }
     function hasJob() { return !!(state.job && state.job.id); }
-    async function rpc(client, name, body) { return (await client.rest('POST', 'rpc/' + name, { body: body || {} })).data; }
+    async function rpc(client, name, body) {
+      try { return (await client.rest('POST', 'rpc/' + name, { body: body || {} })).data; }
+      catch (e) {      // migration 50 pas encore exécutée : ancienne fonction sans p_franchise_id (une seule franchise par compte)
+        if (!(body && 'p_franchise_id' in body) || !(e.code === 'PGRST202' || /p_franchise_id|Could not find the function/i.test(e.message || ''))) throw e;
+        var b = Object.assign({}, body); delete b.p_franchise_id; return (await client.rest('POST', 'rpc/' + name, { body: b })).data;
+      }
+    }
 
     async function poll(client) {
       try { state.job = await rpc(client, 'hr_status', { p_franchise_id: client.franchiseId() }); } catch (e) { say('bad', 'sb.failed', [e.message]); }

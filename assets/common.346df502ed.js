@@ -180,7 +180,8 @@
     // Sans opts.count : aucun comptage ; une page pleine fait lire la suite, page après page.
     async function selectAll(table, query, opts) {
       if (!(await ready(table))) return [];                 // le compte n'a aucune franchise : rien à lire
-      query = scopeQuery(table, query, fid, true);
+      // opts.allTeams : base sans team.owner_franchise_id (migration 38 absente), donc sans équipe personnalisée : aucun filtre sur team
+      query = opts && opts.allTeams && table === 'team' ? query : scopeQuery(table, query, fid, true);
       var pageSize = 1000, url = function (off) { return encodeURIComponent(table) + '?' + (query ? query + '&' : '') + 'limit=' + pageSize + '&offset=' + off; };
       var countIt = !!(opts && opts.count), first = await rest('GET', url(0), countIt ? { headers: { Prefer: 'count=exact' } } : {});
       var out = first.data || [], m = /\/(\d+)$/.exec(first.range || ''), total = countIt && m ? +m[1] : null, step = out.length;
@@ -340,10 +341,20 @@
   }
   // lecture d'une table filtrée sur la franchise active (sb.js ajoute franchise_id) ; la table franchise : seulement la franchise active
   async function readTable(client, def, fid) {
-    if (def.name === 'franchise') return fid == null ? [] : client.selectAll('franchise', def.query + '&id=eq.' + fid);
+    if (def.name === 'franchise' && fid == null) return [];
     if (fid == null && FTSBX && FTSBX.isScoped(def.name)) return [];        // aucune franchise : rien à lire dans les tables de franchise
-    return client.selectAll(def.name, def.query, { count: def.big });
+    // colonne absente de la base (migration facultative non exécutée, ex. player.nhl_id de la migration 25) : relire toutes les colonnes, comme avant ;
+    // team.owner_franchise_id absente (migration 38) : aucune équipe personnalisée, lecture sans ce filtre
+    var query = def.name === 'franchise' ? def.query + '&id=eq.' + fid : def.query, allTeams = false;
+    for (var attempt = 0; ; attempt++) {
+      try { return await client.selectAll(def.name, query, { count: def.big, allTeams: allTeams }); }
+      catch (e) {
+        if (!missingColumn(e) || attempt >= 2) throw e;
+        if (/owner_franchise_id/.test(e.message || '')) allTeams = true; else query = query.replace(/(^|&)select=[^&]*/, '$1select=*');
+      }
+    }
   }
+  function missingColumn(e) { return !!e && (e.code === '42703' || e.code === 'PGRST204' || /column .* does not exist/i.test(e.message || '')); }
   // Versions des données (table data_version, incrémentée par les triggers à chaque écriture) : une valeur par table lue.
   // Les triggers (migration 51) font monter une vue avec ses tables sources et une table enfant avec son parent : une ligne par table lue suffit
   // (team : ligne globale + ligne de la franchise). null : table data_version absente (migration non exécutée) → tout relire.
