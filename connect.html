@@ -7,14 +7,14 @@
 :root[data-theme="dark"]{--bg:#0e1116;--panel:#171b23;--fg:#eef0f5;--muted:#9ba4b5;--line:#2a303c;--c1:color-mix(in srgb,var(--base1) 72%,#fff);--c2:color-mix(in srgb,var(--base2) 40%,#fff);color-scheme:dark}
 *{box-sizing:border-box}html,body{margin:0}
 body{background:var(--bg);color:var(--fg);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-.top{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;padding:14px 22px;background:var(--base1);color:#fff;border-bottom:4px solid var(--base2)}
-.brand{display:flex;gap:12px;align-items:center}.crest{width:34px;height:34px;border-radius:8px;background:#fff;box-shadow:inset 0 0 0 5px var(--base2),inset 0 0 0 11px #fff}
-.brand .fr{font-weight:700;font-size:18px;letter-spacing:.2px}.brand .sub{opacity:.85;font-size:13px}
+.top{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;padding:14px 22px;background:var(--base1);color:var(--on-base1);border-bottom:4px solid var(--base2)}
+.brand{display:flex;gap:12px;align-items:center}.crest{width:34px;height:34px;border-radius:8px;background:#fff;box-shadow:inset 0 0 0 5px var(--base2),inset 0 0 0 11px #fff,0 0 0 2px var(--on-base1)}
+.brand .fr{font-weight:700;font-size:18px;letter-spacing:.2px}.brand .sub{font-size:13px}
 .ctl{display:flex;flex-wrap:wrap;gap:10px}
-.seg{display:inline-flex;background:rgba(255,255,255,.16);border-radius:10px;padding:3px}
-.seg button{border:0;background:transparent;color:#fff;padding:6px 12px;border-radius:8px;font:inherit;cursor:pointer}
-.seg button[aria-pressed=true]{background:#fff;color:var(--base1);font-weight:700}
-.seg button:focus-visible{outline:3px solid var(--base2);outline-offset:2px}
+.seg{display:inline-flex;background:transparent;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--on-base1) 45%,transparent);border-radius:10px;padding:3px}
+.seg button{border:0;background:transparent;color:var(--on-base1);padding:6px 12px;border-radius:8px;font:inherit;cursor:pointer}
+.seg button[aria-pressed=true]{background:var(--on-base1);color:var(--base1);font-weight:700}
+.seg button:focus-visible{outline:3px solid var(--on-base1);outline-offset:2px}
 /* Focus des champs (D1, 2026-11-11) : double anneau, sans décalage de mise en page.
    --focus = couleur principale de l'équipe, assombrie en thème clair et éclaircie en thème sombre pour rester à 3:1 au moins contre le fond ;
    le halo --focus-halo (couleur du panneau) sépare l'anneau du champ et de ce qui l'entoure, quel que soit le fond. */
@@ -25,6 +25,15 @@ body{background:var(--bg);color:var(--fg);font:15px/1.45 system-ui,-apple-system
 @supports (color:oklch(from red l c h)){:root{--focus:oklch(from var(--base1) min(l,.5) c h)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--focus:oklch(from var(--base1) max(l,.75) min(c,.12) h)}}
 :root[data-theme="dark"]{--focus:oklch(from var(--base1) max(l,.75) min(c,.12) h)}}
+/* Texte sur la couleur de l'équipe (2026-11-12) : --on-base1 = texte posé sur --base1 (en-tête, pilule active) et --on-c1-dark = texte posé sur --c1 en sombre,
+   calculés par live_mount.js:theme() (3e couleur de l'équipe si elle atteint 4,5:1, sinon noir ou blanc, le meilleur). --on-c1 = texte posé sur --c1.
+   --ink1 = couleur de l'équipe employée comme texte sur le panneau : assombrie (clair) ou éclaircie (sombre), même méthode que --focus. */
+:root{--on-base1:#fff;--on-c1:var(--on-base1);--ink1:color-mix(in srgb,var(--base1) 45%,#000)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--on-c1:var(--on-c1-dark,#fff);--ink1:color-mix(in srgb,var(--base1) 45%,#fff)}}
+:root[data-theme="dark"]{--on-c1:var(--on-c1-dark,#fff);--ink1:color-mix(in srgb,var(--base1) 45%,#fff)}
+@supports (color:oklch(from red l c h)){:root{--ink1:oklch(from var(--base1) min(l,.5) c h)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--ink1:oklch(from var(--base1) max(l,.75) min(c,.12) h)}}
+:root[data-theme="dark"]{--ink1:oklch(from var(--base1) max(l,.75) min(c,.12) h)}}
 :is(input,select,textarea):focus-visible,:is(input.cell,select.cell,textarea):focus{outline:2px solid var(--focus);outline-offset:1px;box-shadow:0 0 0 4px var(--focus-halo)}
 main{max-width:1120px;margin:0 auto;padding:18px;display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px}
 .pick{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:14px;align-items:end}
@@ -35,7 +44,7 @@ main{max-width:1120px;margin:0 auto;padding:18px;display:grid;grid-template-colu
 .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 18px;min-width:0}.card.wide{grid-column:1/-1}
 h2{margin:0;font-size:24px}h3{margin:0 0 10px;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);display:flex;gap:12px;align-items:center;flex-wrap:wrap}
 .keyl{font-size:12px;text-transform:none;letter-spacing:0;display:inline-flex;gap:6px;align-items:center}
-.who{display:flex;gap:12px;align-items:center;margin-bottom:12px}.pos{background:var(--c1);color:#fff;font-weight:700;border-radius:8px;padding:3px 10px;font-size:13px}
+.who{display:flex;gap:12px;align-items:center;margin-bottom:12px}.pos{background:var(--c1);color:var(--on-c1);font-weight:700;border-radius:8px;padding:3px 10px;font-size:13px}
 dl{margin:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px 16px}dt{font-size:12px;color:var(--muted)}dd{margin:0;font-weight:600}
 .muted{color:var(--muted)}.note{font-size:12px;margin:6px 0 0}
 .rec{display:grid;grid-template-columns:46px 1fr auto;gap:2px 12px;align-items:center;margin:9px 0}
@@ -43,9 +52,10 @@ dl{margin:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr)
 .fill1{position:absolute;left:0;top:0;height:100%;background:var(--c1);border-radius:6px}.fill2{position:absolute;left:0;bottom:0;height:4px;background:var(--c2)}
 .rec-n{font-variant-numeric:tabular-nums;font-size:13px;text-align:right}.rec-h{grid-column:2/4;font-size:12px;margin-top:-2px}
 .s2{color:var(--c2)}
+/* Radar (2026-11-14, maquette radar_par_poste) : score du joueur et contour en --ink1 (lisible avec toute équipe, 4,5:1 et plus) ; le remplissage garde --c1 */
 svg{display:block;max-width:100%}.ring{fill:none;stroke:var(--line)}.ring90{stroke:var(--muted);stroke-dasharray:3 4}.spoke{stroke:var(--line)}.ringlbl{font-size:10px;fill:var(--muted)}
-.poly1{fill:color-mix(in srgb,var(--c1) 28%,transparent);stroke:var(--c1);stroke-width:2.5}.poly2{fill:color-mix(in srgb,var(--c2) 18%,transparent);stroke:var(--c2);stroke-width:2;stroke-dasharray:6 4}
-.axname{font-size:12px;font-weight:600;fill:var(--fg)}.axval{font-size:12px}.axval .s1{fill:var(--c1);font-weight:700}.axval .s2{fill:var(--c2);font-weight:700}.axval .raw{fill:var(--muted);font-size:11px}
+.poly1{fill:color-mix(in srgb,var(--c1) 28%,transparent);stroke:var(--ink1);stroke-width:2.5}.poly2{fill:color-mix(in srgb,var(--c2) 18%,transparent);stroke:var(--c2);stroke-width:2;stroke-dasharray:6 4}
+.axname{font-size:12px;font-weight:600;fill:var(--fg)}.axval{font-size:12px}.axval .s1{fill:var(--ink1);font-weight:700}.axval .s2{fill:var(--c2);font-weight:700}.axval .raw{fill:var(--muted);font-size:11px}
 .grid{stroke:var(--line)}.tick{font-size:10px;fill:var(--muted)}
 .bar-g{fill:var(--c1)}.bar-a{fill:color-mix(in srgb,var(--c1) 45%,var(--panel))}.line1{fill:none;stroke:var(--c1);stroke-width:2.6}.line2{fill:none;stroke:var(--c2);stroke-width:2.2;stroke-dasharray:6 4}.dot2{fill:var(--c2)}
 .scroll{overflow-x:auto}table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
@@ -56,9 +66,9 @@ tr.total td{font-weight:700;border-top:2px solid var(--line)}
 tr.me td{background:color-mix(in srgb,var(--c1) 14%,transparent);font-weight:600}
 
 /* Logo de l'équipe à la place du carré : pastille blanche, repli sur le carré si l'image ne charge pas */
-.crest.logo{width:58px;height:58px;border-radius:50%;background:#fff;box-shadow:none;padding:5px;flex:none;display:inline-flex;align-items:center;justify-content:center;overflow:hidden}.crest.logo img{width:100%;height:100%;object-fit:contain;display:block}
+.crest.logo{width:58px;height:58px;border-radius:50%;background:#fff;box-shadow:none;padding:5px;flex:none;display:inline-flex;align-items:center;justify-content:center;overflow:hidden}.crest.logo img{width:100%;height:100%;object-fit:contain;display:block}.top .crest.logo{box-shadow:0 0 0 2px var(--on-base1)}
 /* Sélecteurs en pilules (langue, thème, type de données, période) : même composant partout ; « page » = sur le fond de la page */
-.seg.page{background:var(--line)}.seg.page button{color:var(--fg)}.seg.page button[aria-pressed=true]{background:var(--panel);color:var(--c1);box-shadow:0 1px 3px rgba(0,0,0,.18)}
+.seg.page{background:var(--line);box-shadow:none}.seg.page button{color:var(--fg)}.seg.page button[aria-pressed=true]{background:var(--panel);color:var(--ink1);box-shadow:0 1px 3px rgba(0,0,0,.18)}
 .slicer{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)}.slicer .lbl{padding-left:2px}
 
 /* Boutons et champs de base (communs à toutes les pages) */
@@ -69,18 +79,79 @@ tr.me td{background:color-mix(in srgb,var(--c1) 14%,transparent);font-weight:600
 .card.sb h3{margin:0;flex:none}.card.sb p{margin:0;font-size:13px;flex:1 1 160px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.card.sb .acts,.card.sb .acts.left{margin:0;gap:8px;align-items:center}
 .card.sb input{font:inherit;font-size:14px;padding:6px 10px;width:165px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--fg)}.card.sb .btn{padding:6px 12px}
 /* Navigation entre les pages en pilules (liens dans le même composant que FR/EN) */
-.seg a{color:#fff;padding:6px 12px;border-radius:8px;font:inherit;text-decoration:none;cursor:pointer;white-space:nowrap}.seg a:hover{background:rgba(255,255,255,.22)}.seg a:focus-visible{outline:3px solid var(--base2);outline-offset:2px}
+.seg a{color:var(--on-base1);padding:6px 12px;border-radius:8px;font:inherit;text-decoration:none;cursor:pointer;white-space:nowrap}.seg a:hover{box-shadow:inset 0 0 0 1px currentColor}.seg a:focus-visible{outline:3px solid var(--on-base1);outline-offset:2px}
 .seg[role=navigation]{flex-wrap:wrap}
  
 /* En-tête fixe aux couleurs de l'équipe pendant le défilement */
 header.top{position:sticky;top:0;z-index:60;box-shadow:0 2px 8px rgba(0,0,0,.18)}
 /* Navigation : la page en cours est une pilule sélectionnée, comme FR / EN */
-.seg a[aria-pressed=true]{background:#fff;color:var(--base1);font-weight:700;box-shadow:0 1px 3px rgba(0,0,0,.18)}.seg a.home{font-weight:600}
-.seg.page a{color:var(--fg)}.seg.page a[aria-pressed=true]{background:var(--panel);color:var(--c1)}
+.seg a[aria-pressed=true]{background:var(--on-base1);color:var(--base1);font-weight:700;box-shadow:0 1px 3px rgba(0,0,0,.18)}.seg a.home{font-weight:600}
+.seg.page a{color:var(--fg)}.seg.page a[aria-pressed=true]{background:var(--panel);color:var(--ink1)}
+.seg.page button:focus-visible,.seg.page a:focus-visible{outline-color:var(--focus)}
 
 /* En-tête compact (il reste affiché pendant le défilement) */
 header.top{padding:8px 22px;gap:6px 18px}header.top .seg button,header.top .seg a{padding:5px 11px;font-size:13px}header.top .brand .fr{font-size:18px}header.top .crest.logo{width:56px;height:56px}
 .viewbar{display:flex;gap:14px;flex-wrap:wrap;align-items:center;padding:12px 22px 0;max-width:1280px;margin:0 auto}
+
+/* Franchise active (page Franchise) : choix seulement s'il y a 2 franchises ou plus. --o1/--o2 = couleurs de CETTE franchise (style en ligne, depuis les données) ; --opt = variante lisible de --o1 (même méthode que --focus) */
+.fra{margin:0 0 14px;padding:0 0 14px;border-bottom:1px solid var(--line)}
+.fra-lbl{display:block;font-size:12px;color:var(--muted);padding:0;margin:0 0 6px}
+.fra-one{display:flex;gap:12px;align-items:center}
+.fra-name{font-weight:700;font-size:15px;color:var(--fg)}
+.fra-meta{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.fra-list{border:0;margin:0;padding:0;min-width:0}
+.fra-opts{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:8px}
+.fra-opt{--opt:color-mix(in srgb,var(--o1) 55%,#000);display:grid;grid-template-columns:auto auto minmax(0,1fr);gap:10px;align-items:center;padding:8px 12px 8px 18px;border:1px solid var(--line);border-radius:10px;background:var(--panel);cursor:pointer;box-shadow:inset 5px 0 0 var(--o1),inset 8px 0 0 var(--o2)}
+.fra-opt:hover{border-color:var(--muted)}
+.fra-opt:has(input:checked){border-color:var(--opt);box-shadow:inset 5px 0 0 var(--o1),inset 8px 0 0 var(--o2),0 0 0 1px var(--opt)}
+.fra-opt:not(:has(input:checked)) .fra-name{font-weight:600}
+.fra-opt input{margin:0;width:16px;height:16px;accent-color:var(--opt)}
+.fra-opt .fra-txt{display:flex;flex-direction:column;min-width:0}
+.fra-opt .fra-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fra .crest{width:36px;height:36px;border-radius:50%;flex:none;background:var(--o1);box-shadow:inset 0 0 0 4px var(--o2),0 0 0 1px var(--line)}
+.fra .crest.logo{background:#fff;padding:3px;box-shadow:0 0 0 1px var(--line)}
+.fra .note{margin-top:8px}.fra p.ok{font-size:12px;margin:8px 0 0}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .fra-opt{--opt:color-mix(in srgb,var(--o1) 45%,#fff)}}
+:root[data-theme="dark"] .fra-opt{--opt:color-mix(in srgb,var(--o1) 45%,#fff)}
+@supports (color:oklch(from red l c h)){.fra-opt{--opt:oklch(from var(--o1) min(l,.5) c h)}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .fra-opt{--opt:oklch(from var(--o1) max(l,.75) min(c,.12) h)}}
+  :root[data-theme="dark"] .fra-opt{--opt:oklch(from var(--o1) max(l,.75) min(c,.12) h)}}
+/* Couleurs de statut communes (maquette saisie_joueurs_echanges, approuvée le 2026-11-13). Jamais une couleur d'équipe ; toujours avec une icône ou un texte.
+   --st-*     : bordures et icônes (3:1 au moins contre le panneau) ;
+   --st-*-ink : texte (4,5:1 au moins contre le panneau et contre la teinte d'alerte de la cellule). */
+:root{--st-ok:#1b7a44;--st-ok-ink:#17693a;--st-warn:#c47c0a;--st-warn-ink:#7a4a00;--st-err:#c0392b;--st-err-ink:#a5281c}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--st-ok:#5cc98a;--st-ok-ink:#7fd9a4;--st-warn:#e0a030;--st-warn-ink:#f2c46a;--st-err:#e8695b;--st-err-ink:#ff9d92}}
+:root[data-theme="dark"]{--st-ok:#5cc98a;--st-ok-ink:#7fd9a4;--st-warn:#e0a030;--st-warn-ink:#f2c46a;--st-err:#e8695b;--st-err-ink:#ff9d92}
+/* texte lu par les lecteurs d'écran seulement */
+.vh{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+/* Profil par poste sur la fiche joueur (maquette docs/maquettes/radar_par_poste.html, approuvée le 2026-11-14).
+   Aucune nouvelle couleur : accent d'équipe lisible = --ink1, petit échantillon = --st-warn (icône + texte), neutres.
+   Sélecteurs stables (le rendu remplace innerHTML) : carte section.card.prof2 ; panneau .pgrp[data-grp="D|F"] ;
+   carte « Carrière par poste » section.card.cbg ; étiquette de poste d'une ligne de saison td.gcol .gtag */
+.card.prof2{grid-column:1/-1}
+.prof2-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:12px 22px}
+.pgrp{min-width:0;padding:10px 0 0;border-top:3px solid var(--ink1)}
+.pgrp+.pgrp{position:relative}
+@media (min-width:760px){.prof2-grid .pgrp+.pgrp::before{content:"";position:absolute;left:-11px;top:0;bottom:0;border-left:1px solid var(--line)}}
+.pgrp svg{max-width:460px;margin:0 auto}
+.pgrp-h{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px}
+.pgrp-h h4{margin:0;font-size:16px;font-weight:700;color:var(--fg)}
+.pgrp-meta{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.pgrp-meta b{color:var(--fg);font-weight:600}
+/* Bande des saisons : un bâton par saison (hauteur = matchs joués) ; en couleur, les saisons à ce poste */
+.gstrip{display:flex;align-items:flex-end;gap:3px;height:30px;margin:8px 0 6px;max-width:100%;border-bottom:1px solid var(--line)}
+.gstrip i{flex:1 1 0;max-width:22px;min-width:3px;border-radius:2px 2px 0 0;background:color-mix(in srgb,var(--muted) 28%,transparent)}
+.gstrip i.on{background:var(--ink1)}
+/* Petit échantillon (moins de 20 MJ en saison, 5 en séries) : radar atténué et en pointillé, avec une étiquette (icône + texte, jamais la couleur seule) */
+.smp{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;color:var(--st-warn-ink);border:1px solid var(--st-warn);border-radius:6px;padding:1px 7px;line-height:18px}
+.smp svg{width:13px;height:13px;color:var(--st-warn);flex:none}
+.pgrp.small .poly1{fill:color-mix(in srgb,var(--c1) 12%,transparent);stroke-dasharray:5 4}
+/* Carrière par poste (petite table) et étiquette de poste dans le tableau des saisons */
+.cbg :is(th,td){padding:6px 7px}.cbg :is(th,td):first-child{padding-left:0}
+.cbg tr.total td{font-weight:700;border-top:2px solid var(--line)}
+td.gcol{width:1%}
+.gtag{display:inline-block;min-width:20px;text-align:center;font-size:12px;font-weight:700;line-height:18px;border-radius:5px;border:1px solid var(--line);color:var(--fg)}
+.gtag.lead{border-color:var(--ink1);color:var(--ink1)}
 main.entry{display:block;max-width:1280px}main.entry .pick{margin-bottom:14px}
 .acts{display:flex;gap:8px;margin-left:auto;flex-wrap:wrap}.btn{font:inherit;padding:8px 14px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--fg);cursor:pointer}
 .btn:hover{border-color:var(--c1)}.btn.ghost{color:var(--muted)}
@@ -93,10 +164,10 @@ td.d{color:var(--muted);background:color-mix(in srgb,var(--line) 35%,transparent
 .badge{display:inline-block;min-width:18px;padding:0 6px;border-radius:9px;background:#d68910;color:#fff;font-size:12px;text-align:center}.badge.bad{background:#c0392b}
 .foot{display:flex;gap:18px;flex-wrap:wrap;padding:10px 4px;font-size:13px;border-top:1px solid var(--line);margin-top:6px}.foot .bad{color:#c0392b;font-weight:600}.foot .ok{color:#1e8449;font-weight:600}
 select.cell{width:auto;min-width:96px;text-align:left}input.cell.text,input.cell.player,input.cell.date{text-align:left}input.cell.date{width:104px}input.cell.player{width:170px}input.cell.int{width:84px}
-a.navlink{color:#fff;text-decoration:underline;align-self:center;font-size:14px}.x{border:0;background:transparent;color:var(--muted);font-size:18px;cursor:pointer}.x:hover{color:#c0392b}
+a.navlink{color:var(--on-base1);text-decoration:underline;align-self:center;font-size:14px}.x{border:0;background:transparent;color:var(--muted);font-size:18px;cursor:pointer}.x:hover{color:#c0392b}
 details.base{margin-bottom:12px}details.base summary{cursor:pointer;color:var(--muted);font-size:13px}.tabs{flex-wrap:wrap}
 table.ev th{white-space:nowrap}table.ev td.ci{padding:0 2px}
-.acts.left{margin-left:0;align-items:center}p.ok{color:#1e8449;font-weight:600}p.bad{color:#c0392b;font-weight:600}p.warn{color:#b9770e;font-weight:600}
+.acts.left{margin-left:0;align-items:center}p.ok{color:#1e8449;font-weight:600}p.bad{color:#c0392b;font-weight:600}p.warn{color:var(--st-warn-ink);font-weight:600}
 
 /* ===================== Grilles du moteur (Début de saison, Saison morte) ===================== */
 /* Bordures sur les cellules et même hauteur partout (la colonne des noms s'appelle « pl » : « who » est déjà pris par la fiche joueur) */
@@ -129,7 +200,7 @@ tr.grphead th,table.ratings tr.grphead th{position:static!important;height:30px;
 .up{color:#1e8449;font-weight:700}.down{color:#c0392b;font-weight:700}.flat{color:var(--muted)}
 .summary{display:flex;align-items:center;gap:16px;margin:10px 0;font-size:14px;flex-wrap:wrap}.summary .bar{flex:1 1 200px;max-width:380px;margin:0}
 .toolbar{display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;margin:6px 0 10px}.fld.sm{margin:0;font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:3px}.fld.sm input{font:inherit;font-size:14px;padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--fg);width:220px}
-.btn.small{padding:0 14px;height:34px;font-size:13px}.btn.on{background:var(--c1);color:#fff;border-color:var(--c1)}
+.btn.small{padding:0 14px;height:34px;font-size:13px}.btn.on{background:var(--c1);color:var(--on-c1);border-color:var(--c1)}
 /* calendrier : colonnes Match et Écart étroites, logo de l'adversaire */
 table.grid.ev.sched th.pl{min-width:56px;width:56px;text-align:center;font-weight:600}
 table.grid.ev.sched th.d.gap,table.grid.ev.sched td.gap{width:64px;min-width:64px}table.grid.ev.sched th.d.logo,table.grid.ev.sched td.logo{width:46px;min-width:46px;padding:0}
@@ -161,14 +232,14 @@ table.grid.ev.ratings th.pl{min-width:200px}
 .cust-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px 16px;align-items:end;margin:8px 0}.cust-grid .fld{margin:0;max-width:none}.colrow{display:flex;gap:6px;align-items:center}.colrow input[type=color]{width:38px;height:32px;padding:0;border:1px solid var(--line);border-radius:6px;background:var(--panel)}.colrow input:not([type=color]){width:100px}
 .logo-prev img{width:64px;height:64px;object-fit:contain;background:#fff;border-radius:50%;padding:4px;border:1px solid var(--line)}.chk{display:flex;gap:8px;align-items:center;margin:8px 0}
 .divs{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;margin:8px 0}.div{border:1px solid var(--line);border-radius:10px;padding:8px 10px}.div h5{margin:0 0 6px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}.div .cnt{background:var(--line);border-radius:9px;padding:0 8px;margin-left:4px}
-.dv{display:flex;justify-content:space-between;align-items:center;gap:6px;padding:2px 0;font-size:13px}.dv.cust span{font-weight:700;color:var(--c1)}.dv.moved span{text-decoration:underline dotted}.dv select{font:inherit;font-size:12px;padding:1px 4px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--fg)}
+.dv{display:flex;justify-content:space-between;align-items:center;gap:6px;padding:2px 0;font-size:13px}.dv.cust span{font-weight:700;color:var(--ink1)}.dv.moved span{text-decoration:underline dotted}.dv select{font:inherit;font-size:12px;padding:1px 4px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--fg)}
 
 /* écran Franchise : franchise | ligue, puis création et importation (compacte) | mode d'emploi (compact) */
 main.entry>.setup-grid{grid-column:1/-1;display:grid;gap:16px;grid-template-columns:1fr;align-items:start}.setup-grid .ar>.card{margin:0}
 @media (min-width:1000px){.setup-grid{grid-template-columns:minmax(340px,4fr) minmax(0,6fr);grid-template-areas:"fr lg" "im gd"}.setup-grid.no-league{grid-template-areas:"fr im" "gd gd"}.setup-grid .a-fr{grid-area:fr}.setup-grid .a-lg{grid-area:lg}.setup-grid .a-im{grid-area:im}.setup-grid .a-gd{grid-area:gd}}
 .card.compact{padding:10px 14px}.card.compact h3{font-size:13px;margin:0 0 6px}.card.compact p{margin:4px 0;font-size:13px}.card.compact .note{font-size:12px}.card.compact .bar{height:6px;margin:6px 0}.card.compact .btn{padding:6px 12px;font-size:13px}.card.compact .acts{margin-top:6px}
 .guide-card{padding:10px 14px}.guide-card h3{font-size:13px;margin:0 0 6px}.guide-card h4{font-size:12px;margin:10px 0 4px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
-.steps{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px}.steps li{display:flex;gap:8px;align-items:flex-start;font-size:12.5px;line-height:1.35}.steps b{flex:none;width:20px;height:20px;border-radius:50%;background:var(--c1);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:12px}
+.steps{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px}.steps li{display:flex;gap:8px;align-items:flex-start;font-size:12.5px;line-height:1.35}.steps b{flex:none;width:20px;height:20px;border-radius:50%;background:var(--c1);color:var(--on-c1);display:inline-flex;align-items:center;justify-content:center;font-size:12px}
 .errs{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:6px 14px}.errs li{font-size:12.5px;line-height:1.35;padding:4px 8px;border-left:3px solid var(--line)}.errs li.hot{border-left-color:#d68910;background:color-mix(in srgb,#d68910 14%,transparent);font-weight:600}
 
 /* écran Franchise : divisions sur une seule rangée, textes d'introduction plus petits */
@@ -222,7 +293,7 @@ table.grid.ev.awards td:hover .tip,table.grid.ev.awards td:focus-within .tip{dis
 .lineups{display:grid;grid-template-columns:repeat(auto-fit,minmax(520px,1fr));gap:18px}
 .lineup{border:1px solid var(--line);border-radius:14px;padding:12px 16px 16px;background:linear-gradient(180deg,color-mix(in srgb,var(--c1) 7%,var(--panel)),var(--panel))}.lineup h4{margin:0 0 12px;text-align:center;font-size:13px;letter-spacing:.1em;text-transform:uppercase}
 .lrow{display:flex;justify-content:center;gap:14px;margin-top:12px}.lrow.d2{padding:0 16%}.lrow.g1{padding:0 30%}
-.slot{flex:1;min-width:0;display:flex;flex-direction:column;gap:5px;align-items:stretch}.slbl{align-self:center;font-weight:800;font-size:12px;letter-spacing:.08em;color:var(--c1);border-bottom:2px solid var(--c1);padding:0 10px 1px}
+.slot{flex:1;min-width:0;display:flex;flex-direction:column;gap:5px;align-items:stretch}.slbl{align-self:center;font-weight:800;font-size:12px;letter-spacing:.08em;color:var(--ink1);border-bottom:2px solid var(--c1);padding:0 10px 1px}
 .slot input.cell,.slot select.cell{width:100%}.slot .steam{display:flex;align-items:center;gap:6px}.slot .steam select.cell{flex:1;min-width:0}.slot .steam .tlogo{width:30px;height:30px}.slot.empty .slbl{color:var(--muted);border-color:var(--line)}
 /* ===== bandeau du gagnant ===== */
 .winband{display:flex;align-items:center;gap:18px;border-radius:12px;padding:12px 22px;margin:0 0 14px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.45)}.winband .wlogo{display:inline-flex;background:rgba(255,255,255,.92);border-radius:50%;padding:8px}.winband .wlogo .tlogo{width:72px;height:72px}
@@ -296,7 +367,7 @@ table.grid.ev.ct select.cell[data-c="years"],table.grid.ev.ct select.cell[data-c
 
 /* transactions : formulaire à deux équipes et liste en cartes */
 .tcard{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:0 0 14px;background:var(--panel)}.tcard.editing{border-color:#d68910;box-shadow:0 0 0 2px color-mix(in srgb,#d68910 25%,transparent)}
-.tch{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:8px}.tch label{display:flex;flex-direction:column;font-size:12px;gap:3px;color:var(--muted)}.tch .tedit{color:#b9770e;font-weight:700;font-size:13px}.tch .x{margin-left:auto}
+.tch{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:8px}.tch label{display:flex;flex-direction:column;font-size:12px;gap:3px;color:var(--muted)}.tch .tedit{color:var(--st-warn-ink);font-weight:700;font-size:13px}.tch .x{margin-left:auto}
 table.trg{border-collapse:separate;border-spacing:0}table.trg th.side{background:color-mix(in srgb,var(--fg) 6%,transparent);text-align:left;padding:6px 10px;font-size:14px}table.trg th.side .tlogo{width:26px;height:26px;margin-right:8px}
 table.trg th.grp{border-bottom:2px solid var(--line);font-size:12px}table.trg th.el{text-align:left;font-weight:600;white-space:nowrap;padding-right:10px;color:var(--muted)}table.trg td.gap,table.trg th.gap{width:18px;min-width:18px;padding:0;background:transparent;border:0}
 table.trg td.na{background:repeating-linear-gradient(135deg,transparent 0 5px,color-mix(in srgb,var(--fg) 6%,transparent) 5px 6px)}table.trg select.cell,table.trg input.cell{min-width:0;font-size:13px}table.trg select.cell[data-c$=":pid"]{min-width:170px}table.trg select.cell[data-c$=":type"]{min-width:84px}table.trg input.cell.tcombo{min-width:130px}table.trg input.cell.int{width:84px;text-align:center}table.trg select.cell[data-c$=":round"]{min-width:56px}
@@ -326,14 +397,203 @@ table.grid.ev.np input.cell[data-c="dyear"],table.grid.ev.np input.cell[data-c="
 table.grid.ev.np td.via0{color:var(--muted);font-weight:600;white-space:nowrap}td img.flag{width:20px;height:14px;object-fit:cover;vertical-align:middle;margin-left:4px;border-radius:2px}
 .plf{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:6px 0 10px}.plf input[type=search]{min-width:260px;padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--fg);font:inherit}.plf select{padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--fg);font:inherit}.plf .plcount{color:var(--muted);font-size:13px}
 table.grid.ev.pl th{white-space:normal;line-height:1.15;vertical-align:bottom;position:sticky;top:0;background:var(--panel);z-index:2}table.grid.ev.pl td{white-space:nowrap;font-size:13px}table.grid.ev.pl td.num{text-align:center}
+
+/* Menu de joueur (FTPC, connect/player_combo.js) : liste (datalist) + saisie libre, sur le modèle du menu d'équipe (tcombo).
+   Trait plein = le nom est lié à une fiche de la base ; trait pointillé = pas de fiche (texte libre ou joueur à créer).
+   L'icône à droite du champ dit l'état ; son texte complet est lu par aria-describedby et affiché en infobulle. */
+.pcb{display:inline-flex;align-items:center;gap:6px;vertical-align:middle}
+.pcb-f{position:relative;display:inline-block}
+input.cell.pcombo{text-align:left;width:184px;padding-right:26px}
+input.pcombo::-webkit-calendar-picker-indicator{display:none!important}
+.pcb-mk{position:absolute;right:6px;top:50%;width:16px;height:16px;margin-top:-8px;display:block;pointer-events:auto;color:var(--muted)}
+.pcb-mk svg{width:16px;height:16px;display:block}
+.pcb[data-st="linked"] .pcb-mk,.pcb[data-st="hist"] .pcb-mk{color:var(--st-ok)}
+.pcb[data-st="near"] .pcb-mk,.pcb[data-st="group"] .pcb-mk{color:var(--st-warn)}
+.pcb[data-st="new"] .pcb-mk{color:var(--fg)}
+table.grid.ev td.ci .pcb[data-st="free"] input.cell,table.grid.ev td.ci .pcb[data-st="new"] input.cell{border-style:dashed;border-color:color-mix(in srgb,var(--fg) 45%,var(--line))}
+table.grid.ev td.ci.err .pcb input.cell{border-style:solid}
+/* suggestion « Lier à … » : bouton compact dans la cellule, atteint par Tab juste après le champ */
+.pcb-sug{font:inherit;font-size:12px;font-weight:600;line-height:1;padding:6px 9px;border-radius:7px;border:1px solid var(--st-warn);background:var(--panel);color:var(--st-warn-ink);cursor:pointer;white-space:nowrap}
+.pcb-sug:hover{background:color-mix(in srgb,var(--st-warn) 12%,var(--panel))}
+.pcb-sug:focus-visible{outline:2px solid var(--focus);outline-offset:1px;box-shadow:0 0 0 4px var(--focus-halo)}
+/* jamais plus large que sa cellule : le bouton passe à la ligne et son texte est tronqué (le title donne le nom complet) ; l'ordre de tabulation ne change pas */
+.pcb{flex-wrap:wrap;row-gap:4px;max-width:100%}
+.pcb-sug{max-width:100%;min-width:0;overflow:hidden;text-overflow:ellipsis}
+/* Étoiles (cases étroites) : champ pleine largeur de la case, bouton « Lier à … » dessous, aligné à gauche */
+.lineup .pcb{display:flex;width:100%}
+.lineup .pcb-f{flex:1 1 100%;min-width:0}
+.lineup .pcb-f input.cell.pcombo{width:100%}
+.lineup .pcb-sug{align-self:flex-start}
+/* légende des états, au-dessus de la grille */
+.pcb-legend{display:flex;flex-wrap:wrap;gap:4px 16px;align-items:center;font-size:12px;color:var(--muted);margin:2px 0 10px}
+.pcb-legend .lg{display:inline-flex;gap:5px;align-items:center;color:var(--fg)}.pcb-legend svg{width:14px;height:14px}
+.pcb-legend .lg.ok{color:var(--st-ok-ink)}.pcb-legend .lg.wn{color:var(--st-warn-ink)}.pcb-legend .lg.fr{color:var(--muted)}
+.pcb-legend .lg span{color:var(--fg)}
+/* message sous la grille pour la cellule active (même texte que l'infobulle, lisible sans souris) */
+.pcb-live{min-height:20px;font-size:13px;margin:8px 2px 0;color:var(--muted)}.pcb-live.wn{color:var(--st-warn-ink);font-weight:600}.pcb-live.er{color:var(--st-err-ink);font-weight:600}
+
+/* Échange : nouveau joueur reçu. Une sous-ligne sous l'élément, du côté de l'équipe partenaire, encadrée en pointillé (pas encore en base).
+   Sélecteurs stables : [data-c="in:<s>:np_first|np_last|np_pos|np_birth"] */
+table.trg input.cell.pcombo{width:178px;min-width:178px;font-size:12px;padding-right:24px}
+table.trg tr.npx-row>td{height:auto;padding:2px 3px 8px 52px;border-bottom:1px solid var(--line)}
+table.trg tr.has-np>td,table.trg tr.has-np>th{border-bottom:0}
+.npx{position:sticky;left:0;max-width:min(760px,calc(100vw - 150px));white-space:normal;display:flex;flex-wrap:wrap;align-items:flex-end;gap:6px 10px;padding:8px 10px;border:1px dashed color-mix(in srgb,var(--fg) 40%,var(--line));border-radius:9px;background:color-mix(in srgb,var(--fg) 3%,var(--panel))}
+.npx-tag{flex-basis:100%;display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--fg);align-self:center;margin-right:4px}.npx-tag svg{width:16px;height:16px}
+.npx-tag .pcb-sug{margin-left:6px}.npx-near{display:inline-flex;gap:5px;align-items:center;font-weight:600;color:var(--st-warn-ink);flex-basis:100%;margin-top:4px}.npx-near svg{color:var(--st-warn)}
+.npx label{display:flex;flex-direction:column;gap:3px;font-size:11px;color:var(--muted)}
+.npx label.err>:is(input,select){border-color:var(--st-err)!important;background:color-mix(in srgb,var(--st-err) 12%,var(--panel))!important}
+.npx label.wn>:is(input,select){border-color:var(--st-warn)!important}
+.npx input.cell,.npx select.cell{height:30px;box-sizing:border-box;border:1px solid color-mix(in srgb,var(--fg) 24%,var(--line));border-radius:7px;background:color-mix(in srgb,var(--fg) 4.5%,var(--panel))}.npx :is(input,select).cell:focus{border-color:var(--c1);background:color-mix(in srgb,var(--c1) 13%,var(--panel))}.npx input.cell{width:120px;text-align:left}.npx input.cell.date{width:104px}.npx select.cell{min-width:64px;width:70px}
+.npx-msg{flex-basis:100%;display:flex;gap:6px;align-items:flex-start;margin:2px 0 0;font-size:12px;color:var(--muted)}.npx-msg svg{width:14px;height:14px;flex:none;margin-top:2px}.npx-msg.er{color:var(--st-err-ink);font-weight:600}.npx-msg.wn{color:var(--st-warn-ink);font-weight:600}
+
+/* Bouton « Enregistrer » de la carte d'échange, à gauche du « × ». Couleur d'équipe en texte (--ink1), jamais en fond de carte.
+   Sélecteurs stables : button.tsave[data-act="save-trade"][data-ti], #tsave-msg-<ti> */
+.tch .tsave{margin-left:auto;display:inline-flex;align-items:center;gap:7px;font-weight:700;color:var(--ink1);border-color:var(--ink1);padding:6px 14px}
+.tch .tsave+.x{margin-left:0}
+.tch .tsave:hover{background:var(--c1);color:var(--on-c1);border-color:var(--c1)}
+.tch .tsave:focus-visible{outline:2px solid var(--focus);outline-offset:1px;box-shadow:0 0 0 4px var(--focus-halo)}
+.tch .tsave[aria-disabled="true"]{color:var(--muted);border-color:var(--line);border-style:dashed;cursor:not-allowed;background:var(--panel)}
+.tch .tsave[aria-busy="true"]{color:var(--fg);border-color:var(--muted);cursor:progress;background:var(--panel)}
+.tch .tsave.done{color:var(--st-ok-ink);border-color:var(--st-ok);background:var(--panel)}
+.tsave .spin{width:12px;height:12px;border-radius:50%;border:2px solid currentColor;border-right-color:transparent;animation:tspin .8s linear infinite}
+.tsave svg{width:15px;height:15px}
+@keyframes tspin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.tsave .spin{animation:none;border-right-color:currentColor;opacity:.6}}
+.tsave-msg{margin:-2px 0 8px;font-size:13px;display:flex;gap:7px;align-items:flex-start}.tsave-msg svg{width:15px;height:15px;flex:none;margin-top:2px}
+.tsave-msg.er{color:var(--st-err-ink);font-weight:600}.tsave-msg.ok{color:var(--st-ok-ink);font-weight:600}.tsave-msg.mu{color:var(--muted)}
+/* l'échange enregistré, dans « Déjà saisi » : contour bref, sans mouvement si l'utilisateur le demande (ajouter .fade après l'affichage) */
+.trc.just{outline:2px solid var(--st-ok);outline-offset:1px;transition:outline-color 1.6s ease 2s}.trc.just.fade{outline-color:transparent}
+@media (prefers-reduced-motion:reduce){.trc.just{transition:none}}
+.trc .chip-ok{display:inline-flex;gap:5px;align-items:center;font-size:12px;font-weight:700;color:var(--st-ok-ink)}.trc .chip-ok svg{width:14px;height:14px}
+.trlive{min-height:0;margin:0 0 10px}
+
+/* ===== Liste des joueurs modifiable (maquette approuvée le 2026-11-13 : docs/maquettes/liste_joueurs_modifiable.html) ===== */
+/* ===== PROPOSITION (à ajouter à events/style_events.css après accord) =====
+   Liste des joueurs modifiable. Aucune nouvelle couleur : statut = --st-*, accent d'équipe = --ink1 (texte et barre, lisible
+   avec toute équipe), focus = règle commune. Sélecteurs stables (le rendu remplace innerHTML) :
+     ligne               tr[data-pid="<id>"]
+     bouton de ligne     button.pled[data-act="pl-edit"][data-pid="<id>"]   (aria-expanded, aria-controls="ple-<id>")
+     panneau             #ple-<id>
+     champ               .ple [data-pid="<id>"][data-f="first|last|num|birth|height|weight|hand|ptype|country|undrafted|dy|dr|dp|dteam"]
+     enregistrer         button.tsave[data-act="pl-save"][data-pid="<id>"], message #tsave-msg-pl<id>
+     annuler             button[data-act="pl-cancel"][data-pid="<id>"]
+     filtre              button[data-pl="miss"] (aria-pressed)                                                                   */
+
+/* 1. Colonnes figées : N° et bouton, prénom, nom (le joueur reste visible au défilement horizontal, comme la colonne joueur des grilles) */
+table.grid.ev.pl{border-collapse:separate;border-spacing:0}
+table.grid.ev.pl td{height:32px;padding:0 6px}
+table.grid.ev.pl :is(th,td).plc0{position:sticky;left:0;z-index:1;background:var(--panel);width:142px;min-width:142px;max-width:142px;text-align:left;white-space:nowrap}
+table.grid.ev.pl :is(th,td).plc1{position:sticky;left:142px;z-index:1;background:var(--panel);min-width:100px;max-width:100px;overflow:hidden;text-overflow:ellipsis}
+table.grid.ev.pl :is(th,td).plc2{position:sticky;left:242px;z-index:1;background:var(--panel);min-width:118px;max-width:118px;overflow:hidden;text-overflow:ellipsis;border-right:1px solid var(--line)}
+table.grid.ev.pl thead :is(th.plc0,th.plc1,th.plc2){z-index:3}
+table.grid.ev.pl td.plc1,table.grid.ev.pl td.plc2{font-weight:600}
+td .pln{display:inline-block;min-width:24px;margin-right:6px;text-align:right;color:var(--muted);font-variant-numeric:tabular-nums;font-size:12px}
+
+/* 2. Bouton de ligne : « Modifier » (sobre) ou « Compléter » (renseignements manquants : icône et texte d'avertissement) */
+.pled{font:inherit;font-size:12px;line-height:1;display:inline-flex;align-items:center;gap:5px;padding:5px 8px;border-radius:7px;border:1px solid var(--line);background:var(--panel);color:var(--fg);cursor:pointer;vertical-align:middle}
+.pled svg{width:13px;height:13px;flex:none}
+.pled:hover{border-color:var(--ink1)}
+.pled.need{border-color:var(--st-warn);color:var(--st-warn-ink);font-weight:700}
+.pled[aria-expanded="true"]{background:var(--ink1);border-color:var(--ink1);color:var(--panel)}
+.pled:focus-visible{outline:2px solid var(--focus);outline-offset:1px;box-shadow:0 0 0 4px var(--focus-halo)}
+
+/* 3. Case vide d'un renseignement modifiable : tiret dans un cadre pointillé d'avertissement (le texte « à compléter » est lu par les lecteurs d'écran) */
+table.grid.ev.pl td.miss{position:relative}
+td.miss .mk{display:inline-block;min-width:26px;padding:0 6px;line-height:20px;text-align:center;border:1px dashed var(--st-warn);border-radius:5px;color:var(--st-warn-ink);font-weight:700}
+
+/* 4. Ligne ouverte et ligne tout juste enregistrée */
+table.grid.ev.pl tr.open>td{background:color-mix(in srgb,var(--ink1) 7%,var(--panel));border-bottom-color:transparent}
+table.grid.ev.pl tr.open>td.plc0{box-shadow:inset 4px 0 0 var(--ink1)}
+table.grid.ev.pl tr.just>td{background:color-mix(in srgb,var(--st-ok) 10%,var(--panel));transition:background-color 1.6s ease 2.4s}
+table.grid.ev.pl tr.just.fade>td{background:var(--panel)}
+table.grid.ev.pl tr.just>td:not(.plc0,.plc1,.plc2){background:color-mix(in srgb,var(--st-ok) 10%,transparent)}
+table.grid.ev.pl tr.just.fade>td:not(.plc0,.plc1,.plc2){background:transparent}
+@media (prefers-reduced-motion:reduce){table.grid.ev.pl tr.just>td{transition:none}}
+/* ligne tout juste enregistrée : une coche (texte « Enregistré » pour les lecteurs d'écran) remplace le numéro de ligne ; le message d'état au-dessus de la liste le dit en toutes lettres */
+.pln.pl-ok{display:inline-flex;justify-content:flex-end;vertical-align:middle;color:var(--st-ok-ink)}.pl-ok svg{width:15px;height:15px}
+
+/* 5. Panneau de modification, sous la ligne (pas de fenêtre modale) ; figé à gauche pour rester visible si la table défile */
+table.grid.ev.pl tr.ple-row>td{height:auto;padding:0 0 14px;white-space:normal;border-bottom:2px solid var(--line);background:transparent}
+.ple{position:sticky;left:0;box-sizing:border-box;width:min(860px,calc(100vw - 64px));padding:10px 14px 10px;border:1px solid var(--line);border-left:4px solid var(--ink1);border-top:0;border-radius:0 0 10px 10px;background:var(--panel);font-size:13px}
+.ple-head{display:flex;flex-wrap:wrap;gap:2px 12px;align-items:baseline;margin:0 0 8px}
+.ple-head h4{margin:0;font-size:15px;color:var(--fg)}
+.ple-origin{display:inline-flex;gap:6px;align-items:center;font-size:12.5px;color:var(--muted)}.ple-origin svg{width:15px;height:15px;color:var(--st-warn);flex:none}
+.ple-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 12px;align-items:start}
+@media (max-width:760px){.ple-grid{grid-template-columns:1fr}}
+.ple-fs{border:1px solid var(--line);border-radius:9px;margin:0;padding:4px 10px 10px;min-width:0;display:flex;flex-wrap:wrap;gap:8px 10px;align-items:flex-start}
+.ple-fs legend{font-size:12.5px;font-weight:700;padding:0 5px;color:var(--fg)}
+.ple-fs legend .cnt{margin-left:6px;font-weight:600;color:var(--st-warn-ink)}
+.pf{display:flex;flex-direction:column;gap:3px;font-size:11.5px;color:var(--muted);min-width:0}
+.pf>label{white-space:nowrap}
+.ple :is(input,select).cell{height:30px;box-sizing:border-box;font:inherit;font-size:13px;padding:0 7px;color:var(--fg);border:1px solid color-mix(in srgb,var(--fg) 24%,var(--line));border-radius:7px;background:color-mix(in srgb,var(--fg) 4.5%,var(--panel));text-align:left}
+.ple :is(input,select).cell:hover{border-color:var(--ink1)}
+.ple :is(input,select).cell:focus{border-color:var(--ink1);background:color-mix(in srgb,var(--c1) 10%,var(--panel))}
+.ple input.cell::placeholder{color:var(--muted);opacity:1}
+.ple [data-f="first"]{width:128px}.ple [data-f="last"]{width:150px}.ple [data-f="num"]{width:56px;text-align:center}
+.ple [data-f="birth"]{width:112px;font-variant-numeric:tabular-nums}.ple [data-f="height"],.ple [data-f="weight"]{width:64px;text-align:center}.ple [data-f="hand"]{width:96px}
+.ple [data-f="ptype"]{width:186px}.ple [data-f="country"]{width:150px}
+.ple [data-f="dy"]{width:66px;text-align:center}.ple [data-f="dr"]{width:52px;text-align:center}.ple [data-f="dp"]{width:58px;text-align:center}.ple [data-f="dteam"]{width:206px}
+.pf .fl{display:flex;align-items:center;gap:4px}.pf .fl img.flag{margin:0}
+/* renseignement manquant : cadre pointillé d'avertissement + compte dans le titre du groupe */
+.pf.miss :is(input,select).cell{border-style:dashed;border-color:var(--st-warn)}
+/* message à côté de la case, qui dit comment corriger */
+.pf.err :is(input,select).cell{border-style:solid;border-color:var(--st-err);background:color-mix(in srgb,var(--st-err) 12%,var(--panel))}
+.pf.wn :is(input,select).cell{border-style:solid;border-color:var(--st-warn)}
+/* une case en erreur ou en avertissement prend toute la largeur du groupe : le message s'affiche à droite de la case */
+.pf.err,.pf.wn{flex-basis:100%}
+.pf-in{display:flex;align-items:center;gap:8px;min-width:0}
+.pf-m{display:flex;gap:4px;align-items:flex-start;max-width:300px;font-size:11.5px;line-height:1.3;white-space:normal}.pf-m svg{width:13px;height:13px;flex:none;margin-top:1px}
+.pf.err .pf-m{color:var(--st-err-ink);font-weight:600}.pf.wn .pf-m{color:var(--st-warn-ink);font-weight:600}
+.pf-m:empty{display:none}
+/* case qui ne s'applique pas (repêchage d'un joueur non repêché) : hachurée, jamais ouverte à la saisie */
+.pf.na .na-box{display:block;height:30px;border:1px solid var(--line);border-radius:7px;background:repeating-linear-gradient(135deg,transparent 0 5px,color-mix(in srgb,var(--fg) 8%,transparent) 5px 6px)}
+.pf.chk{flex-basis:100%;flex-direction:row;align-items:center;gap:7px;font-size:13px;color:var(--fg)}
+.pf.chk input{width:16px;height:16px;margin:0;accent-color:var(--ink1)}
+/* ce qui se modifie ailleurs : lecture seule (même traitement que cellRO) */
+.ple-ro{display:flex;flex-wrap:wrap;gap:3px 16px;margin:10px 0 0;padding:6px 10px;border-radius:8px;background:color-mix(in srgb,var(--fg) 4%,var(--panel));font-size:12.5px;color:var(--muted)}
+.ple-ro b{color:var(--fg);font-weight:600}.ple-ro .ro-t{color:var(--fg);font-weight:700}
+/* barre d'actions : composant .tch/.tsave de la carte d'échange, réutilisé tel quel */
+.ple-acts{margin:10px 0 0;align-items:center}.ple-acts .tsave-msg{margin:0;flex:1 1 280px}
+.ple-acts .tsave+.btn{padding:6px 12px}
+/* filtre « À compléter » et message d'état de la liste */
+.plf .btn.small[data-pl="miss"]{margin-left:0;height:auto;padding:6px 10px;display:inline-flex;gap:6px;align-items:center;font-size:13px}
+.plf .btn.small[data-pl="miss"] svg{width:14px;height:14px;color:var(--st-warn)}
+.plf .btn.small[data-pl="miss"][aria-pressed="true"]{border-color:var(--st-warn);background:color-mix(in srgb,var(--st-warn) 14%,var(--panel));color:var(--fg);font-weight:700}
+.plf .btn.small[data-pl="miss"]:focus-visible{outline:2px solid var(--focus);outline-offset:1px;box-shadow:0 0 0 4px var(--focus-halo)}
+.pl-live{min-height:0;margin:0 0 8px;font-size:13px;display:flex;gap:7px;align-items:center}.pl-live:empty{display:none}.pl-live svg{width:15px;height:15px}
+.pl-live.ok{color:var(--st-ok-ink);font-weight:600}.pl-live.wn{color:var(--st-warn-ink);font-weight:600}
+/* ===== fin de la proposition ===== */
 .fld{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);margin:10px 0;max-width:520px}.fld input{font:inherit;font-size:15px;padding:9px 11px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--fg)}.ok{color:#1e8449;font-weight:600}.bad{color:#c0392b;font-weight:600}tr.badrow td{background:color-mix(in srgb,#c0392b 12%,transparent)}main.entry{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px}</style></head>
 <body><div id="app"></div>
-<script id="cfg" type="application/json">{"url": "https://zbvpzklmbvvodnrlhumi.supabase.co", "key": "sb_publishable_7fo7NGJa5V5Tq9jc5ABsPQ_RNzdhCt5", "expected": {"award": 13, "franchise": 1, "historical_award_counts": 14, "label": 2418, "player": 1264, "player_rating": 1554, "player_stint": 348, "position_change": 10, "projected_level": 52, "retirement": 384, "role_assignment": 648, "roster_move": 672, "salary_cap_season": 25, "schedule_game": 2050, "skater_season_stats": 5459, "stanley_cup_member": 575, "team": 39, "team_season_stats": 50, "trade": 174, "trade_asset": 782, "all_star_selection": 300, "award_win": 334, "contract": 597, "contract_termination": 116, "contract_year": 1444, "data_issue": 84, "draft_lottery": 384, "draft_pick": 184, "draft_pick_initial": 182, "draft_top3": 72, "goalie_season_stats": 494, "offer_sheet": 0, "offer_sheet_pick": 0, "playoff_series": 375, "standing": 800, "stanley_cup_result": 25}, "views": ["v_skater_career_totals", "v_skater_career_records", "v_skater_season_records", "v_contract_year_level", "v_radar_thresholds_ppg"]}</script>
+<script id="cfg" type="application/json">{"url": "https://zbvpzklmbvvodnrlhumi.supabase.co", "key": "sb_publishable_7fo7NGJa5V5Tq9jc5ABsPQ_RNzdhCt5", "expected": {"award": 13, "franchise": 1, "historical_award_counts": 14, "label": 2462, "player": 1257, "player_rating": 1554, "player_stint": 348, "position_change": 10, "projected_level": 44, "retirement": 384, "role_assignment": 648, "roster_move": 672, "salary_cap_season": 25, "schedule_game": 2050, "skater_season_stats": 5459, "stanley_cup_member": 575, "team": 39, "team_season_stats": 50, "trade": 174, "trade_asset": 782, "all_star_selection": 300, "award_win": 334, "contract": 713, "contract_year": 1444, "data_issue": 606, "data_version": 0, "draft_lottery": 384, "draft_pick": 181, "draft_pick_initial": 182, "draft_top3": 72, "goalie_season_stats": 494, "offer_sheet": 0, "offer_sheet_pick": 0, "playoff_series": 375, "standing": 800, "stanley_cup_result": 25}, "views": ["v_skater_career_totals", "v_skater_career_records", "v_skater_season_records", "v_contract_year_level", "v_radar_thresholds_ppg"]}</script>
 <script>/* Petit client Supabase sans dépendance : connexion par courriel, lecture, écriture, comptage. Utilise seulement fetch. */
 (function (root) {
+  // Tables propres à une franchise : chaque lecture et chaque modification est filtrée sur la franchise active (franchise_id).
+  var SCOPED = ['player', 'player_stint', 'skater_season_stats', 'goalie_season_stats', 'team_season_stats', 'standing', 'playoff_series', 'award_win', 'all_star_selection',
+    'stanley_cup_result', 'stanley_cup_member', 'salary_cap_season', 'contract', 'offer_sheet', 'offer_sheet_pick', 'data_issue', 'trade', 'roster_move',
+    'player_rating', 'schedule_game', 'position_change', 'role_assignment', 'draft_pick_initial', 'draft_pick', 'draft_lottery', 'draft_top3', 'retirement', 'franchise_league_team',
+    'historical_award_counts', 'projected_level', 'v_contract_year_level', 'v_skater_career_totals', 'v_skater_career_records', 'v_skater_season_records', 'hr_job'];
+  // Tables enfants sans franchise_id : filtrées par leur parent (embarqué vide de PostgREST, « parent!inner() »)
+  var CHILD = { contract_year: 'contract', trade_asset: 'trade' };
+  var SCOPED_SET = {}; SCOPED.forEach(function (t) { SCOPED_SET[t] = 1; });
+  // Ajoute le filtre de la franchise active à une requête PostgREST (select=… ; filtres…). fid absent : erreur, jamais de lecture sans filtre.
+  function scopeQuery(table, query, fid, forRead) {
+    var q = query || '';
+    if (!SCOPED_SET[table] && !CHILD[table] && table !== 'team') return q;
+    if (fid == null && table === 'team') return q ? q + '&owner_franchise_id=is.null' : 'owner_franchise_id=is.null';
+    if (fid == null) { var e = new Error('no active franchise'); e.code = 'FT_NO_FRANCHISE'; throw e; }
+    var add;
+    if (SCOPED_SET[table]) add = 'franchise_id=eq.' + fid;
+    else if (CHILD[table]) {
+      if (!forRead) return q;          // modification d'une table enfant : elle vise des ids de parent déjà filtrés par franchise (et la RLS)
+      add = CHILD[table] + '.franchise_id=eq.' + fid;
+      q = /(^|&)select=/.test(q) ? q.replace(/(^|&)select=([^&]*)/, function (m, a, cols) { return a + 'select=' + cols + ',' + CHILD[table] + '!inner()'; }) : 'select=*,' + CHILD[table] + '!inner()' + (q ? '&' + q : '');
+    } else add = 'or=(owner_franchise_id.is.null,owner_franchise_id.eq.' + fid + ')';      // équipes de la LNH + équipes personnalisées de cette franchise
+    return q ? q + '&' + add : add;
+  }
   function makeClient(cfg, storage, fetchFn) {
     var f = fetchFn || (typeof fetch !== 'undefined' ? fetch.bind(root) : null);
-    var base = String(cfg.url).replace(/\/+$/, ''), session = null;
+    var base = String(cfg.url).replace(/\/+$/, ''), session = null, fid = null;
     try { session = JSON.parse((storage && storage.get('ft_session')) || 'null'); } catch (e) { session = null; }
     function save() { try { storage && storage.set('ft_session', JSON.stringify(session)); } catch (e) { /* ignore */ } }
     function now() { return Math.floor(Date.now() / 1000); }
@@ -342,7 +602,12 @@ table.grid.ev.pl th{white-space:normal;line-height:1.15;vertical-align:bottom;po
       return Object.assign({ apikey: cfg.key, Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' }, extra || {});
     }
     function msg(j, status) { return (j && (j.message || j.error_description || j.msg || j.hint)) || ('HTTP ' + status); }
+    function pspan(n) { var P = typeof FTPERF !== 'undefined' ? FTPERF : root.FTPERF; return P ? P.span(n) : function () {}; }
     async function auth(path, body) {
+      var done = pspan(path.indexOf('refresh') >= 0 ? 'connexion (jeton)' : 'connexion');
+      try { return await auth0(path, body); } finally { done(); }
+    }
+    async function auth0(path, body) {
       var r = await f(base + '/auth/v1/' + path, { method: 'POST', headers: { apikey: cfg.key, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       var j = await r.json().catch(function () { return {}; });
       if (!r.ok) { var e = new Error(msg(j, r.status)); e.status = r.status; throw e; }
@@ -353,7 +618,15 @@ table.grid.ev.pl th{white-space:normal;line-height:1.15;vertical-align:bottom;po
     async function refresh() { return setSession(await auth('token?grant_type=refresh_token', { refresh_token: session.refresh_token })); }
     async function ensure() { if (session && session.expires_at - 60 < now()) { try { await refresh(); } catch (e) { session = null; save(); } } }
     function signOut() { session = null; save(); }
+    // Requêtes simultanées limitées (cfg.concurrency, 6 par défaut) : les suivantes attendent dans une file, dans l'ordre d'arrivée
+    var LIMIT = cfg.concurrency || 6, active = 0, queue = [];
+    function acquire() { if (active < LIMIT) { active++; return Promise.resolve(); } return new Promise(function (res) { queue.push(res); }); }
+    function release() { var next = queue.shift(); if (next) next(); else active--; }
     async function rest(method, path, opts) {
+      await acquire();
+      try { return await rest0(method, path, opts); } finally { release(); }
+    }
+    async function rest0(method, path, opts) {
       opts = opts || {}; await ensure();
       var r = await f(base + '/rest/v1/' + path, { method: method, headers: headers(opts.headers, opts.anon), body: opts.body === undefined ? undefined : JSON.stringify(opts.body) });
       var text = await r.text(), j = null; try { j = text ? JSON.parse(text) : null; } catch (e) { j = null; }
@@ -366,28 +639,86 @@ table.grid.ev.pl th{white-space:normal;line-height:1.15;vertical-align:bottom;po
       var m = /\/(\d+)$/.exec(res.range || ''); return m ? +m[1] : (res.data ? res.data.length : 0);
     }
     // Lit toutes les lignes (Supabase limite chaque réponse à 1000 lignes) en suivant le total annoncé par le serveur
-    async function selectAll(table, query) {
-      var out = [], offset = 0, total = null, pageSize = 1000;
-      for (var guard = 0; guard < 200; guard++) {
-        var res = await rest('GET', encodeURIComponent(table) + '?' + (query ? query + '&' : '') + 'limit=' + pageSize + '&offset=' + offset, { headers: { Prefer: 'count=exact' } });
-        var rows = res.data || [], m = /\/(\d+)$/.exec(res.range || ''); if (m) total = +m[1];
-        out = out.concat(rows); offset += rows.length;
-        if (!rows.length || (total !== null && offset >= total)) break;
+    // table de franchise lue ou écrite sans franchise active : on la choisit d'abord (jamais de requête sans filtre)
+    function needsScope(table) { return !!(SCOPED_SET[table] || CHILD[table] || table === 'team'); }
+    async function ready(table) { if (fid == null && needsScope(table)) await resolveFranchise(); return fid != null || table === 'team' || !needsScope(table); }
+    // Lit toutes les lignes (Supabase limite chaque réponse, 1000 lignes par défaut).
+    // opts.count : grosse table ; le total (count=exact) est demandé sur la première page, puis les pages suivantes partent en parallèle.
+    // Sans opts.count : aucun comptage ; une page pleine fait lire la suite, page après page.
+    async function selectAll(table, query, opts) {
+      if (!(await ready(table))) return [];                 // le compte n'a aucune franchise : rien à lire
+      // opts.allTeams : base sans team.owner_franchise_id (migration 38 absente), donc sans équipe personnalisée : aucun filtre sur team
+      query = opts && opts.allTeams && table === 'team' ? query : scopeQuery(table, query, fid, true);
+      var pageSize = 1000, url = function (off) { return encodeURIComponent(table) + '?' + (query ? query + '&' : '') + 'limit=' + pageSize + '&offset=' + off; };
+      var countIt = !!(opts && opts.count), first = await rest('GET', url(0), countIt ? { headers: { Prefer: 'count=exact' } } : {});
+      var out = first.data || [], m = /\/(\d+)$/.exec(first.range || ''), total = countIt && m ? +m[1] : null, step = out.length;
+      if (total !== null && step && out.length < total) {
+        var offs = []; for (var o = step; o < total; o += step) offs.push(o);
+        var pages = await Promise.all(offs.map(function (off) { return rest('GET', url(off)).then(function (r) { return r.data || []; }); }));
+        pages.forEach(function (rows) { out = out.concat(rows); });
+      }
+      // suite page après page : page pleine sans total connu, ou lecture parallèle incomplète
+      for (var guard = 0; guard < 200 && out.length && (total !== null ? out.length < total : out.length % step === 0 && out.length >= pageSize); guard++) {
+        var more = (await rest('GET', url(out.length))).data || []; if (!more.length) break; out = out.concat(more);
+        if (total === null && more.length < step) break;
       }
       return out;
     }
-    async function select(table, query) { return (await rest('GET', encodeURIComponent(table) + (query ? '?' + query : ''))).data; }
-    async function upsert(table, rows, onConflict) { return rest('POST', encodeURIComponent(table) + (onConflict ? '?on_conflict=' + onConflict : ''), { headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: rows }); }
+    async function select(table, query) { if (!(await ready(table))) return []; query = scopeQuery(table, query, fid, true); return (await rest('GET', encodeURIComponent(table) + (query ? '?' + query : ''))).data; }
+    // écriture : chaque ligne d'une table de franchise doit porter la franchise active (jamais une autre)
+    function checkRows(table, rows) {
+      if (!SCOPED_SET[table]) return rows;
+      if (fid == null) { var e = new Error('no active franchise'); e.code = 'FT_NO_FRANCHISE'; throw e; }
+      (Array.isArray(rows) ? rows : [rows]).forEach(function (r) {
+        if (r.franchise_id == null) r.franchise_id = fid;
+        else if (String(r.franchise_id) !== String(fid)) { var e2 = new Error('franchise_id ' + r.franchise_id + ' ≠ franchise active ' + fid); e2.code = 'FT_WRONG_FRANCHISE'; throw e2; }
+      });
+      return rows;
+    }
+    // PATCH ou DELETE sur une table de franchise : le filtre de la franchise active est ajouté
+    function scopeFilter(table, filter) { return SCOPED_SET[table] ? scopeQuery(table, filter, fid, false) : filter; }
+    async function upsert(table, rows, onConflict) { await ready(table); checkRows(table, rows); return rest('POST', encodeURIComponent(table) + (onConflict ? '?on_conflict=' + onConflict : ''), { headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: rows }); }
     async function insert(table, rows, opts) {
+      await ready(table); checkRows(table, rows);
       var ret = opts && opts.returning;
       var res = await rest('POST', encodeURIComponent(table), { headers: { Prefer: ret ? 'return=representation' : 'return=minimal' }, body: rows });
       return ret ? res.data : res;
     }
-    async function remove(table, filter) { return rest('DELETE', encodeURIComponent(table) + '?' + filter, { headers: { Prefer: 'return=minimal' } }); }
+    async function remove(table, filter) { await ready(table); if (SCOPED_SET[table] && fid == null) throw new Error('no active franchise'); return rest('DELETE', encodeURIComponent(table) + '?' + scopeFilter(table, filter), { headers: { Prefer: 'return=minimal' } }); }
+    async function patch(table, filter, body) { await ready(table); if (SCOPED_SET[table] && fid == null) throw new Error('no active franchise'); if (SCOPED_SET[table] && body && body.franchise_id != null && String(body.franchise_id) !== String(fid)) throw new Error('franchise_id ≠ franchise active'); return rest('PATCH', encodeURIComponent(table) + '?' + scopeFilter(table, filter), { headers: { Prefer: 'return=minimal' }, body: body }); }
+    // Fonction RPC (POST /rest/v1/rpc/<fn>) : un appel = une transaction côté serveur (migration 52 : ft_save_*, ft_apply_batch).
+    // p_franchise_id absent ou vide : la franchise active ; une autre valeur est refusée. opts.unscoped : fonction sans franchise (create_franchise…).
+    async function rpc(fn, args, opts) {
+      var body = Object.assign({}, args || {});
+      if (!(opts && opts.unscoped)) {
+        if (fid == null) await resolveFranchise();
+        if (fid == null) { var e = new Error('no active franchise'); e.code = 'FT_NO_FRANCHISE'; throw e; }
+        if (body.p_franchise_id == null) body.p_franchise_id = fid;
+        else if (String(body.p_franchise_id) !== String(fid)) { var e2 = new Error('franchise_id ' + body.p_franchise_id + ' ≠ franchise active ' + fid); e2.code = 'FT_WRONG_FRANCHISE'; throw e2; }
+      }
+      return (await rest('POST', 'rpc/' + encodeURIComponent(fn), { body: body })).data;
+    }
+    // franchise active : fixée avant toute lecture (live_mount.js) ; mémorisée dans ft_franchise
+    function setFranchise(id) { fid = id == null ? null : +id; }
+    function stored() { try { return +((storage && storage.get('ft_franchise')) || 0) || null; } catch (e) { return null; } }
+    function remember(id) { try { storage && storage.set('ft_franchise', String(id)); } catch (e) { /* ignore */ } }
+    // Choisit la franchise active : celle demandée (?franchise=), sinon celle mémorisée, sinon la seule du compte.
+    // Plusieurs franchises sans choix : erreur FT_PICK_FRANCHISE ; franchise mémorisée disparue : FT_FRANCHISE_GONE. Aucune franchise : null.
+    async function resolveFranchise(asked) {
+      var list = await select('franchise', 'select=id,name,abbreviation&order=id'), ids = list.map(function (f) { return f.id; }), st = stored(), id = null;
+      if (asked != null && ids.indexOf(+asked) >= 0) { id = +asked; remember(id); }
+      else if (st != null && ids.indexOf(st) >= 0) id = st;
+      else if (list.length === 1) { id = list[0].id; remember(id); }
+      else if (list.length) { var e = new Error(st != null ? 'franchise ' + st + ' introuvable' : 'aucune franchise active'); e.code = st != null ? 'FT_FRANCHISE_GONE' : 'FT_PICK_FRANCHISE'; e.list = list; throw e; }
+      fid = id; return { id: id, list: list };
+    }
+    async function ensureFranchise() { if (fid == null) await resolveFranchise(); return fid; }
+    function chooseFranchise(id) { fid = +id; remember(fid); }
     return { signIn: signIn, signOut: signOut, user: function () { return session && session.user; }, signedIn: function () { return !!(session && session.access_token); },
-             count: count, select: select, selectAll: selectAll, upsert: upsert, insert: insert, remove: remove, rest: rest };
+             count: count, select: select, selectAll: selectAll, upsert: upsert, insert: insert, remove: remove, patch: patch, rest: rest, rpc: rpc,
+             setFranchise: setFranchise, chooseFranchise: chooseFranchise, resolveFranchise: resolveFranchise, ensureFranchise: ensureFranchise, storedFranchise: stored, franchiseId: function () { return fid; }, scope: function (table, query) { return scopeQuery(table, query, fid, true); } };
   }
-  var api = { makeClient: makeClient };
+  var api = { makeClient: makeClient, SCOPED: SCOPED, CHILD: CHILD, scopeQuery: scopeQuery };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.FTSB = api;
 })(typeof window !== 'undefined' ? window : this);
 </script>
