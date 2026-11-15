@@ -127,7 +127,7 @@ header.top{padding:8px 22px;gap:6px 18px}header.top .seg button,header.top .seg 
 /* Profil par poste sur la fiche joueur (maquette docs/maquettes/radar_par_poste.html, approuvée le 2026-11-14).
    Aucune nouvelle couleur : accent d'équipe lisible = --ink1, petit échantillon = --st-warn (icône + texte), neutres.
    Sélecteurs stables (le rendu remplace innerHTML) : carte section.card.prof2 ; panneau .pgrp[data-grp="D|F"] ;
-   carte « Carrière par poste » section.card.cbg ; étiquette de poste d'une ligne de saison td.gcol .gtag */
+   chiffres de carrière d'un poste .pgrp[data-grp] dl.pgrp-stats ; étiquette de poste d'une ligne de saison td.gcol .gtag */
 .card.prof2{grid-column:1/-1}
 .prof2-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:12px 22px}
 .pgrp{min-width:0;padding:10px 0 0;border-top:3px solid var(--ink1)}
@@ -146,12 +146,70 @@ header.top{padding:8px 22px;gap:6px 18px}header.top .seg button,header.top .seg 
 .smp{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;color:var(--st-warn-ink);border:1px solid var(--st-warn);border-radius:6px;padding:1px 7px;line-height:18px}
 .smp svg{width:13px;height:13px;color:var(--st-warn);flex:none}
 .pgrp.small .poly1{fill:color-mix(in srgb,var(--c1) 12%,transparent);stroke-dasharray:5 4}
-/* Carrière par poste (petite table) et étiquette de poste dans le tableau des saisons */
-.cbg :is(th,td){padding:6px 7px}.cbg :is(th,td):first-child{padding-left:0}
-.cbg tr.total td{font-weight:700;border-top:2px solid var(--line)}
+/* Chiffres de carrière d'un poste, sous la bande des saisons (maquette docs/maquettes/carriere_par_poste.html, variante A, approuvée le 2026-11-14).
+   5 cases de largeur égale (MJ, B, A, PTS, +/-) : jamais de défilement horizontal. Aucune nouvelle couleur. */
+.pgrp-stats{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));margin:2px 0 8px;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.pgrp-stats>div{padding:4px 8px 5px;text-align:right;min-width:0}
+.pgrp-stats>div+div{border-left:1px solid var(--line)}
+.pgrp-stats dt{font-size:12px;font-weight:600;color:var(--muted);line-height:16px}
+.pgrp-stats dd{margin:0;font-size:18px;font-weight:700;line-height:24px;color:var(--fg);font-variant-numeric:tabular-nums;white-space:nowrap}
+/* Étiquette de poste dans le tableau des saisons */
 td.gcol{width:1%}
 .gtag{display:inline-block;min-width:20px;text-align:center;font-size:12px;font-weight:700;line-height:18px;border-radius:5px;border:1px solid var(--line);color:var(--fg)}
 .gtag.lead{border-color:var(--ink1);color:var(--ink1)}
+
+/* ===== Moteur de saisie commun (connect/grid_input.js) : barre d'état toujours visible, case refusée et sa bulle — maquette docs/maquettes/saisie_moteur_commun.html (variante A, validée le 2026-11-14) ===== */
+:root{--gbar-h:46px}
+:root:has(.gbar[data-state="err"]){--gbar-h:84px}
+@media (max-width:640px){:root{--gbar-h:78px}:root:has(.gbar[data-state="err"]){--gbar-h:150px}}
+html:has(.gbar){scroll-padding-bottom:calc(var(--gbar-h) + 10px)}
+#scrollmain{scroll-padding:36px 0 64px 210px}          /* haut : sous l'en-tête collant ; bas : place pour la bulle ; gauche : sous la colonne des noms */
+html:has(.gbar) #scrollmain{max-height:calc(100vh - 210px - var(--gbar-h))}
+
+/* 1. Barre d'état de la saisie : dernier enfant de <main>, collée au bas de la fenêtre ; à la fin de la page elle reprend sa place
+      dans le flux et ne recouvre plus rien. Bord supérieur = 2e couleur de l'équipe (écho de la bordure de l'en-tête). */
+.gbar{position:sticky;bottom:0;z-index:50;display:flex;flex-wrap:wrap;align-items:center;gap:4px 18px;min-height:46px;margin:14px 0 0;padding:7px 14px;
+  background:var(--panel);border:1px solid var(--line);border-bottom:0;border-radius:10px 10px 0 0;box-shadow:inset 0 3px 0 var(--c2),0 -6px 16px rgba(0,0,0,.14);font-size:13px;line-height:1.3}
+.gbar svg{width:15px;height:15px;flex:none}
+.gbar>span,.gbar>p{display:inline-flex;align-items:center;gap:6px;margin:0;min-width:0}
+.gbar-pend b{display:inline-block;min-width:22px;padding:1px 7px;border-radius:9px;background:var(--base1);color:var(--on-base1);text-align:center;font-variant-numeric:tabular-nums}
+.gbar-pend[data-n="0"]{color:var(--muted)}
+.gbar-saved{color:var(--muted)}
+.gbar-al{font-weight:600;color:var(--st-ok-ink)}.gbar-al.bad{color:var(--st-err-ink)}
+.gbar-live{flex:0 1 auto;color:var(--fg)}.gbar-live:empty{display:none}
+.gbar-live.bad{color:var(--st-err-ink);font-weight:600}
+.gbar-key{margin-left:auto!important;color:var(--muted);font-size:12px}
+.gbar kbd{font:inherit;font-size:11px;padding:0 5px;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;background:color-mix(in srgb,var(--fg) 5%,var(--panel));color:var(--fg)}
+/* état d'erreur : le stockage local refuse d'écrire. Fond teinté, bord épais, icône, texte qui dit quoi faire, bouton d'export. */
+.gbar[data-state="err"]{background:color-mix(in srgb,var(--st-err) 12%,var(--panel));box-shadow:inset 0 4px 0 var(--st-err),0 -6px 16px rgba(0,0,0,.14);border-color:var(--st-err)}
+.gbar>p.gbar-err{flex:1 1 100%;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:4px 10px;align-items:center;color:var(--fg)}.gbar-err b{color:var(--st-err-ink)}.gbar-err svg{width:18px;height:18px;color:var(--st-err)}
+.gbar-err .btn{padding:4px 10px;font-size:13px;white-space:nowrap}
+@media (max-width:640px){.gbar>p.gbar-err{grid-template-columns:auto minmax(0,1fr)}.gbar-err .btn{grid-column:2;justify-self:start}}
+@media (max-width:640px){.gbar{gap:2px 12px;padding:6px 10px}.gbar-saved,.gbar-key{display:none!important}.gbar-live{flex-basis:100%}}
+/* Ligne de correction .gbar-fix : produite quand la case qui a le focus est refusée. Large écran (variante A) : masquée, la bulle suffit.
+   Écran étroit (< 641 px) : la bulle serait coupée par la colonne des noms collante ; la ligne de la barre la remplace, et l'annonce
+   identique de #gbar-live est seulement masquée à l'écran (toujours lue). */
+@media (min-width:641px){.gbar[data-tip="1"] .gbar-fix{display:none}}
+@media (max-width:640px){td.ci.rej>.gi-tip{display:none!important}.gbar:has(.gbar-fix) .gbar-live.bad{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}}
+
+/* 2. Case dont la valeur est refusée : le texte tapé reste, la case garde le code .err, un coin marqué (pas la couleur seule)
+      et une bulle qui dit comment corriger. La bulle est toujours dans le DOM (aria-describedby), visible tant que la case a le focus. */
+table.grid td.ci{position:relative}
+td.ci.rej::after{content:"";position:absolute;top:2px;right:2px;border-style:solid;border-width:0 8px 8px 0;border-color:transparent var(--st-err) transparent transparent;border-radius:0 5px 0 0;pointer-events:none}
+td.ci.rej input.cell{border-color:var(--st-err);background:color-mix(in srgb,var(--st-err) 14%,var(--panel));color:var(--fg);font-style:italic}
+.gi-tip{display:none;position:absolute;z-index:6;left:50%;top:calc(100% + 6px);transform:translateX(-50%);width:max-content;max-width:250px;padding:6px 10px 7px;
+  background:var(--panel);color:var(--fg);border:1px solid var(--st-err);border-left-width:4px;border-radius:7px;box-shadow:0 6px 18px rgba(0,0,0,.22);
+  font-size:12.5px;line-height:1.35;white-space:normal;text-align:left;font-style:normal}
+.gi-tip::before{content:"";position:absolute;left:50%;top:-6px;width:10px;height:10px;margin-left:-5px;background:var(--panel);border:1px solid var(--st-err);border-width:1px 0 0 1px;transform:rotate(45deg)}
+.gi-tip.up{top:auto;bottom:calc(100% + 6px)}.gi-tip.up::before{top:auto;bottom:-6px;border-width:0 1px 1px 0}
+.gi-tip b{display:flex;gap:5px;align-items:center;color:var(--st-err-ink)}.gi-tip b svg{width:13px;height:13px;color:var(--st-err);flex:none}
+td.ci.rej:focus-within>.gi-tip,td.ci.rej:hover>.gi-tip{display:block}
+/* 1re colonne : une bulle ne passe pas sous la colonne des noms collante */
+table.grid td.ci.first>.gi-tip{left:0;transform:none}table.grid td.ci.first>.gi-tip::before{left:18px}
+@media (prefers-reduced-motion:no-preference){td.ci.rej:focus-within>.gi-tip{animation:gi-in .12s ease-out}}
+@keyframes gi-in{from{opacity:0}to{opacity:1}}
+/* ligne de correction dans la barre (écran étroit seulement) */
+.gbar-fix{flex:1 1 100%;color:var(--fg)}.gbar-fix b{color:var(--st-err-ink)}.gbar-fix svg{color:var(--st-err)}
 main.entry{display:block;max-width:1280px}main.entry .pick{margin-bottom:14px}
 .acts{display:flex;gap:8px;margin-left:auto;flex-wrap:wrap}.btn{font:inherit;padding:8px 14px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--fg);cursor:pointer}
 .btn:hover{border-color:var(--c1)}.btn.ghost{color:var(--muted)}
@@ -159,15 +217,15 @@ table.grid{font-size:13px}table.grid th,table.grid td{padding:2px 4px}table.grid
 table.grid thead th{position:sticky;top:0;background:var(--panel);z-index:2}
 td.ci{padding:0}input.cell{width:56px;font:inherit;font-size:13px;text-align:right;padding:5px 6px;border:1px solid transparent;border-radius:6px;background:transparent;color:var(--fg);font-variant-numeric:tabular-nums}
 input.cell:hover{border-color:var(--line)}input.cell:focus{border-color:var(--c1);background:color-mix(in srgb,var(--c1) 8%,var(--panel))}
-td.ci.err input.cell{border-color:#c0392b;background:color-mix(in srgb,#c0392b 14%,transparent)}td.ci.warn input.cell{border-color:#d68910;background:color-mix(in srgb,#d68910 14%,transparent)}
+td.ci.err input.cell{border-color:var(--st-err);background:color-mix(in srgb,var(--st-err) 14%,transparent)}td.ci.warn input.cell{border-color:var(--st-warn);background:color-mix(in srgb,var(--st-warn) 14%,transparent)}
 td.d{color:var(--muted);background:color-mix(in srgb,var(--line) 35%,transparent)}th.d{color:var(--muted)}
-.badge{display:inline-block;min-width:18px;padding:0 6px;border-radius:9px;background:#d68910;color:#fff;font-size:12px;text-align:center}.badge.bad{background:#c0392b}
-.foot{display:flex;gap:18px;flex-wrap:wrap;padding:10px 4px;font-size:13px;border-top:1px solid var(--line);margin-top:6px}.foot .bad{color:#c0392b;font-weight:600}.foot .ok{color:#1e8449;font-weight:600}
+.badge{display:inline-block;min-width:18px;padding:0 6px;border-radius:9px;background:var(--st-warn);color:var(--panel);font-size:12px;text-align:center}.badge.bad{background:var(--st-err)}
+.foot{display:flex;gap:18px;flex-wrap:wrap;padding:10px 4px;font-size:13px;border-top:1px solid var(--line);margin-top:6px}.foot .bad{color:var(--st-err);font-weight:600}.foot .ok{color:var(--st-ok-ink);font-weight:600}
 select.cell{width:auto;min-width:96px;text-align:left}input.cell.text,input.cell.player,input.cell.date{text-align:left}input.cell.date{width:104px}input.cell.player{width:170px}input.cell.int{width:84px}
-a.navlink{color:var(--on-base1);text-decoration:underline;align-self:center;font-size:14px}.x{border:0;background:transparent;color:var(--muted);font-size:18px;cursor:pointer}.x:hover{color:#c0392b}
+a.navlink{color:var(--on-base1);text-decoration:underline;align-self:center;font-size:14px}.x{border:0;background:transparent;color:var(--muted);font-size:18px;cursor:pointer}.x:hover{color:var(--st-err)}
 details.base{margin-bottom:12px}details.base summary{cursor:pointer;color:var(--muted);font-size:13px}.tabs{flex-wrap:wrap}
 table.ev th{white-space:nowrap}table.ev td.ci{padding:0 2px}
-.acts.left{margin-left:0;align-items:center}p.ok{color:#1e8449;font-weight:600}p.bad{color:#c0392b;font-weight:600}p.warn{color:var(--st-warn-ink);font-weight:600}
+.acts.left{margin-left:0;align-items:center}p.ok{color:var(--st-ok-ink);font-weight:600}p.bad{color:var(--st-err);font-weight:600}p.warn{color:var(--st-warn-ink);font-weight:600}
 
 /* ===================== Grilles du moteur (Début de saison, Saison morte) ===================== */
 /* Bordures sur les cellules et même hauteur partout (la colonne des noms s'appelle « pl » : « who » est déjà pris par la fiche joueur) */
@@ -179,7 +237,7 @@ table.grid.ev thead th{position:sticky;top:0;background:var(--panel);z-index:2;f
 table.grid.ev td.ci input.cell,table.grid.ev td.ci select.cell{height:30px;box-sizing:border-box;border:1px solid color-mix(in srgb,var(--fg) 24%,var(--line));border-radius:7px;background:color-mix(in srgb,var(--fg) 4.5%,var(--panel))}
 table.grid.ev td.ci input.cell:hover,table.grid.ev td.ci select.cell:hover{border-color:var(--c1)}
 table.grid.ev td.ci input.cell:focus,table.grid.ev td.ci select.cell:focus{border-color:var(--c1);background:color-mix(in srgb,var(--c1) 13%,var(--panel))}
-table.grid.ev td.ci.err input.cell,table.grid.ev td.ci.err select.cell{border-color:#c0392b;background:color-mix(in srgb,#c0392b 14%,var(--panel))}table.grid.ev td.ci.warn input.cell,table.grid.ev td.ci.warn select.cell{border-color:#d68910;background:color-mix(in srgb,#d68910 14%,var(--panel))}
+table.grid.ev td.ci.err input.cell,table.grid.ev td.ci.err select.cell{border-color:var(--st-err);background:color-mix(in srgb,var(--st-err) 14%,var(--panel))}table.grid.ev td.ci.warn input.cell,table.grid.ev td.ci.warn select.cell{border-color:var(--st-warn);background:color-mix(in srgb,var(--st-warn) 14%,var(--panel))}
 table.grid.ev th.d,table.grid.ev td.d{text-align:center}
 /* alignement : groupes (capitaine et assistants, trios, paires, gardiens, surnuméraires) */
 tr.g-lead{--kc:#c9a227}tr.g-fwd{--kc:#3b82c4}tr.g-def{--kc:#3b9a5b}tr.g-gk{--kc:#8a5cc2}tr.g-ext{--kc:#8c93a1}
@@ -197,7 +255,7 @@ table.grid.ev.ratings th.pl{min-width:200px}.nm{font-weight:600}.poschip{margin-
 .poschip.pos-F{background:color-mix(in srgb,#3b82c4 20%,transparent);color:#3b82c4}.poschip.pos-D{background:color-mix(in srgb,#3b9a5b 20%,transparent);color:#3b9a5b}.poschip.pos-G{background:color-mix(in srgb,#8a5cc2 20%,transparent);color:#8a5cc2}
 table.ratings input.cell.int{width:76px;text-align:center}table.ratings td.ci{text-align:center}table.ratings th:not(.pl){text-align:center}
 tr.grphead th,table.ratings tr.grphead th{position:static!important;height:30px;text-align:left!important;font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);background:color-mix(in srgb,var(--line) 55%,var(--panel));border-right:0}
-.up{color:#1e8449;font-weight:700}.down{color:#c0392b;font-weight:700}.flat{color:var(--muted)}
+.up{color:var(--st-ok-ink);font-weight:700}.down{color:var(--st-err);font-weight:700}.flat{color:var(--muted)}
 .summary{display:flex;align-items:center;gap:16px;margin:10px 0;font-size:14px;flex-wrap:wrap}.summary .bar{flex:1 1 200px;max-width:380px;margin:0}
 .toolbar{display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;margin:6px 0 10px}.fld.sm{margin:0;font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:3px}.fld.sm input{font:inherit;font-size:14px;padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--fg);width:220px}
 .btn.small{padding:0 14px;height:34px;font-size:13px}.btn.on{background:var(--c1);color:var(--on-c1);border-color:var(--c1)}
@@ -208,7 +266,7 @@ table.grid.ev.sched th.d.gap,table.grid.ev.sched td.gap{width:64px;min-width:64p
 input.cell.teamlist{width:270px;text-align:left}
 /* importation du calendrier */
 .imp-box{border:1px solid color-mix(in srgb,var(--c1) 35%,var(--line));border-radius:12px;padding:12px 16px;margin:10px 0;background:color-mix(in srgb,var(--c1) 5%,var(--panel))}.imp-box h4{margin:0 0 8px;font-size:14px}.imp-box p{margin:6px 0;font-size:13px}
-table.imp-prev{border-collapse:collapse;font-size:13px;margin:8px 0}table.imp-prev th,table.imp-prev td{padding:3px 12px 3px 0;text-align:left;border-bottom:1px solid var(--line)}table.imp-prev tr.bad td{color:#c0392b}
+table.imp-prev{border-collapse:collapse;font-size:13px;margin:8px 0}table.imp-prev th,table.imp-prev td{padding:3px 12px 3px 0;text-align:left;border-bottom:1px solid var(--line)}table.imp-prev tr.bad td{color:var(--st-err)}
 
 /* sélecteurs de la zone de choix : largeur raisonnable sur les pages de saison */
 main.entry .pick label{flex:0 0 auto}main.entry .pick select{min-width:190px}
@@ -224,7 +282,7 @@ table.grid.ev.ratings th.pl{min-width:200px}
   .panels.ratings .p-F{grid-area:F}.panels.ratings .p-D{grid-area:D}.panels.ratings .p-G{grid-area:G}
 }
 
-.guide{margin:6px 0 12px;padding-left:20px;font-size:13px}.guide li{margin:6px 0}.guide li.hot{color:var(--fg);font-weight:600;background:color-mix(in srgb,#d68910 14%,transparent);border-radius:6px;padding:4px 8px;margin-left:-8px}.fails{margin:10px 0;padding:10px 14px;border:1px solid color-mix(in srgb,#c0392b 40%,var(--line));border-radius:10px;background:color-mix(in srgb,#c0392b 5%,var(--panel))}.fails h4{margin:0 0 6px;font-size:13px}.fails ul{margin:0;padding-left:18px;font-size:13px}.fails li{margin:5px 0}.fails code{font-size:12px}
+.guide{margin:6px 0 12px;padding-left:20px;font-size:13px}.guide li{margin:6px 0}.guide li.hot{color:var(--fg);font-weight:600;background:color-mix(in srgb,var(--st-warn) 14%,transparent);border-radius:6px;padding:4px 8px;margin-left:-8px}.fails{margin:10px 0;padding:10px 14px;border:1px solid color-mix(in srgb,var(--st-err) 40%,var(--line));border-radius:10px;background:color-mix(in srgb,var(--st-err) 5%,var(--panel))}.fails h4{margin:0 0 6px;font-size:13px}.fails ul{margin:0;padding-left:18px;font-size:13px}.fails li{margin:5px 0}.fails code{font-size:12px}
 
 /* équipes personnalisées et divisions (écran Franchise) */
 .cust{list-style:none;margin:6px 0;padding:0}.cust li{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);font-size:14px;flex-wrap:wrap}.cust .sw{width:14px;height:14px;border-radius:50%;display:inline-block}.cust .tlogo{width:26px;height:26px}
@@ -240,7 +298,7 @@ main.entry>.setup-grid{grid-column:1/-1;display:grid;gap:16px;grid-template-colu
 .card.compact{padding:10px 14px}.card.compact h3{font-size:13px;margin:0 0 6px}.card.compact p{margin:4px 0;font-size:13px}.card.compact .note{font-size:12px}.card.compact .bar{height:6px;margin:6px 0}.card.compact .btn{padding:6px 12px;font-size:13px}.card.compact .acts{margin-top:6px}
 .guide-card{padding:10px 14px}.guide-card h3{font-size:13px;margin:0 0 6px}.guide-card h4{font-size:12px;margin:10px 0 4px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
 .steps{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px}.steps li{display:flex;gap:8px;align-items:flex-start;font-size:12.5px;line-height:1.35}.steps b{flex:none;width:20px;height:20px;border-radius:50%;background:var(--c1);color:var(--on-c1);display:inline-flex;align-items:center;justify-content:center;font-size:12px}
-.errs{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:6px 14px}.errs li{font-size:12.5px;line-height:1.35;padding:4px 8px;border-left:3px solid var(--line)}.errs li.hot{border-left-color:#d68910;background:color-mix(in srgb,#d68910 14%,transparent);font-weight:600}
+.errs{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:6px 14px}.errs li{font-size:12.5px;line-height:1.35;padding:4px 8px;border-left:3px solid var(--line)}.errs li.hot{border-left-color:var(--st-warn);background:color-mix(in srgb,var(--st-warn) 14%,transparent);font-weight:600}
 
 /* écran Franchise : divisions sur une seule rangée, textes d'introduction plus petits */
 .setup-grid .divs{grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:8px}.setup-grid .div{padding:6px 8px}.setup-grid .dv{font-size:12px}.setup-grid .dv select{font-size:11px;padding:0 2px}
@@ -301,17 +359,17 @@ table.grid.ev.awards td:hover .tip,table.grid.ev.awards td:focus-within .tip{dis
 /* ===== arbre des séries ===== */
 .tree{display:grid;grid-template-columns:repeat(7,minmax(112px,1fr));gap:6px;align-items:stretch;min-width:860px}.tcol{display:flex;flex-direction:column}.thead{text-align:center;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);height:30px;display:flex;align-items:center;justify-content:center;gap:5px;white-space:nowrap}
 .tcol .tbody{flex:1;display:flex;flex-direction:column;justify-content:space-around;gap:10px}.pair{position:relative;display:flex;flex-direction:column;gap:3px;padding:0 2px}.pair .dbadge{align-self:center}
-.sbox{border:1px solid var(--line);border-radius:10px;background:var(--panel);overflow:hidden}.sbox.bad{border-color:#c0392b}.srow{display:flex;align-items:center;gap:6px;padding:3px 6px;min-height:36px}.srow+.srow{border-top:1px solid var(--line)}.srow.win{background:color-mix(in srgb,var(--c1) 14%,transparent);font-weight:700}.srow.lose{opacity:.6}
+.sbox{border:1px solid var(--line);border-radius:10px;background:var(--panel);overflow:hidden}.sbox.bad{border-color:var(--st-err)}.srow{display:flex;align-items:center;gap:6px;padding:3px 6px;min-height:36px}.srow+.srow{border-top:1px solid var(--line)}.srow.win{background:color-mix(in srgb,var(--c1) 14%,transparent);font-weight:700}.srow.lose{opacity:.6}
 .srow .tl{display:inline-flex;width:30px;height:30px;align-items:center;justify-content:center}.srow .tl .tlogo{width:28px;height:28px}.srow .tl.none{color:var(--muted)}.srow .seed{flex:1;font-size:10px;color:var(--muted);white-space:nowrap}
 .srow .lcell input.cell{width:38px;text-align:center;padding:2px}
 .dbadge{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.08em;border:1px solid var(--line);border-radius:999px;padding:1px 8px;color:var(--muted);background:color-mix(in srgb,var(--fg) 4%,var(--panel))}
-.cbadge{display:inline-block;font-weight:800;border-radius:999px;padding:1px 8px;font-size:10px;color:#fff}.cbadge.west{background:#1f6fb2}.cbadge.east{background:#c0392b}
+.cbadge{display:inline-block;font-weight:800;border-radius:999px;padding:1px 8px;font-size:10px;color:#fff}.cbadge.west{background:#1f6fb2}.cbadge.east{background:var(--st-err)}
 .tcol.fin .tbody{justify-content:center}.cupwrap{display:flex;justify-content:center;margin-bottom:10px}.cupimg{height:110px;width:auto}
 .layout.allstar,.layout.series{overflow-x:auto}
 /* retouches : en-têtes de l'arbre sur deux lignes, champs de l'alignement */
 .thead{flex-direction:column;white-space:normal;line-height:1.15;height:40px;text-align:center;gap:2px}
 .lineup input.cell,.lineup select.cell{border:1px solid var(--line);border-radius:8px;background:color-mix(in srgb,var(--fg) 5%,var(--panel));color:inherit;font:inherit;font-size:12.5px;padding:5px 6px}
-.lineup input.cell{text-align:center;font-weight:600}.lineup select.cell{font-size:12px;padding:5px 2px}.lineup .lcell.err input.cell,.lineup .lcell.err select.cell{border-color:#c0392b;background:color-mix(in srgb,#c0392b 12%,var(--panel))}
+.lineup input.cell{text-align:center;font-weight:600}.lineup select.cell{font-size:12px;padding:5px 2px}.lineup .lcell.err input.cell,.lineup .lcell.err select.cell{border-color:var(--st-err);background:color-mix(in srgb,var(--st-err) 12%,var(--panel))}
 .srow .lcell input.cell{border:1px solid var(--line);border-radius:6px;background:color-mix(in srgb,var(--fg) 5%,var(--panel));color:inherit;font:inherit;font-weight:700}
 /* logos des séries : info-bulle immédiate, divisions et conférences en images, logo des séries avec l'année */
 .tl[data-name]{position:relative}.tl[data-name]:hover::after{content:attr(data-name);position:absolute;bottom:calc(100% + 4px);left:0;background:var(--fg);color:var(--panel);padding:3px 9px;border-radius:6px;font-size:12px;font-weight:600;white-space:nowrap;z-index:30;pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,.25)}
@@ -321,9 +379,9 @@ table.grid.ev.awards td:hover .tip,table.grid.ev.awards td:focus-within .tip{dis
 
 /* ===== Coupe Stanley : joueurs de l'équipe gagnante ===== */
 .cupchamp{display:flex;align-items:center;gap:10px;margin:2px 0 14px}.cupchamp label{font-weight:700}.cupchamp select.cell{min-width:240px}.cupchamp .olg .tlogo{width:34px;height:34px}
-.mtitle{margin:6px 0 8px;font-size:13px;letter-spacing:.06em;text-transform:uppercase}.mcount{margin-left:8px;font-size:12px;color:var(--muted);text-transform:none;letter-spacing:0}.mcount.over{color:#c0392b;font-weight:700}
+.mtitle{margin:6px 0 8px;font-size:13px;letter-spacing:.06em;text-transform:uppercase}.mcount{margin-left:8px;font-size:12px;color:var(--muted);text-transform:none;letter-spacing:0}.mcount.over{color:var(--st-err);font-weight:700}
 .members{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px}.mgrp{border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:color-mix(in srgb,var(--fg) 2.5%,var(--panel))}.mgrp h4{margin:0 0 8px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
-.mrow{display:flex;align-items:center;gap:8px;margin-bottom:5px}.mnum{width:22px;text-align:right;font-size:11px;color:var(--muted)}.mrow input.cell{flex:1;min-width:0;border:1px solid var(--line);border-radius:8px;background:color-mix(in srgb,var(--fg) 5%,var(--panel));color:inherit;font:inherit;padding:5px 8px}.mrow .lcell.err input.cell{border-color:#c0392b}
+.mrow{display:flex;align-items:center;gap:8px;margin-bottom:5px}.mnum{width:22px;text-align:right;font-size:11px;color:var(--muted)}.mrow input.cell{flex:1;min-width:0;border:1px solid var(--line);border-radius:8px;background:color-mix(in srgb,var(--fg) 5%,var(--panel));color:inherit;font:inherit;padding:5px 8px}.mrow .lcell.err input.cell{border-color:var(--st-err)}
 /* ===== retraites ===== */
 table.grid.ev.retire th{white-space:normal;line-height:1.15;vertical-align:bottom;text-align:center}table.grid.ev.retire td,table.grid.ev.retire th{padding:0 3px}
 table.grid.ev.retire input.cell{width:100%;min-width:46px}table.grid.ev.retire input.cell[data-c="season"]{width:62px;min-width:62px;text-align:center}table.grid.ev.retire input.cell[data-c="name"]{min-width:170px;width:190px}table.grid.ev.retire input.cell[data-c="hof"]{width:70px;text-align:center}
@@ -357,21 +415,21 @@ table.grid.ev.retire input.cell.tcombo[data-c="team"]{min-width:126px;max-width:
 .lineup input.cell.tcombo{text-align:left;font-weight:400;font-size:12px;padding:5px 2px 5px 6px}
 
 /* événements : mouvements et blessures */
-table.grid.ev.mv td.na{background:repeating-linear-gradient(135deg,transparent 0 5px,color-mix(in srgb,var(--fg) 6%,transparent) 5px 6px)}table.grid.ev.mv tr.saved.edited>td{background:color-mix(in srgb,#d68910 11%,transparent)}
+table.grid.ev.mv td.na{background:repeating-linear-gradient(135deg,transparent 0 5px,color-mix(in srgb,var(--fg) 6%,transparent) 5px 6px)}table.grid.ev.mv tr.saved.edited>td{background:color-mix(in srgb,var(--st-warn) 11%,transparent)}
 table.grid.ev.mv select.cell[data-c="pid"]{min-width:200px}table.grid.ev.mv td.num.d{text-align:center;font-weight:600}
 
 /* contrats et offres hostiles */
-table.grid.ev.ct td.na,table.grid.ev.os td.na{background:repeating-linear-gradient(135deg,transparent 0 5px,color-mix(in srgb,var(--fg) 6%,transparent) 5px 6px)}table.grid.ev.ct tr.saved.edited>td{background:color-mix(in srgb,#d68910 11%,transparent)}
+table.grid.ev.ct td.na,table.grid.ev.os td.na{background:repeating-linear-gradient(135deg,transparent 0 5px,color-mix(in srgb,var(--fg) 6%,transparent) 5px 6px)}table.grid.ev.ct tr.saved.edited>td{background:color-mix(in srgb,var(--st-warn) 11%,transparent)}
 table.grid.ev.ct select.cell[data-c="pid"],table.grid.ev.os select.cell[data-c="pid"]{min-width:190px}table.grid.ev.ct select.cell[data-c^="cl"]{min-width:104px;font-size:12px}table.grid.ev.ct th,table.grid.ev.os th{white-space:normal;line-height:1.15;vertical-align:bottom}
 table.grid.ev.ct select.cell[data-c="years"],table.grid.ev.ct select.cell[data-c="first"]{min-width:90px}table.grid.ev.os input.cell.tcombo{min-width:120px}table.grid.ev.os input.cell.int{width:70px;text-align:center}table.grid.ev.os select.cell[data-c$="r"]{min-width:56px}
 
 /* transactions : formulaire à deux équipes et liste en cartes */
-.tcard{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:0 0 14px;background:var(--panel)}.tcard.editing{border-color:#d68910;box-shadow:0 0 0 2px color-mix(in srgb,#d68910 25%,transparent)}
+.tcard{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:0 0 14px;background:var(--panel)}.tcard.editing{border-color:var(--st-warn);box-shadow:0 0 0 2px color-mix(in srgb,var(--st-warn) 25%,transparent)}
 .tch{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:8px}.tch label{display:flex;flex-direction:column;font-size:12px;gap:3px;color:var(--muted)}.tch .tedit{color:var(--st-warn-ink);font-weight:700;font-size:13px}.tch .x{margin-left:auto}
 table.trg{border-collapse:separate;border-spacing:0}table.trg th.side{background:color-mix(in srgb,var(--fg) 6%,transparent);text-align:left;padding:6px 10px;font-size:14px}table.trg th.side .tlogo{width:26px;height:26px;margin-right:8px}
 table.trg th.grp{border-bottom:2px solid var(--line);font-size:12px}table.trg th.el{text-align:left;font-weight:600;white-space:nowrap;padding-right:10px;color:var(--muted)}table.trg td.gap,table.trg th.gap{width:18px;min-width:18px;padding:0;background:transparent;border:0}
 table.trg td.na{background:repeating-linear-gradient(135deg,transparent 0 5px,color-mix(in srgb,var(--fg) 6%,transparent) 5px 6px)}table.trg select.cell,table.trg input.cell{min-width:0;font-size:13px}table.trg select.cell[data-c$=":pid"]{min-width:170px}table.trg select.cell[data-c$=":type"]{min-width:84px}table.trg input.cell.tcombo{min-width:130px}table.trg input.cell.int{width:84px;text-align:center}table.trg select.cell[data-c$=":round"]{min-width:56px}
-.trlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:12px;margin-top:8px}.trc{border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--panel)}.trc.editing{border-color:#d68910;opacity:.85}
+.trlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:12px;margin-top:8px}.trc{border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--panel)}.trc.editing{border-color:var(--st-warn);opacity:.85}
 .trc header{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px}.trc header .d{font-weight:700;font-variant-numeric:tabular-nums}.trc header .tt{display:inline-flex;align-items:center;gap:5px}.trc header .arr{color:var(--muted)}.trc header .btn{margin-left:auto}
 .trc .cols{display:grid;grid-template-columns:1fr 1fr;gap:10px}.trc h5{margin:0 0 4px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}.trc ul{list-style:none;margin:0;padding:0;font-size:13px}.trc li{padding:3px 0;border-top:1px dashed var(--line)}.trc li:first-child{border-top:0}
 table.grid.ev td.pos0{color:var(--muted);font-weight:600;text-align:center}
@@ -565,7 +623,7 @@ table.grid.ev.pl tr.ple-row>td{height:auto;padding:0 0 14px;white-space:normal;b
 /* ===== fin de la proposition ===== */
 .fld{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);margin:10px 0;max-width:520px}.fld input{font:inherit;font-size:15px;padding:9px 11px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--fg)}.ok{color:#1e8449;font-weight:600}.bad{color:#c0392b;font-weight:600}tr.badrow td{background:color-mix(in srgb,#c0392b 12%,transparent)}main.entry{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px}</style></head>
 <body><div id="app"></div>
-<script id="cfg" type="application/json">{"url": "https://zbvpzklmbvvodnrlhumi.supabase.co", "key": "sb_publishable_7fo7NGJa5V5Tq9jc5ABsPQ_RNzdhCt5", "expected": {"award": 13, "franchise": 1, "historical_award_counts": 14, "label": 2462, "player": 1257, "player_rating": 1554, "player_stint": 348, "position_change": 10, "projected_level": 44, "retirement": 384, "role_assignment": 648, "roster_move": 672, "salary_cap_season": 25, "schedule_game": 2050, "skater_season_stats": 5459, "stanley_cup_member": 575, "team": 39, "team_season_stats": 50, "trade": 174, "trade_asset": 782, "all_star_selection": 300, "award_win": 334, "contract": 713, "contract_year": 1444, "data_issue": 606, "data_version": 0, "draft_lottery": 384, "draft_pick": 181, "draft_pick_initial": 182, "draft_top3": 72, "goalie_season_stats": 494, "offer_sheet": 0, "offer_sheet_pick": 0, "playoff_series": 375, "standing": 800, "stanley_cup_result": 25}, "views": ["v_skater_career_totals", "v_skater_career_records", "v_skater_season_records", "v_contract_year_level", "v_radar_thresholds_ppg"]}</script>
+<script id="cfg" type="application/json">{"url": "https://zbvpzklmbvvodnrlhumi.supabase.co", "key": "sb_publishable_7fo7NGJa5V5Tq9jc5ABsPQ_RNzdhCt5", "expected": {"award": 13, "franchise": 1, "historical_award_counts": 14, "label": 2534, "player": 1257, "player_rating": 1554, "player_stint": 348, "position_change": 10, "projected_level": 44, "retirement": 384, "role_assignment": 648, "roster_move": 672, "salary_cap_season": 25, "schedule_game": 2050, "skater_season_stats": 5459, "stanley_cup_member": 575, "team": 39, "team_season_stats": 50, "trade": 174, "trade_asset": 782, "all_star_selection": 300, "award_win": 334, "contract": 713, "contract_year": 1444, "data_issue": 606, "data_version": 0, "draft_lottery": 384, "draft_pick": 181, "draft_pick_initial": 182, "draft_top3": 72, "goalie_season_stats": 494, "offer_sheet": 0, "offer_sheet_pick": 0, "playoff_series": 375, "standing": 800, "stanley_cup_result": 25}, "views": ["v_skater_career_totals", "v_skater_career_records", "v_skater_season_records", "v_contract_year_level", "v_radar_thresholds_ppg"]}</script>
 <script>/* Petit client Supabase sans dépendance : connexion par courriel, lecture, écriture, comptage. Utilise seulement fetch. */
 (function (root) {
   // Tables propres à une franchise : chaque lecture et chaque modification est filtrée sur la franchise active (franchise_id).
