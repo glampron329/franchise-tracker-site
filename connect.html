@@ -370,8 +370,6 @@ tr.g-year.ga1>th,tr.g-year.ga1>td{background-image:linear-gradient(color-mix(in 
 table.grid.ev.picks input.cell{width:100%;min-width:56px}table.grid.ev.picks input.cell.text{min-width:110px}table.grid.ev.picks input.cell.int{width:62px;text-align:center}table.grid.ev.picks input.cell.date{width:118px}table.grid.ev.picks th.pl{min-width:90px}
 .scroll.vs{max-height:calc(100vh - 230px);overflow:auto}.scroll.vs thead th{position:sticky;top:0;z-index:4}
 /* définitions sous le tableau */
-section.defs{margin:14px 0 4px;padding:10px 14px;border:1px solid var(--line);border-radius:10px;background:color-mix(in srgb,var(--fg) 2.5%,var(--panel))}section.defs h4{margin:0 0 6px;font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
-section.defs dl{margin:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:6px 22px}section.defs dl>div{display:flex;flex-direction:column;font-size:12.5px;line-height:1.35}section.defs dt{font-weight:700}section.defs dd{margin:0;color:var(--muted)}
 
 /* cellules calculées sans teinte (seules les colonnes de montants calculés sont grisées) ; tableau des choix resserré */
 table.grid.ev td.ro:not(.calc){background:transparent!important;background-image:none}
@@ -384,7 +382,7 @@ table.grid.ev td.lg{width:44px;min-width:44px;text-align:center;padding:0 2px}ta
 /* choix de repêchage : drapeau, aide à la saisie */
 img.flag{width:22px;height:15px;object-fit:cover;border:1px solid var(--line);border-radius:2px;margin-left:6px;vertical-align:middle}
 table.grid.ev.picks select.cell[data-c="country"]{min-width:128px}table.grid.ev.picks select.cell[data-c="ptype"]{min-width:168px}table.grid.ev.picks th{vertical-align:bottom}
-.btn.small{padding:3px 10px;font-size:12px;margin-left:8px}section.defs.flash{outline:3px solid var(--c1);transition:outline .3s}
+.btn.small{padding:3px 10px;font-size:12px;margin-left:8px}
 
 /* trophées */
 table.grid.ev.awards th.pl{width:44px;min-width:44px;padding:0 4px;text-align:center}svg.trophy,img.trophy{width:26px;height:26px;vertical-align:middle}
@@ -679,7 +677,7 @@ table.grid.ev.pl tr.ple-row>td{height:auto;padding:0 0 14px;white-space:normal;b
 /* ===== fin de la proposition ===== */
 .fld{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);margin:10px 0;max-width:520px}.fld input{font:inherit;font-size:15px;padding:9px 11px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--fg)}.ok{color:#1e8449;font-weight:600}.bad{color:#c0392b;font-weight:600}tr.badrow td{background:color-mix(in srgb,#c0392b 12%,transparent)}main.entry{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px}</style></head>
 <body><div id="app"></div>
-<script id="cfg" type="application/json">{"url": "https://zbvpzklmbvvodnrlhumi.supabase.co", "key": "sb_publishable_7fo7NGJa5V5Tq9jc5ABsPQ_RNzdhCt5", "expected": {"award": 13, "franchise": 1, "historical_award_counts": 14, "label": 2760, "player": 1257, "player_rating": 1554, "player_stint": 348, "position_change": 10, "projected_level": 44, "retirement": 384, "role_assignment": 648, "roster_move": 672, "salary_cap_season": 25, "schedule_game": 2050, "skater_season_stats": 5459, "stanley_cup_member": 575, "team": 39, "team_season_stats": 50, "trade": 174, "trade_asset": 782, "all_star_selection": 300, "award_win": 334, "contract": 713, "contract_year": 1444, "data_issue": 606, "data_version": 0, "draft_lottery": 384, "draft_pick": 181, "draft_pick_initial": 182, "draft_top3": 72, "goalie_season_stats": 494, "offer_sheet": 0, "offer_sheet_pick": 0, "playoff_series": 375, "standing": 800, "stanley_cup_result": 25}, "views": ["v_skater_career_totals", "v_skater_career_records", "v_skater_season_records", "v_contract_year_level", "v_radar_thresholds_ppg"]}</script>
+<script id="cfg" type="application/json">{"url": "https://zbvpzklmbvvodnrlhumi.supabase.co", "key": "sb_publishable_7fo7NGJa5V5Tq9jc5ABsPQ_RNzdhCt5", "expected": {"award": 13, "franchise": 1, "historical_award_counts": 14, "label": 2808, "player": 1257, "player_rating": 1554, "player_stint": 348, "position_change": 10, "projected_level": 44, "retirement": 384, "role_assignment": 648, "roster_move": 672, "salary_cap_season": 25, "schedule_game": 2050, "skater_season_stats": 5459, "stanley_cup_member": 575, "team": 39, "team_season_stats": 50, "trade": 174, "trade_asset": 782, "all_star_selection": 300, "award_win": 334, "contract": 713, "contract_year": 1444, "data_issue": 606, "data_version": 0, "draft_lottery": 384, "draft_pick": 181, "draft_pick_initial": 182, "draft_top3": 72, "goalie_season_stats": 494, "offer_sheet": 0, "offer_sheet_pick": 0, "playoff_series": 375, "standing": 800, "stanley_cup_result": 25}, "views": ["v_skater_career_totals", "v_skater_career_records", "v_skater_season_records", "v_contract_year_level", "v_radar_thresholds_ppg"]}</script>
 <script>/* Petit client Supabase sans dépendance : connexion par courriel, lecture, écriture, comptage. Utilise seulement fetch. */
 (function (root) {
   // Tables propres à une franchise : chaque lecture et chaque modification est filtrée sur la franchise active (franchise_id).
