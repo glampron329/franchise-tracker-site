@@ -675,9 +675,41 @@ table.grid.ev.pl tr.ple-row>td{height:auto;padding:0 0 14px;white-space:normal;b
 .pl-live{min-height:0;margin:0 0 8px;font-size:13px;display:flex;gap:7px;align-items:center}.pl-live:empty{display:none}.pl-live svg{width:15px;height:15px}
 .pl-live.ok{color:var(--st-ok-ink);font-weight:600}.pl-live.wn{color:var(--st-warn-ink);font-weight:600}
 /* ===== fin de la proposition ===== */
+/* ===== Saison morte : classement (maquette validée : docs/maquettes/classement.html) =====
+   Aucune nouvelle couleur : neutres (--fg, --muted, --line, --panel), accent d'équipe lisible --ink1 (4,5:1 et plus avec toute équipe), statuts du moteur commun.
+   Sélecteurs stables (le rendu remplace innerHTML) : table.grid.ev.standings ; cellules .cell[data-r][data-c="team|w|l"] ; calculées td.d[data-d="0..6"] ;
+   lettre de qualification .std-q[data-q="Z|Y|X|W"] ; ligne de la franchise tr:has(td.lg.mine). */
+table.grid.ev.standings th,table.grid.ev.standings td{padding:0 4px}
+table.grid.ev.standings thead th{text-align:center;vertical-align:bottom;padding-bottom:5px}
+table.grid.ev.standings thead th.pl{text-align:center}
+table.grid.ev.standings th.pl{min-width:38px;width:38px;text-align:center;font-weight:700;font-variant-numeric:tabular-nums;padding:0 4px}
+table.grid.ev.standings td.lg,table.grid.ev.standings th:empty{width:36px;min-width:36px;padding:0 2px}
+table.grid.ev.standings input.cell.tcombo{min-width:0;width:192px;text-align:left}
+table.grid.ev.standings input.cell.int{width:46px;text-align:center}
+table.grid.ev.standings td.d{min-width:42px;text-align:center;font-variant-numeric:tabular-nums}
+table.grid.ev.standings td.d.sc-pts{color:var(--fg);font-weight:700}                      /* PTS : la valeur à comparer avec le jeu */
+table.grid.ev.standings td.d.sc-seed{min-width:62px}
+table.grid.ev.standings td.d.sc-conf,table.grid.ev.standings td.d.sc-div{min-width:48px}
+/* une valeur absente (ligne incomplète) : tiret, jamais 0 */
+table.grid.ev.standings td.d .na{color:var(--muted)}
+/* Qualification : lettre dans une pastille (une lettre seule se lit mal dans un tableau de chiffres et se confond avec V/W).
+   Z et Y (premières de la ligue, de l'association) : pleines ; X et W (division, quatrième as) : contour ; non qualifiée : tiret. Info-bulle std.clinch_*. */
+.std-q{display:inline-block;min-width:20px;height:20px;padding:0 3px;box-sizing:border-box;border:1.5px solid var(--fg);border-radius:5px;font-size:12px;font-weight:800;line-height:17px;text-align:center;color:var(--fg);cursor:help}
+.std-q[data-q="Z"],.std-q[data-q="Y"]{background:var(--fg);color:var(--panel)}
+.std-q[data-q=""]{border-color:transparent;color:var(--muted);font-weight:400}
+/* Ligne de la franchise : filet à gauche du rang et rang en couleur d'équipe lisible (--ink1) ; V et D repris de la fiche Équipe, en lecture seule (info-bulle std.row_auto) */
+table.grid.ev.standings tr:has(td.lg.mine)>th.pl{box-shadow:inset 4px 0 0 var(--ink1);color:var(--ink1)}
+table.grid.ev.standings td.ro.calc.own{color:var(--fg);font-weight:600;background:color-mix(in srgb,var(--fg) 5%,var(--panel))}
+table.grid.ev.standings td.ro.own .std-own{display:flex;align-items:center;justify-content:center;gap:3px;height:100%;cursor:help}
+table.grid.ev.standings td.ro.own svg{width:11px;height:11px;flex:none;color:var(--ink1)}
+
+/* Légende des pastilles de Résultat, sous la grille */
+.std-legend{display:flex;flex-wrap:wrap;align-items:center;gap:6px 16px;margin:10px 0 4px;font-size:13px;color:var(--muted)}
+.std-legend .std-leg{display:inline-flex;align-items:center;gap:6px;color:var(--fg)}
+.std-legend .std-q{cursor:default}
 .fld{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);margin:10px 0;max-width:520px}.fld input{font:inherit;font-size:15px;padding:9px 11px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--fg)}.ok{color:#1e8449;font-weight:600}.bad{color:#c0392b;font-weight:600}tr.badrow td{background:color-mix(in srgb,#c0392b 12%,transparent)}main.entry{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px}</style></head>
 <body><div id="app"></div>
-<script id="cfg" type="application/json">{"url": "https://zbvpzklmbvvodnrlhumi.supabase.co", "key": "sb_publishable_7fo7NGJa5V5Tq9jc5ABsPQ_RNzdhCt5", "expected": {"award": 13, "franchise": 1, "historical_award_counts": 14, "label": 2808, "player": 1257, "player_rating": 1554, "player_stint": 348, "position_change": 10, "projected_level": 44, "retirement": 384, "role_assignment": 648, "roster_move": 672, "salary_cap_season": 25, "schedule_game": 2050, "skater_season_stats": 5459, "stanley_cup_member": 575, "team": 39, "team_season_stats": 50, "trade": 174, "trade_asset": 782, "all_star_selection": 300, "award_win": 334, "contract": 713, "contract_year": 1444, "data_issue": 606, "data_version": 0, "draft_lottery": 384, "draft_pick": 181, "draft_pick_initial": 182, "draft_top3": 72, "goalie_season_stats": 494, "offer_sheet": 0, "offer_sheet_pick": 0, "playoff_series": 375, "standing": 800, "stanley_cup_result": 25}, "views": ["v_skater_career_totals", "v_skater_career_records", "v_skater_season_records", "v_contract_year_level", "v_radar_thresholds_ppg"]}</script>
+<script id="cfg" type="application/json">{"url": "https://zbvpzklmbvvodnrlhumi.supabase.co", "key": "sb_publishable_7fo7NGJa5V5Tq9jc5ABsPQ_RNzdhCt5", "expected": {"award": 13, "franchise": 1, "historical_award_counts": 14, "label": 2890, "player": 1257, "player_rating": 1554, "player_stint": 348, "position_change": 10, "projected_level": 44, "retirement": 384, "role_assignment": 648, "roster_move": 672, "salary_cap_season": 25, "schedule_game": 2050, "skater_season_stats": 5459, "stanley_cup_member": 575, "team": 39, "team_season_stats": 50, "trade": 174, "trade_asset": 782, "all_star_selection": 300, "award_win": 334, "contract": 713, "contract_year": 1444, "data_issue": 606, "data_version": 0, "draft_lottery": 384, "draft_pick": 181, "draft_pick_initial": 182, "draft_top3": 72, "goalie_season_stats": 494, "offer_sheet": 0, "offer_sheet_pick": 0, "playoff_series": 375, "standing": 800, "stanley_cup_result": 25}, "views": ["v_skater_career_totals", "v_skater_career_records", "v_skater_season_records", "v_contract_year_level", "v_radar_thresholds_ppg"]}</script>
 <script>/* Petit client Supabase sans dépendance : connexion par courriel, lecture, écriture, comptage. Utilise seulement fetch. */
 (function (root) {
   // Tables propres à une franchise : chaque lecture et chaque modification est filtrée sur la franchise active (franchise_id).
