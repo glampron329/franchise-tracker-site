@@ -268,6 +268,62 @@ table.grid td.ci.first>.gi-tip{left:0;transform:none}table.grid td.ci.first>.gi-
 /* ===== fin de l'aide en contexte ===== */
 /* Panneau de connexion : un refus ou un avertissement n'est jamais tronqué (sa propre ligne, retour à la ligne) ; décision du 2026-11-17 */
 .card.sb p.bad,.card.sb p.warn{flex:1 1 100%;white-space:normal;overflow:visible;text-overflow:clip;padding:2px 0 2px 10px;border-left:3px solid currentColor;line-height:1.4}
+/* ===== Homonymes : question « Même joueur ? » (connect/homonym_ui.js ; maquette docs/maquettes/homonymes.html) =====
+   Question « Même joueur ? » : encadré NON modal, sous la ligne concernée (sous-ligne pleine largeur <tr class="homo-row">, même
+   principe que la sous-ligne « nouveau joueur reçu » des échanges, .npx-row). Collé à gauche (sticky) : visible sans défilement
+   horizontal, même quand la grille défile dans son cadre.
+   Couleurs : statut seulement, jamais la couleur de l'équipe (sauf l'anneau de focus commun --focus).
+     question en attente = avertissement (--st-warn, icône triangle) ; réponse « Oui » = --st-ok (icône coche) ;
+     date manquante ou réponse refusée = --st-err (icône croix) ; le texte dit toujours l'état : la couleur n'est jamais seule.
+   Règle visuelle reprise du choix de joueur (FTPC) : trait PLEIN = fiche existante (« Oui, c'est lui ») ;
+   trait POINTILLÉ = nouvelle fiche (« Non, c'est un autre joueur », étiquette « Autre joueur »). */
+tr.homo-row>td{height:auto;padding:2px 4px 10px;border-bottom:1px solid var(--line);white-space:normal;text-align:left}
+tr.has-homo>td,tr.has-homo>th{border-bottom:0}
+.homo{position:sticky;left:4px;box-sizing:border-box;width:max-content;max-width:min(780px,calc(100vw - 120px));display:grid;gap:8px;padding:10px 12px 12px;
+  border:1px solid color-mix(in srgb,var(--st-warn) 50%,var(--line));border-left:4px solid var(--st-warn);border-radius:9px;
+  background:color-mix(in srgb,var(--st-warn) 7%,var(--panel));color:var(--fg);font-size:13px;line-height:1.4;white-space:normal}
+.homo:focus{outline:2px solid var(--focus);outline-offset:2px}
+.homo svg{width:15px;height:15px;flex:none}
+.homo-q{display:flex;gap:8px;align-items:flex-start;margin:0}
+.homo-q>svg{margin-top:2px;color:var(--st-warn)}
+.homo-q b{font-weight:700;margin-right:6px}
+.homo-list{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.homo-cand{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 16px;align-items:center;padding:5px 6px 5px 10px;border:1px solid var(--line);border-radius:7px;background:var(--panel)}
+.homo-who{min-width:0;font-variant-numeric:tabular-nums}.homo-who b{font-weight:700}.homo-who .homo-meta{color:var(--muted)}
+.homo-btn{font:inherit;font-size:12.5px;font-weight:600;line-height:1.2;display:inline-flex;align-items:center;gap:6px;padding:6px 11px;border-radius:7px;
+  border:1px solid color-mix(in srgb,var(--fg) 45%,var(--line));background:var(--panel);color:var(--fg);cursor:pointer;white-space:nowrap}
+.homo-btn:hover{background:color-mix(in srgb,var(--fg) 6%,var(--panel))}
+.homo-btn:focus-visible{outline:2px solid var(--focus);outline-offset:1px;box-shadow:0 0 0 4px var(--focus-halo)}
+.homo-btn.yes svg{color:var(--st-ok)}
+.homo-btn.no{border-style:dashed;justify-self:start}
+.homo-btn.undo{font-weight:500;padding:3px 9px;color:var(--muted)}
+.homo-btn[aria-disabled="true"]{cursor:not-allowed;color:var(--muted);border-color:var(--line)}
+.homo-foot{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}
+.homo-msg{display:flex;gap:6px;align-items:flex-start;margin:0;font-size:12.5px}.homo-msg>svg{margin-top:1px}
+.homo-msg.er{color:var(--st-err-ink);font-weight:600}.homo-msg.ok{color:var(--st-ok-ink);font-weight:600}
+.homo-key{font-size:11.5px;color:var(--muted)}
+/* réponse donnée : l'encadré se réduit à une ligne (le choix reste visible et modifiable) */
+.homo.done{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;padding:7px 10px 7px 12px;width:min(780px,calc(100vw - 120px))}
+.homo.done .homo-msg{flex:1 1 300px;min-width:0}
+.homo.done.ok{border-color:color-mix(in srgb,var(--st-ok) 45%,var(--line));border-left-color:var(--st-ok);background:color-mix(in srgb,var(--st-ok) 6%,var(--panel))}
+.homo.done.other{border-color:var(--line);border-left:4px dashed color-mix(in srgb,var(--fg) 45%,var(--line));background:var(--panel)}
+.homo.done.other.er,.homo.er{border-color:color-mix(in srgb,var(--st-err) 45%,var(--line));border-left-color:var(--st-err);background:color-mix(in srgb,var(--st-err) 6%,var(--panel))}
+.homo.done.other.er{border-left-style:solid}
+/* champ de date dans l'encadré (Historique : pas de colonne Date de naissance) */
+.homo label.homo-date{display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+.homo input.cell.date{width:112px;height:30px;box-sizing:border-box;font:inherit;font-size:13px;padding:3px 7px;border:1px solid color-mix(in srgb,var(--fg) 24%,var(--line));border-radius:7px;background:var(--panel);color:var(--fg);text-align:left}
+.homo label.homo-date.err input{border-color:var(--st-err);background:color-mix(in srgb,var(--st-err) 12%,var(--panel))}
+/* étiquette « Autre joueur » : pastille pointillée, dans l'encadré et dans la case du nom (forme courte « Autre », texte complet lu) */
+.homo-tag{display:inline-flex;align-items:center;font-size:11px;font-weight:700;line-height:15px;padding:0 7px;border-radius:8px;border:1px dashed color-mix(in srgb,var(--fg) 55%,var(--line));color:var(--fg);background:var(--panel);white-space:nowrap}
+.homo-f{position:relative;display:inline-block}
+.homo-f>input.cell{padding-right:52px!important}
+.homo-f>.homo-tag{position:absolute;right:5px;top:50%;transform:translateY(-50%);pointer-events:none}
+/* choix de joueur (FTPC) : nouvel état « homo » = nom exact d'un joueur connu, réponse attendue (trait pointillé : pas encore lié) */
+.pcb[data-st="homo"] .pcb-mk{color:var(--st-warn)}
+table.grid.ev td.ci .pcb[data-st="homo"] input.cell{border-style:dashed;border-color:var(--st-warn)}
+/* choix de joueur avec saisie libre : une valeur suivie de l'étiquette d'homonyme ne doit pas être coupée (« Sebastian Aho (D · né en 2008) ») */
+input.cell.pcombo.hlong{width:262px}
+@media (prefers-reduced-motion:no-preference){.homo.appear{animation:homo-in .18s ease-out}@keyframes homo-in{from{opacity:0;transform:translateY(-3px)}}}
 main.entry{display:block;max-width:1280px}main.entry .pick{margin-bottom:14px}
 .acts{display:flex;gap:8px;margin-left:auto;flex-wrap:wrap}.btn{font:inherit;padding:8px 14px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--fg);cursor:pointer}
 .btn:hover{border-color:var(--c1)}.btn.ghost{color:var(--muted)}
@@ -709,14 +765,14 @@ table.grid.ev.standings td.ro.own svg{width:11px;height:11px;flex:none;color:var
 .std-legend .std-q{cursor:default}
 .fld{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);margin:10px 0;max-width:520px}.fld input{font:inherit;font-size:15px;padding:9px 11px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--fg)}.ok{color:#1e8449;font-weight:600}.bad{color:#c0392b;font-weight:600}tr.badrow td{background:color-mix(in srgb,#c0392b 12%,transparent)}main.entry{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px}</style></head>
 <body><div id="app"></div>
-<script id="cfg" type="application/json">{"url": "https://zbvpzklmbvvodnrlhumi.supabase.co", "key": "sb_publishable_7fo7NGJa5V5Tq9jc5ABsPQ_RNzdhCt5", "expected": {"award": 13, "franchise": 1, "historical_award_counts": 14, "label": 3038, "player": 1257, "player_rating": 1554, "player_stint": 348, "position_change": 10, "projected_level": 44, "retirement": 384, "role_assignment": 648, "roster_move": 672, "salary_cap_season": 25, "schedule_game": 2050, "skater_season_stats": 5459, "stanley_cup_member": 575, "team": 39, "team_season_stats": 50, "trade": 174, "trade_asset": 782, "all_star_selection": 300, "award_win": 334, "contract": 713, "contract_year": 1444, "data_issue": 606, "data_version": 0, "draft_lottery": 384, "draft_pick": 181, "draft_pick_initial": 182, "draft_top3": 72, "goalie_season_stats": 494, "offer_sheet": 0, "offer_sheet_pick": 0, "playoff_series": 375, "standing": 800, "stanley_cup_result": 25}, "views": ["v_skater_career_totals", "v_skater_career_records", "v_skater_season_records", "v_contract_year_level", "v_radar_thresholds_ppg"]}</script>
+<script id="cfg" type="application/json">{"url": "https://zbvpzklmbvvodnrlhumi.supabase.co", "key": "sb_publishable_7fo7NGJa5V5Tq9jc5ABsPQ_RNzdhCt5", "expected": {"award": 13, "franchise": 1, "historical_award_counts": 14, "label": 3098, "player": 1257, "player_rating": 1554, "player_stint": 348, "position_change": 10, "projected_level": 44, "retirement": 384, "role_assignment": 648, "roster_move": 672, "salary_cap_season": 25, "schedule_game": 2050, "skater_season_stats": 5459, "stanley_cup_member": 575, "team": 39, "team_season_stats": 50, "trade": 174, "trade_asset": 782, "all_star_selection": 300, "award_win": 334, "contract": 713, "contract_year": 1444, "data_issue": 606, "data_version": 0, "draft_lottery": 384, "draft_pick": 181, "draft_pick_initial": 182, "draft_top3": 72, "goalie_season_stats": 494, "offer_sheet": 0, "offer_sheet_pick": 0, "playoff_series": 375, "standing": 800, "stanley_cup_result": 25}, "views": ["v_skater_career_totals", "v_skater_career_records", "v_skater_season_records", "v_contract_year_level", "v_radar_thresholds_ppg"]}</script>
 <script>/* Petit client Supabase sans dépendance : connexion par courriel, lecture, écriture, comptage. Utilise seulement fetch. */
 (function (root) {
   // Tables propres à une franchise : chaque lecture et chaque modification est filtrée sur la franchise active (franchise_id).
   var SCOPED = ['player', 'player_stint', 'skater_season_stats', 'goalie_season_stats', 'team_season_stats', 'standing', 'playoff_series', 'award_win', 'all_star_selection',
     'stanley_cup_result', 'stanley_cup_member', 'salary_cap_season', 'contract', 'offer_sheet', 'offer_sheet_pick', 'data_issue', 'trade', 'roster_move',
     'player_rating', 'schedule_game', 'position_change', 'role_assignment', 'draft_pick_initial', 'draft_pick', 'draft_lottery', 'draft_top3', 'retirement', 'franchise_league_team',
-    'historical_award_counts', 'projected_level', 'v_contract_year_level', 'v_skater_career_totals', 'v_skater_career_records', 'v_skater_season_records', 'hr_job'];
+    'historical_award_counts', 'projected_level', 'v_contract_year_level', 'v_skater_career_totals', 'v_skater_career_records', 'v_skater_season_records', 'hr_job', 'v_player_career'];
   // Tables enfants sans franchise_id : filtrées par leur parent (embarqué vide de PostgREST, « parent!inner() »)
   var CHILD = { contract_year: 'contract', trade_asset: 'trade' };
   var SCOPED_SET = {}; SCOPED.forEach(function (t) { SCOPED_SET[t] = 1; });
@@ -774,7 +830,12 @@ table.grid.ev.standings td.ro.own svg{width:11px;height:11px;flex:none;color:var
       opts = opts || {}; await ensure();
       var r = await f(base + '/rest/v1/' + path, { method: method, headers: headers(opts.headers, opts.anon), body: opts.body === undefined ? undefined : JSON.stringify(opts.body) });
       var text = await r.text(), j = null; try { j = text ? JSON.parse(text) : null; } catch (e) { j = null; }
-      if (!r.ok) { var err = new Error(msg(j, r.status)); err.status = r.status; err.code = j && j.code; throw err; }
+      if (!r.ok) {
+        var err = new Error(msg(j, r.status)); err.status = r.status; err.code = j && j.code; err.hint = j && j.hint || null;
+        // détail de la base (migration 71 : JSON des homonymes, raison du refus) : objet si c'est du JSON, sinon le texte
+        var dt = j && j.details; if (typeof dt === 'string') { try { dt = JSON.parse(dt); } catch (x) { /* texte libre */ } } err.details = dt == null ? null : dt;
+        throw err;
+      }
       return { data: j, range: r.headers && r.headers.get ? r.headers.get('content-range') : null };
     }
     // nombre de lignes visibles pour l'utilisateur courant (ou pour un visiteur anonyme)
