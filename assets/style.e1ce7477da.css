@@ -1,0 +1,361 @@
+:root{--base1:#AF1E2D;--base2:#192168;--bg:#f4f5f8;--panel:#fff;--fg:#151922;--muted:#5d6678;--line:#e2e5ec;--c1:var(--base1);--c2:var(--base2);color-scheme:light}
+/* Thème : suit l'ordinateur tant que rien n'est choisi ; le choix « Clair » / « Sombre » (attribut data-theme) l'emporte */
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e1116;--panel:#171b23;--fg:#eef0f5;--muted:#9ba4b5;--line:#2a303c;--c1:color-mix(in srgb,var(--base1) 72%,#fff);--c2:color-mix(in srgb,var(--base2) 40%,#fff);color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0e1116;--panel:#171b23;--fg:#eef0f5;--muted:#9ba4b5;--line:#2a303c;--c1:color-mix(in srgb,var(--base1) 72%,#fff);--c2:color-mix(in srgb,var(--base2) 40%,#fff);color-scheme:dark}
+*{box-sizing:border-box}html,body{margin:0}
+body{background:var(--bg);color:var(--fg);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.top{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;padding:14px 22px;background:var(--base1);color:var(--on-base1);border-bottom:4px solid var(--base2)}
+.brand{display:flex;gap:12px;align-items:center}.crest{width:34px;height:34px;border-radius:8px;background:#fff;box-shadow:inset 0 0 0 5px var(--base2),inset 0 0 0 11px #fff,0 0 0 2px var(--on-base1)}
+.brand .fr{font-weight:700;font-size:18px;letter-spacing:.2px}.brand .sub{font-size:13px}
+.ctl{display:flex;flex-wrap:wrap;gap:10px}
+.seg{display:inline-flex;background:transparent;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--on-base1) 45%,transparent);border-radius:10px;padding:3px}
+.seg button{border:0;background:transparent;color:var(--on-base1);padding:6px 12px;border-radius:8px;font:inherit;cursor:pointer}
+.seg button[aria-pressed=true]{background:var(--on-base1);color:var(--base1);font-weight:700}
+.seg button:focus-visible{outline:3px solid var(--on-base1);outline-offset:2px}
+/* Focus des champs (D1, 2026-11-11) : double anneau, sans décalage de mise en page.
+   --focus = couleur principale de l'équipe, assombrie en thème clair et éclaircie en thème sombre pour rester à 3:1 au moins contre le fond ;
+   le halo --focus-halo (couleur du panneau) sépare l'anneau du champ et de ce qui l'entoure, quel que soit le fond. */
+:root{--focus:color-mix(in srgb,var(--base1) 55%,#000);--focus-halo:var(--panel)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--focus:color-mix(in srgb,var(--base1) 45%,#fff)}}
+:root[data-theme="dark"]{--focus:color-mix(in srgb,var(--base1) 45%,#fff)}
+/* Navigateurs récents : garder la vraie couleur de l'équipe quand elle est déjà assez foncée (clair) ou claire (sombre) */
+@supports (color:oklch(from red l c h)){:root{--focus:oklch(from var(--base1) min(l,.5) c h)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--focus:oklch(from var(--base1) max(l,.75) min(c,.12) h)}}
+:root[data-theme="dark"]{--focus:oklch(from var(--base1) max(l,.75) min(c,.12) h)}}
+/* Texte sur la couleur de l'équipe (2026-11-12) : --on-base1 = texte posé sur --base1 (en-tête, pilule active) et --on-c1-dark = texte posé sur --c1 en sombre,
+   calculés par live_mount.js:theme() (3e couleur de l'équipe si elle atteint 4,5:1, sinon noir ou blanc, le meilleur). --on-c1 = texte posé sur --c1.
+   --ink1 = couleur de l'équipe employée comme texte sur le panneau : assombrie (clair) ou éclaircie (sombre), même méthode que --focus. */
+:root{--on-base1:#fff;--on-c1:var(--on-base1);--ink1:color-mix(in srgb,var(--base1) 45%,#000)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--on-c1:var(--on-c1-dark,#fff);--ink1:color-mix(in srgb,var(--base1) 45%,#fff)}}
+:root[data-theme="dark"]{--on-c1:var(--on-c1-dark,#fff);--ink1:color-mix(in srgb,var(--base1) 45%,#fff)}
+@supports (color:oklch(from red l c h)){:root{--ink1:oklch(from var(--base1) min(l,.5) c h)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--ink1:oklch(from var(--base1) max(l,.75) min(c,.12) h)}}
+:root[data-theme="dark"]{--ink1:oklch(from var(--base1) max(l,.75) min(c,.12) h)}}
+:is(input,select,textarea):focus-visible,:is(input.cell,select.cell,textarea):focus{outline:2px solid var(--focus);outline-offset:1px;box-shadow:0 0 0 4px var(--focus-halo)}
+main{max-width:1120px;margin:0 auto;padding:18px;display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px}
+.pick{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:14px;align-items:end}
+.pick label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);flex:1 1 240px}
+.pick input,.pick select{font:inherit;font-size:15px;padding:9px 11px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--fg)}
+.legend{display:flex;gap:14px;align-items:center;font-size:13px}.lg{display:inline-flex;gap:6px;align-items:center}
+.sw1,.sw2,.sw1b{display:inline-block;width:12px;height:12px;border-radius:3px;background:var(--c1)}.sw2{background:var(--c2)}.sw1b{background:color-mix(in srgb,var(--c1) 45%,var(--panel))}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 18px;min-width:0}.card.wide{grid-column:1/-1}
+h2{margin:0;font-size:24px}h3{margin:0 0 10px;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.keyl{font-size:12px;text-transform:none;letter-spacing:0;display:inline-flex;gap:6px;align-items:center}
+.who{display:flex;gap:12px;align-items:center;margin-bottom:12px}.pos{background:var(--c1);color:var(--on-c1);font-weight:700;border-radius:8px;padding:3px 10px;font-size:13px}
+dl{margin:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px 16px}dt{font-size:12px;color:var(--muted)}dd{margin:0;font-weight:600}
+.muted{color:var(--muted)}.note{font-size:12px;margin:6px 0 0}
+.rec{display:grid;grid-template-columns:46px 1fr auto;gap:2px 12px;align-items:center;margin:9px 0}
+.rec-l{font-weight:700}.rec-b{position:relative;height:12px;background:var(--line);border-radius:6px;overflow:hidden}
+.fill1{position:absolute;left:0;top:0;height:100%;background:var(--c1);border-radius:6px}.fill2{position:absolute;left:0;bottom:0;height:4px;background:var(--c2)}
+.rec-n{font-variant-numeric:tabular-nums;font-size:13px;text-align:right}.rec-h{grid-column:2/4;font-size:12px;margin-top:-2px}
+.s2{color:var(--c2)}
+/* Radar (2026-11-14, maquette radar_par_poste) : score du joueur et contour en --ink1 (lisible avec toute équipe, 4,5:1 et plus) ; le remplissage garde --c1 */
+svg{display:block;max-width:100%}.ring{fill:none;stroke:var(--line)}.ring90{stroke:var(--muted);stroke-dasharray:3 4}.spoke{stroke:var(--line)}.ringlbl{font-size:10px;fill:var(--muted)}
+.poly1{fill:color-mix(in srgb,var(--c1) 28%,transparent);stroke:var(--ink1);stroke-width:2.5}.poly2{fill:color-mix(in srgb,var(--c2) 18%,transparent);stroke:var(--c2);stroke-width:2;stroke-dasharray:6 4}
+.axname{font-size:12px;font-weight:600;fill:var(--fg)}.axval{font-size:12px}.axval .s1{fill:var(--ink1);font-weight:700}.axval .s2{fill:var(--c2);font-weight:700}.axval .raw{fill:var(--muted);font-size:11px}
+.grid{stroke:var(--line)}.tick{font-size:10px;fill:var(--muted)}
+.bar-g{fill:var(--c1)}.bar-a{fill:color-mix(in srgb,var(--c1) 45%,var(--panel))}.line1{fill:none;stroke:var(--c1);stroke-width:2.6}.line2{fill:none;stroke:var(--c2);stroke-width:2.2;stroke-dasharray:6 4}.dot2{fill:var(--c2)}
+.scroll{overflow-x:auto}table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+th,td{padding:6px 10px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}th{font-size:12px;color:var(--muted);font-weight:600}.num{text-align:right}
+tr.total td{font-weight:700;border-top:2px solid var(--line)}
+
+.trow{display:grid;grid-template-columns:1fr auto;gap:2px 12px;padding:6px 0;border-bottom:1px solid var(--line)}.trow b{font-variant-numeric:tabular-nums}.trow .muted{grid-column:1/-1;font-size:12px}
+tr.me td{background:color-mix(in srgb,var(--c1) 14%,transparent);font-weight:600}
+
+/* Logo de l'équipe à la place du carré : pastille blanche, repli sur le carré si l'image ne charge pas */
+.crest.logo{width:58px;height:58px;border-radius:50%;background:#fff;box-shadow:none;padding:5px;flex:none;display:inline-flex;align-items:center;justify-content:center;overflow:hidden}.crest.logo img{width:100%;height:100%;object-fit:contain;display:block}.top .crest.logo{box-shadow:0 0 0 2px var(--on-base1)}
+/* Sélecteurs en pilules (langue, thème, type de données, période) : même composant partout ; « page » = sur le fond de la page */
+.seg.page{background:var(--line);box-shadow:none}.seg.page button{color:var(--fg)}.seg.page button[aria-pressed=true]{background:var(--panel);color:var(--ink1);box-shadow:0 1px 3px rgba(0,0,0,.18)}
+.slicer{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)}.slicer .lbl{padding-left:2px}
+
+/* Boutons et champs de base (communs à toutes les pages) */
+.btn{font:inherit;padding:8px 14px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--fg);cursor:pointer}.btn:hover{border-color:var(--c1)}.btn.ghost{color:var(--muted)}.btn:disabled{opacity:.55;cursor:default}
+.acts{display:flex;gap:8px;flex-wrap:wrap}
+/* Panneau Supabase : une seule ligne (titre, état, champs, boutons, message), sur toute la largeur ; passe à la ligne seulement sur un écran étroit */
+.card.sb{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:8px 18px;padding:8px 14px;margin-bottom:12px}
+.card.sb h3{margin:0;flex:none}.card.sb p{margin:0;font-size:13px;flex:1 1 160px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.card.sb .acts,.card.sb .acts.left{margin:0;gap:8px;align-items:center}
+.card.sb input{font:inherit;font-size:14px;padding:6px 10px;width:165px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--fg)}.card.sb .btn{padding:6px 12px}
+/* Navigation entre les pages en pilules (liens dans le même composant que FR/EN) */
+.seg a{color:var(--on-base1);padding:6px 12px;border-radius:8px;font:inherit;text-decoration:none;cursor:pointer;white-space:nowrap}.seg a:hover{box-shadow:inset 0 0 0 1px currentColor}.seg a:focus-visible{outline:3px solid var(--on-base1);outline-offset:2px}
+.seg[role=navigation]{flex-wrap:wrap}
+ 
+/* En-tête fixe aux couleurs de l'équipe pendant le défilement */
+header.top{position:sticky;top:0;z-index:60;box-shadow:0 2px 8px rgba(0,0,0,.18)}
+/* Navigation : la page en cours est une pilule sélectionnée, comme FR / EN */
+.seg a[aria-pressed=true]{background:var(--on-base1);color:var(--base1);font-weight:700;box-shadow:0 1px 3px rgba(0,0,0,.18)}.seg a.home{font-weight:600}
+.seg.page a{color:var(--fg)}.seg.page a[aria-pressed=true]{background:var(--panel);color:var(--ink1)}
+.seg.page button:focus-visible,.seg.page a:focus-visible{outline-color:var(--focus)}
+
+/* En-tête compact (il reste affiché pendant le défilement) */
+header.top{padding:8px 22px;gap:6px 18px}header.top .seg button,header.top .seg a{padding:5px 11px;font-size:13px}header.top .brand .fr{font-size:18px}header.top .crest.logo{width:56px;height:56px}
+.viewbar{display:flex;gap:14px;flex-wrap:wrap;align-items:center;padding:12px 22px 0;max-width:1280px;margin:0 auto}
+
+/* Franchise active (page Franchise) : choix seulement s'il y a 2 franchises ou plus. --o1/--o2 = couleurs de CETTE franchise (style en ligne, depuis les données) ; --opt = variante lisible de --o1 (même méthode que --focus) */
+.fra{margin:0 0 14px;padding:0 0 14px;border-bottom:1px solid var(--line)}
+.fra-lbl{display:block;font-size:12px;color:var(--muted);padding:0;margin:0 0 6px}
+.fra-one{display:flex;gap:12px;align-items:center}
+.fra-name{font-weight:700;font-size:15px;color:var(--fg)}
+.fra-meta{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.fra-list{border:0;margin:0;padding:0;min-width:0}
+.fra-opts{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:8px}
+.fra-opt{--opt:color-mix(in srgb,var(--o1) 55%,#000);display:grid;grid-template-columns:auto auto minmax(0,1fr);gap:10px;align-items:center;padding:8px 12px 8px 18px;border:1px solid var(--line);border-radius:10px;background:var(--panel);cursor:pointer;box-shadow:inset 5px 0 0 var(--o1),inset 8px 0 0 var(--o2)}
+.fra-opt:hover{border-color:var(--muted)}
+.fra-opt:has(input:checked){border-color:var(--opt);box-shadow:inset 5px 0 0 var(--o1),inset 8px 0 0 var(--o2),0 0 0 1px var(--opt)}
+.fra-opt:not(:has(input:checked)) .fra-name{font-weight:600}
+.fra-opt input{margin:0;width:16px;height:16px;accent-color:var(--opt)}
+.fra-opt .fra-txt{display:flex;flex-direction:column;min-width:0}
+.fra-opt .fra-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fra .crest{width:36px;height:36px;border-radius:50%;flex:none;background:var(--o1);box-shadow:inset 0 0 0 4px var(--o2),0 0 0 1px var(--line)}
+.fra .crest.logo{background:#fff;padding:3px;box-shadow:0 0 0 1px var(--line)}
+.fra .note{margin-top:8px}.fra p.ok{font-size:12px;margin:8px 0 0}
+/* Plusieurs franchises par compte (maquette docs/maquettes/franchises_multiples.html, validée le 2026-11-18) : compteur, nouvelle franchise, export.
+   Aucune nouvelle couleur : accent d'équipe lisible = --ink1 (page) ou --opt (tuile, couleurs de CETTE franchise) ; statuts = --st-ok-ink / --st-err-ink
+   avec une icône et un texte ; neutres --fg, --muted, --line. Aucune police ni bibliothèque. */
+.ic{width:16px;height:16px;flex:none;display:inline-block;vertical-align:-3px}
+/* Tuile = choix (label) + export (bouton et état). Le <label> ne contient plus que le bouton radio, le logo et le texte. */
+.fra-opt{display:flex;flex-direction:column;align-items:stretch;gap:8px;cursor:default}
+.fra-opt .fra-pick{display:grid;grid-template-columns:auto auto minmax(0,1fr);gap:10px;align-items:center;cursor:pointer}
+.fra-one{flex-direction:column;align-items:stretch;gap:8px}.fra-one .fra-pick{display:flex;gap:12px;align-items:center}
+.fra-one{--opt:color-mix(in srgb,var(--o1) 55%,#000)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .fra-one{--opt:color-mix(in srgb,var(--o1) 45%,#fff)}}
+:root[data-theme="dark"] .fra-one{--opt:color-mix(in srgb,var(--o1) 45%,#fff)}
+@supports (color:oklch(from red l c h)){.fra-one{--opt:oklch(from var(--o1) min(l,.5) c h)}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .fra-one{--opt:oklch(from var(--o1) max(l,.75) min(c,.12) h)}}
+  :root[data-theme="dark"] .fra-one{--opt:oklch(from var(--o1) max(l,.75) min(c,.12) h)}}
+/* Export : sous le nom, aligné sur le logo (26 px = bouton radio + écart) */
+.fra-x{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;min-width:0}.fra-opt .fra-x{padding-left:26px}
+.btn.fra-exp{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.fra-exp-st{display:flex;align-items:flex-start;gap:6px;margin:0;font-size:12px;line-height:1.4;flex:1 1 100%;min-width:0;max-width:62ch}.fra .fra-exp-st.ok,.fra .fra-exp-st.bad{font-weight:500}
+.fra-exp-st .bar{flex:0 0 64px;height:6px;margin:5px 0 0}.fra .bar>span{background:var(--opt)}
+.fra-exp-st .ic{width:14px;height:14px;margin-top:1px}
+/* Compteur « Franchises : 1 sur 3 » : une case par place du plafond (pleine = franchise existante), puis le texte qui dit la même chose */
+.fra-new{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 14px;margin-top:12px}
+.fra-cnt{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--fg);font-variant-numeric:tabular-nums}
+.fra-pips{display:inline-flex;gap:3px}.fra-pips i{width:9px;height:14px;border-radius:3px;box-shadow:inset 0 0 0 1.5px var(--muted)}.fra-pips i.on{background:var(--ink1);box-shadow:none}
+.btn.fra-add{display:inline-flex;align-items:center;gap:6px;font-weight:600;color:var(--ink1);border-color:color-mix(in srgb,var(--ink1) 45%,var(--line))}
+.btn.fra-add:hover{border-color:var(--ink1)}
+/* Bouton inactif qui reste joignable au clavier (aria-disabled) : grisé sans transparence (texte --muted, 4,5:1 et plus), bordure pointillée */
+.btn[aria-disabled="true"],.btn.fra-add[aria-disabled="true"]{color:var(--muted);background:transparent;border-style:dashed;border-color:var(--muted);cursor:not-allowed;font-weight:400}
+.btn[aria-disabled="true"]:hover{border-color:var(--muted)}
+.fra-full{display:flex;align-items:flex-start;gap:6px;margin:8px 0 0;color:var(--fg);line-height:1.4}.fra-full .ic{color:var(--muted);width:14px;height:14px;margin-top:1px}
+/* Mode création : rappel à la place des tuiles, avec « Annuler » */
+.fra.fra-mode{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:start;padding:10px 12px;margin:0 0 14px;border:1px solid color-mix(in srgb,var(--ink1) 35%,var(--line));border-left:4px solid var(--ink1);border-radius:9px;background:color-mix(in srgb,var(--ink1) 6%,var(--panel))}
+.fra-mode>.ic{width:18px;height:18px;color:var(--ink1);margin-top:1px}.fra-mode p{margin:0;font-size:13px;line-height:1.45;color:var(--fg)}.fra-mode .btn{padding:5px 12px;font-size:13px}
+@media (max-width:520px){.fra.fra-mode{grid-template-columns:auto minmax(0,1fr)}.fra-mode .btn{grid-column:2;justify-self:start}}
+/* Refus FT004 : à côté du bouton de création (icône + texte) */
+.fra-err{display:flex;align-items:flex-start;gap:6px;margin:8px 0 0;font-size:13px;line-height:1.4}.fra-err .ic{margin-top:1px}
+/* Focus visible des boutons (aujourd'hui : anneau par défaut du navigateur) — toutes les pages (décision du 2026-11-18) */
+.btn:focus-visible{outline:2px solid var(--focus);outline-offset:2px;box-shadow:0 0 0 5px var(--focus-halo)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .fra-opt{--opt:color-mix(in srgb,var(--o1) 45%,#fff)}}
+:root[data-theme="dark"] .fra-opt{--opt:color-mix(in srgb,var(--o1) 45%,#fff)}
+@supports (color:oklch(from red l c h)){.fra-opt{--opt:oklch(from var(--o1) min(l,.5) c h)}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .fra-opt{--opt:oklch(from var(--o1) max(l,.75) min(c,.12) h)}}
+  :root[data-theme="dark"] .fra-opt{--opt:oklch(from var(--o1) max(l,.75) min(c,.12) h)}}
+/* Couleurs de statut communes (maquette saisie_joueurs_echanges, approuvée le 2026-11-13). Jamais une couleur d'équipe ; toujours avec une icône ou un texte.
+   --st-*     : bordures et icônes (3:1 au moins contre le panneau) ;
+   --st-*-ink : texte (4,5:1 au moins contre le panneau et contre la teinte d'alerte de la cellule). */
+:root{--st-ok:#1b7a44;--st-ok-ink:#17693a;--st-warn:#c47c0a;--st-warn-ink:#7a4a00;--st-err:#c0392b;--st-err-ink:#a5281c}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--st-ok:#5cc98a;--st-ok-ink:#7fd9a4;--st-warn:#e0a030;--st-warn-ink:#f2c46a;--st-err:#e8695b;--st-err-ink:#ff9d92}}
+:root[data-theme="dark"]{--st-ok:#5cc98a;--st-ok-ink:#7fd9a4;--st-warn:#e0a030;--st-warn-ink:#f2c46a;--st-err:#e8695b;--st-err-ink:#ff9d92}
+/* texte lu par les lecteurs d'écran seulement */
+.vh{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+/* Profil par poste sur la fiche joueur (maquette docs/maquettes/radar_par_poste.html, approuvée le 2026-11-14).
+   Aucune nouvelle couleur : accent d'équipe lisible = --ink1, petit échantillon = --st-warn (icône + texte), neutres.
+   Sélecteurs stables (le rendu remplace innerHTML) : carte section.card.prof2 ; panneau .pgrp[data-grp="D|F"] ;
+   chiffres de carrière d'un poste .pgrp[data-grp] dl.pgrp-stats ; étiquette de poste d'une ligne de saison td.gcol .gtag */
+.card.prof2{grid-column:1/-1}
+.prof2-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:12px 22px}
+.pgrp{min-width:0;padding:10px 0 0;border-top:3px solid var(--ink1)}
+.pgrp+.pgrp{position:relative}
+@media (min-width:760px){.prof2-grid .pgrp+.pgrp::before{content:"";position:absolute;left:-11px;top:0;bottom:0;border-left:1px solid var(--line)}}
+.pgrp svg{max-width:460px;margin:0 auto}
+.pgrp-h{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px}
+.pgrp-h h4{margin:0;font-size:16px;font-weight:700;color:var(--fg)}
+.pgrp-meta{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.pgrp-meta b{color:var(--fg);font-weight:600}
+/* Bande des saisons : un bâton par saison (hauteur = matchs joués) ; en couleur, les saisons à ce poste */
+.gstrip{display:flex;align-items:flex-end;gap:3px;height:30px;margin:8px 0 6px;max-width:100%;border-bottom:1px solid var(--line)}
+.gstrip i{flex:1 1 0;max-width:22px;min-width:3px;border-radius:2px 2px 0 0;background:color-mix(in srgb,var(--muted) 28%,transparent)}
+.gstrip i.on{background:var(--ink1)}
+/* Petit échantillon (moins de 20 MJ en saison, 5 en séries) : radar atténué et en pointillé, avec une étiquette (icône + texte, jamais la couleur seule) */
+.smp{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;color:var(--st-warn-ink);border:1px solid var(--st-warn);border-radius:6px;padding:1px 7px;line-height:18px}
+.smp svg{width:13px;height:13px;color:var(--st-warn);flex:none}
+.pgrp.small .poly1{fill:color-mix(in srgb,var(--c1) 12%,transparent);stroke-dasharray:5 4}
+/* Chiffres de carrière d'un poste, sous la bande des saisons (maquette docs/maquettes/carriere_par_poste.html, variante A, approuvée le 2026-11-14).
+   5 cases de largeur égale (MJ, B, A, PTS, +/-) : jamais de défilement horizontal. Aucune nouvelle couleur. */
+.pgrp-stats{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));margin:2px 0 8px;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.pgrp-stats>div{padding:4px 8px 5px;text-align:right;min-width:0}
+.pgrp-stats>div+div{border-left:1px solid var(--line)}
+.pgrp-stats dt{font-size:12px;font-weight:600;color:var(--muted);line-height:16px}
+.pgrp-stats dd{margin:0;font-size:18px;font-weight:700;line-height:24px;color:var(--fg);font-variant-numeric:tabular-nums;white-space:nowrap}
+/* Étiquette de poste dans le tableau des saisons */
+td.gcol{width:1%}
+.gtag{display:inline-block;min-width:20px;text-align:center;font-size:12px;font-weight:700;line-height:18px;border-radius:5px;border:1px solid var(--line);color:var(--fg)}
+.gtag.lead{border-color:var(--ink1);color:var(--ink1)}
+
+/* ===== Moteur de saisie commun (connect/grid_input.js) : barre d'état toujours visible, case refusée et sa bulle — maquette docs/maquettes/saisie_moteur_commun.html (variante A, validée le 2026-11-14) ===== */
+:root{--gbar-h:46px}
+:root:has(.gbar[data-state="err"]){--gbar-h:84px}
+@media (max-width:640px){:root{--gbar-h:78px}:root:has(.gbar[data-state="err"]){--gbar-h:150px}}
+html:has(.gbar){scroll-padding-bottom:calc(var(--gbar-h) + 10px)}
+#scrollmain{scroll-padding:36px 0 64px 210px}          /* haut : sous l'en-tête collant ; bas : place pour la bulle ; gauche : sous la colonne des noms */
+html:has(.gbar) #scrollmain{max-height:calc(100vh - 210px - var(--gbar-h))}
+
+/* 1. Barre d'état de la saisie : dernier enfant de <main>, collée au bas de la fenêtre ; à la fin de la page elle reprend sa place
+      dans le flux et ne recouvre plus rien. Bord supérieur = 2e couleur de l'équipe (écho de la bordure de l'en-tête). */
+.gbar{grid-column:1/-1;position:sticky;bottom:0;z-index:50;display:flex;flex-wrap:wrap;align-items:center;gap:4px 18px;min-height:46px;margin:14px 0 0;padding:7px 14px;
+  background:var(--panel);border:1px solid var(--line);border-bottom:0;border-radius:10px 10px 0 0;box-shadow:inset 0 3px 0 var(--c2),0 -6px 16px rgba(0,0,0,.14);font-size:13px;line-height:1.3}
+.gbar svg{width:15px;height:15px;flex:none}
+.gbar>span,.gbar>p{display:inline-flex;align-items:center;gap:6px;margin:0;min-width:0}
+.gbar-pend b{display:inline-block;min-width:22px;padding:1px 7px;border-radius:9px;background:var(--base1);color:var(--on-base1);text-align:center;font-variant-numeric:tabular-nums}
+.gbar-pend[data-n="0"]{color:var(--muted)}
+.gbar-saved{color:var(--muted)}
+.gbar-al{font-weight:600;color:var(--st-ok-ink)}.gbar-al.bad{color:var(--st-err-ink)}
+.gbar-live{flex:0 1 auto;color:var(--fg)}.gbar-live:empty{display:none}
+.gbar-live.bad{color:var(--st-err-ink);font-weight:600}
+.gbar-key{margin-left:auto!important;color:var(--muted);font-size:12px}
+.gbar kbd{font:inherit;font-size:11px;padding:0 5px;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;background:color-mix(in srgb,var(--fg) 5%,var(--panel));color:var(--fg)}
+/* état d'erreur : le stockage local refuse d'écrire. Fond teinté, bord épais, icône, texte qui dit quoi faire, bouton d'export. */
+.gbar[data-state="err"]{background:color-mix(in srgb,var(--st-err) 12%,var(--panel));box-shadow:inset 0 4px 0 var(--st-err),0 -6px 16px rgba(0,0,0,.14);border-color:var(--st-err)}
+.gbar>p.gbar-err{flex:1 1 100%;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:4px 10px;align-items:center;color:var(--fg)}.gbar-err b{color:var(--st-err-ink)}.gbar-err svg{width:18px;height:18px;color:var(--st-err)}
+.gbar-err .btn{padding:4px 10px;font-size:13px;white-space:nowrap}
+@media (max-width:640px){.gbar>p.gbar-err{grid-template-columns:auto minmax(0,1fr)}.gbar-err .btn{grid-column:2;justify-self:start}}
+@media (max-width:640px){.gbar{gap:2px 12px;padding:6px 10px}.gbar-saved,.gbar-key{display:none!important}.gbar-live{flex-basis:100%}}
+/* Ligne de correction .gbar-fix : produite quand la case qui a le focus est refusée. Large écran (variante A) : masquée, la bulle suffit.
+   Écran étroit (< 641 px) : la bulle serait coupée par la colonne des noms collante ; la ligne de la barre la remplace, et l'annonce
+   identique de #gbar-live est seulement masquée à l'écran (toujours lue). */
+@media (min-width:641px){.gbar[data-tip="1"] .gbar-fix{display:none}}
+@media (max-width:640px){td.ci.rej>.gi-tip,.gi-host.rej>.gi-tip{display:none!important}.gbar:has(.gbar-fix) .gbar-live.bad{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}}
+
+/* 2. Case dont la valeur est refusée : le texte tapé reste, la case garde le code .err, un coin marqué (pas la couleur seule)
+      et une bulle qui dit comment corriger. La bulle est toujours dans le DOM (aria-describedby), visible tant que la case a le focus. */
+table.grid td.ci{position:relative}
+td.ci.rej::after{content:"";position:absolute;top:2px;right:2px;border-style:solid;border-width:0 8px 8px 0;border-color:transparent var(--st-err) transparent transparent;border-radius:0 5px 0 0;pointer-events:none}
+td.ci.rej input.cell{border-color:var(--st-err);background:color-mix(in srgb,var(--st-err) 14%,var(--panel));color:var(--fg);font-style:italic}
+.gi-tip{display:none;position:absolute;z-index:6;left:50%;top:calc(100% + 6px);transform:translateX(-50%);width:max-content;max-width:250px;padding:6px 10px 7px;
+  background:var(--panel);color:var(--fg);border:1px solid var(--st-err);border-left-width:4px;border-radius:7px;box-shadow:0 6px 18px rgba(0,0,0,.22);
+  font-size:12.5px;line-height:1.35;white-space:normal;text-align:left;font-style:normal}
+.gi-tip::before{content:"";position:absolute;left:50%;top:-6px;width:10px;height:10px;margin-left:-5px;background:var(--panel);border:1px solid var(--st-err);border-width:1px 0 0 1px;transform:rotate(45deg)}
+.gi-tip.up{top:auto;bottom:calc(100% + 6px)}.gi-tip.up::before{top:auto;bottom:-6px;border-width:0 1px 1px 0}
+.gi-tip b{display:flex;gap:5px;align-items:center;color:var(--st-err-ink)}.gi-tip b svg{width:13px;height:13px;color:var(--st-err);flex:none}
+td.ci.rej:focus-within>.gi-tip,td.ci.rej:hover>.gi-tip,.gi-host.rej:focus-within>.gi-tip,.gi-host.rej:hover>.gi-tip{display:block}
+/* champ hors tableau (carte d'échange : équipe, date) : l'étiquette porte la bulle */
+.gi-host{position:relative}.gi-host.rej input.cell{border-color:var(--st-err);background:color-mix(in srgb,var(--st-err) 14%,var(--panel));font-style:italic}
+/* 1re colonne : une bulle ne passe pas sous la colonne des noms collante */
+table.grid td.ci.first>.gi-tip{left:0;transform:none}table.grid td.ci.first>.gi-tip::before{left:18px}
+@media (prefers-reduced-motion:no-preference){td.ci.rej:focus-within>.gi-tip{animation:gi-in .12s ease-out}}
+@keyframes gi-in{from{opacity:0}to{opacity:1}}
+/* ligne de correction dans la barre (écran étroit seulement) */
+.gbar-fix{flex:1 1 100%;color:var(--fg)}.gbar-fix b{color:var(--st-err-ink)}.gbar-fix svg{color:var(--st-err)}
+/* ===== Aide en contexte (connect/ft_help.js) =====
+   Composant commun aux écrans de saisie (entry, events, preseason, offseason, setup, history_edit).
+   Aucune nouvelle couleur : neutres du thème (--fg, --muted, --line, --panel), accent d'équipe lisible = --ink1 (4,5:1 contre le panneau
+   dans les deux thèmes, quelle que soit l'équipe), focus = --focus/--focus-halo (règle commune du 2026-11-11). Aucune couleur de statut.
+   Sélecteurs stables (le rendu remplace innerHTML) : .help[data-help="<écran>"], button[data-help-tg="open|common"], #help-<écran>. */
+.help{margin:4px 0 8px}
+.help [hidden]{display:none!important}
+/* Ligne du haut : rappel clavier existant (entry.hint) à gauche, bouton à droite. Fermée, l'aide ne prend aucune hauteur de plus. */
+.help-bar{display:flex;align-items:center;gap:6px 18px;flex-wrap:wrap}
+.help-bar .help-sum{flex:1 1 420px;margin:0;min-width:0}
+.help-tg{display:inline-flex;align-items:center;gap:7px;flex:none;margin-left:auto;font:inherit;font-size:13px;line-height:1.2;padding:5px 12px 5px 6px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--fg);cursor:pointer}
+.help-tg:hover{border-color:var(--ink1)}
+.help-tg:focus-visible{outline:2px solid var(--focus);outline-offset:2px;box-shadow:0 0 0 5px var(--focus-halo)}
+.help-ic{width:18px;height:18px;flex:none;color:var(--ink1)}
+.help-chev{width:10px;height:10px;flex:none;transition:transform .15s ease-out}
+.help-tg[aria-expanded="true"] .help-chev{transform:rotate(180deg)}
+/* Panneau : sous le rappel clavier, au-dessus de la grille ; jamais par-dessus (pas de modale, pas de superposition). */
+.help-body{margin:8px 0 2px;padding:10px 16px 6px;border:1px solid var(--line);border-radius:10px;background:color-mix(in srgb,var(--fg) 3%,var(--panel));font-size:13px;line-height:1.45;color:var(--fg)}
+.help-body.help-anim{animation:help-in .16s ease-out}
+@keyframes help-in{from{opacity:0;transform:translateY(-4px)}}
+@media (prefers-reduced-motion:reduce){.help-body.help-anim{animation:none}.help-chev{transition:none}}
+.help-h{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 8px;font-size:15px;font-weight:700;letter-spacing:0;text-transform:none;color:var(--fg)}
+.help-chip{font-size:12px;font-weight:600;padding:1px 9px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--fg)}
+/* Colonnes : 3 sur un écran large (60 caractères par ligne environ), 2 à 900 px, 1 en dessous de 620 px environ */
+.help-cols{columns:3 290px;column-gap:30px}
+.help-col{break-inside:avoid;padding-bottom:2px}   /* colonnes CSS : à 900 px, « Alertes » se range sous « Ordre » sans trou */
+.help-sh{display:block;margin:0 0 6px;font-size:13px;font-weight:700;letter-spacing:0;text-transform:none;color:var(--fg)}
+.help ul,.help ol{list-style:none;margin:0 0 8px;padding:0}
+.help li{position:relative;margin:0 0 5px;padding-left:14px}
+.help ul>li::before{content:"";position:absolute;left:2px;top:.6em;width:5px;height:5px;border-radius:1px;background:var(--muted)}
+/* Ordre conseillé : seule vraie séquence de l'aide, donc seule liste numérotée ; pastille = couleur de l'équipe lisible (--ink1) */
+.help ol.help-steps{counter-reset:hs}
+.help ol.help-steps>li{counter-increment:hs;padding-left:28px;min-height:20px}
+.help ol.help-steps>li::before{content:counter(hs);position:absolute;left:0;top:0;width:20px;height:20px;border-radius:50%;background:var(--ink1);color:var(--panel);font-size:12px;font-weight:700;line-height:20px;text-align:center;font-variant-numeric:tabular-nums}
+.help-lead{font-weight:700}
+/* Marqueur « [À COMPLÉTER : …] » : contour pointillé + crayon, neutre (pas une couleur d'alerte) */
+.help mark.help-todo{display:inline-flex;align-items:center;gap:4px;padding:0 5px;border:1px dashed var(--fg);border-radius:4px;background:color-mix(in srgb,var(--fg) 7%,transparent);color:var(--fg);font-weight:600;white-space:nowrap}
+.help mark.help-todo svg{width:12px;height:12px;flex:none}
+/* « Où trouver les chiffres » : bande courte sur toute la largeur, au-dessus des colonnes (2 lignes au plus) */
+.help-top{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:baseline;gap:2px 18px;margin:0 0 10px;padding:0 0 6px;border-bottom:1px solid var(--line)}
+.help-top .help-sh{margin:0}
+.help ul.help-inline{margin:0}
+.help ul.help-inline>li{margin:0 0 3px}
+@media (max-width:620px){.help-top{grid-template-columns:minmax(0,1fr)}}
+/* Remarque propre à la période (Équipe, séries) */
+.help-note{margin:0 0 12px;padding:6px 10px;border-left:3px solid var(--ink1);background:var(--panel);border-radius:0 6px 6px 0}
+/* Bloc commun replié sous le bloc de l'onglet */
+.help-more{margin:2px 0 0;padding-top:6px;border-top:1px solid var(--line)}
+.help-tg.sub{margin-left:0;border-color:transparent;background:transparent;font-weight:700;padding:4px 10px 4px 4px}
+.help-tg.sub:hover{border-color:var(--line)}
+.help-n{min-width:20px;padding:0 6px;border-radius:9px;background:var(--line);color:var(--fg);font-size:12px;font-weight:600;text-align:center;font-variant-numeric:tabular-nums}
+.help ul.help-common{columns:2 320px;column-gap:30px;margin:8px 0 6px}
+.help ul.help-common>li{break-inside:avoid}
+/* ===== fin de l'aide en contexte ===== */
+/* Panneau de connexion : un refus ou un avertissement n'est jamais tronqué (sa propre ligne, retour à la ligne) ; décision du 2026-11-17 */
+.card.sb p.bad,.card.sb p.warn{flex:1 1 100%;white-space:normal;overflow:visible;text-overflow:clip;padding:2px 0 2px 10px;border-left:3px solid currentColor;line-height:1.4}
+/* ===== Homonymes : question « Même joueur ? » (connect/homonym_ui.js ; maquette docs/maquettes/homonymes.html) =====
+   Question « Même joueur ? » : encadré NON modal, sous la ligne concernée (sous-ligne pleine largeur <tr class="homo-row">, même
+   principe que la sous-ligne « nouveau joueur reçu » des échanges, .npx-row). Collé à gauche (sticky) : visible sans défilement
+   horizontal, même quand la grille défile dans son cadre.
+   Couleurs : statut seulement, jamais la couleur de l'équipe (sauf l'anneau de focus commun --focus).
+     question en attente = avertissement (--st-warn, icône triangle) ; réponse « Oui » = --st-ok (icône coche) ;
+     date manquante ou réponse refusée = --st-err (icône croix) ; le texte dit toujours l'état : la couleur n'est jamais seule.
+   Règle visuelle reprise du choix de joueur (FTPC) : trait PLEIN = fiche existante (« Oui, c'est lui ») ;
+   trait POINTILLÉ = nouvelle fiche (« Non, c'est un autre joueur », étiquette « Autre joueur »). */
+tr.homo-row>td{height:auto;padding:2px 4px 10px;border-bottom:1px solid var(--line);white-space:normal;text-align:left}
+tr.has-homo>td,tr.has-homo>th{border-bottom:0}
+.homo{position:sticky;left:4px;box-sizing:border-box;width:max-content;max-width:min(780px,calc(100vw - 120px));display:grid;gap:8px;padding:10px 12px 12px;
+  border:1px solid color-mix(in srgb,var(--st-warn) 50%,var(--line));border-left:4px solid var(--st-warn);border-radius:9px;
+  background:color-mix(in srgb,var(--st-warn) 7%,var(--panel));color:var(--fg);font-size:13px;line-height:1.4;white-space:normal}
+.homo:focus{outline:2px solid var(--focus);outline-offset:2px}
+.homo svg{width:15px;height:15px;flex:none}
+.homo-q{display:flex;gap:8px;align-items:flex-start;margin:0}
+.homo-q>svg{margin-top:2px;color:var(--st-warn)}
+.homo-q b{font-weight:700;margin-right:6px}
+.homo-list{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.homo-cand{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 16px;align-items:center;padding:5px 6px 5px 10px;border:1px solid var(--line);border-radius:7px;background:var(--panel)}
+.homo-who{min-width:0;font-variant-numeric:tabular-nums}.homo-who b{font-weight:700}.homo-who .homo-meta{color:var(--muted)}
+.homo-btn{font:inherit;font-size:12.5px;font-weight:600;line-height:1.2;display:inline-flex;align-items:center;gap:6px;padding:6px 11px;border-radius:7px;
+  border:1px solid color-mix(in srgb,var(--fg) 45%,var(--line));background:var(--panel);color:var(--fg);cursor:pointer;white-space:nowrap}
+.homo-btn:hover{background:color-mix(in srgb,var(--fg) 6%,var(--panel))}
+.homo-btn:focus-visible{outline:2px solid var(--focus);outline-offset:1px;box-shadow:0 0 0 4px var(--focus-halo)}
+.homo-btn.yes svg{color:var(--st-ok)}
+.homo-btn.no{border-style:dashed;justify-self:start}
+.homo-btn.undo{font-weight:500;padding:3px 9px;color:var(--muted)}
+.homo-btn[aria-disabled="true"]{cursor:not-allowed;color:var(--muted);border-color:var(--line)}
+.homo-foot{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}
+.homo-msg{display:flex;gap:6px;align-items:flex-start;margin:0;font-size:12.5px}.homo-msg>svg{margin-top:1px}
+.homo-msg.er{color:var(--st-err-ink);font-weight:600}.homo-msg.ok{color:var(--st-ok-ink);font-weight:600}
+.homo-key{font-size:11.5px;color:var(--muted)}
+/* réponse donnée : l'encadré se réduit à une ligne (le choix reste visible et modifiable) */
+.homo.done{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;padding:7px 10px 7px 12px;width:min(780px,calc(100vw - 120px))}
+.homo.done .homo-msg{flex:1 1 300px;min-width:0}
+.homo.done.ok{border-color:color-mix(in srgb,var(--st-ok) 45%,var(--line));border-left-color:var(--st-ok);background:color-mix(in srgb,var(--st-ok) 6%,var(--panel))}
+.homo.done.other{border-color:var(--line);border-left:4px dashed color-mix(in srgb,var(--fg) 45%,var(--line));background:var(--panel)}
+.homo.done.other.er,.homo.er{border-color:color-mix(in srgb,var(--st-err) 45%,var(--line));border-left-color:var(--st-err);background:color-mix(in srgb,var(--st-err) 6%,var(--panel))}
+.homo.done.other.er{border-left-style:solid}
+/* champ de date dans l'encadré (Historique : pas de colonne Date de naissance) */
+.homo label.homo-date{display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+.homo input.cell.date{width:112px;height:30px;box-sizing:border-box;font:inherit;font-size:13px;padding:3px 7px;border:1px solid color-mix(in srgb,var(--fg) 24%,var(--line));border-radius:7px;background:var(--panel);color:var(--fg);text-align:left}
+.homo label.homo-date.err input{border-color:var(--st-err);background:color-mix(in srgb,var(--st-err) 12%,var(--panel))}
+/* étiquette « Autre joueur » : pastille pointillée, dans l'encadré et dans la case du nom (forme courte « Autre », texte complet lu) */
+.homo-tag{display:inline-flex;align-items:center;font-size:11px;font-weight:700;line-height:15px;padding:0 7px;border-radius:8px;border:1px dashed color-mix(in srgb,var(--fg) 55%,var(--line));color:var(--fg);background:var(--panel);white-space:nowrap}
+.homo-f{position:relative;display:inline-block}
+.homo-f>input.cell{padding-right:52px!important}
+.homo-f>.homo-tag{position:absolute;right:5px;top:50%;transform:translateY(-50%);pointer-events:none}
+/* choix de joueur (FTPC) : nouvel état « homo » = nom exact d'un joueur connu, réponse attendue (trait pointillé : pas encore lié) */
+.pcb[data-st="homo"] .pcb-mk{color:var(--st-warn)}
+table.grid.ev td.ci .pcb[data-st="homo"] input.cell{border-style:dashed;border-color:var(--st-warn)}
+/* choix de joueur avec saisie libre : une valeur suivie de l'étiquette d'homonyme ne doit pas être coupée (« Sebastian Aho (D · né en 2008) ») */
+input.cell.pcombo.hlong{width:262px}
+@media (prefers-reduced-motion:no-preference){.homo.appear{animation:homo-in .18s ease-out}@keyframes homo-in{from{opacity:0;transform:translateY(-3px)}}}
