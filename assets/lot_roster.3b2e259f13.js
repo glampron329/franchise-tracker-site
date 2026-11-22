@@ -827,13 +827,35 @@
     // ---- nouveau joueur dans Contrats (agent libre) et Mouvements (réclamation au ballottage), phase 4b : même composant que les échanges ----
     var NEWP = { ct: ['event', 'free_agent'], mv: ['move', 'waiver_claim'] };
     function newCap(tab, it) { var k = NEWP[tab]; return !!(k && it && it.kind === 'new' && it.r[k[0]] === k[1]); }
+    // nouvelle ligne de Contrats ou de Mouvements : la case Joueur accepte un nom tapé, quel que soit l'événement (la colonne Joueur vient
+    // avant Événement / Mouvement) ; un nom inconnu est gardé, et le joueur se crée dès que l'événement est Agent libre ou Réclamation
+    function freeCell(tab, it) { return !!NEWP[tab] && (!it || it.kind === 'new'); }
     function newList(r) { return inList({ date: r.date }); }
+    function pickList(tab, r) {   // joueurs proposés hors création : mêmes listes que les menus (joueurs actifs à la date selon l'événement)
+      var l = tab === 'ct' ? (r.event ? ctPlayers(r.date, r.pid, r.event) : allPlayers()) : mvPlayers(r.date, r.pid);
+      return l.filter(function (p) { return p.id > 0; }).map(function (p) { return { id: p.id, name: p.name, label: plLabels()[p.id] || null, g: p.pos, o: 'franchise' }; });
+    }
+    function cellList(tab, r) { var k = NEWP[tab]; return r[k[0]] === k[1] ? newList(r) : pickList(tab, r); }
     function evNewCell(tab, it, c, raw) {
-      if (!newCap(tab, it)) return false; var r = it.r, v = String(raw == null ? '' : raw);
+      var v = String(raw == null ? '' : raw); if (tab === 'mv' && state.tab === 'inj') return false;   // Blessures : liste fermée (pas de création)
+      if (!it && c === 'pname' && freeCell(tab, it)) { var nb = blank(tab); if (tab === 'mv') nb.move = ''; entries[tab].push(nb); it = { kind: 'new', i: entries[tab].length - 1, r: nb }; }
+      if (c === 'pname' && freeCell(tab, it) && !newCap(tab, it)) {   // pas (encore) de création : le nom se lie à un joueur de la liste, sinon il reste tapé
+        var r0 = it.r, res = PC.resolve(v.trim(), null, pickList(tab, r0), 'free'); dropNew(r0);
+        if (res.st === 'linked') { r0.pid = res.p.id; r0.pname = res.p.name; } else { r0.pid = null; r0.pname = v.trim(); }
+        r0.touched = true; persist(); return true;
+      }
+      if (!newCap(tab, it)) return false; var r = it.r;
       if (c === 'pname') { setInName({ date: r.date }, r, v); delete r.type; }
       else { v = v.trim(); r.np = r.np || { first: '', last: '', pos: '', birth: '' }; r.np[c.slice(3)] = c === 'np_pos' ? v.toUpperCase() : v; }
       persist(); return true;
     }
+    // nom inconnu sur une nouvelle ligne sans événement : on indique quel événement crée le joueur
+    function pickHint(tab, it, a) {
+      var k = NEWP[tab]; if (!freeCell(tab, it) || !it || it.r.pid != null || !it.r.pname || it.r[k[0]]) return a;
+      return a.filter(function (x) { return x.k !== 'val.player_missing' && x.c !== 'pid'; }).concat([{ c: 'pid', level: 'err', k: tab === 'ct' ? 'val.np_pick_event_ct' : 'val.np_pick_event_mv', p: [it.r.pname] }]);
+    }
+    // l'événement devient Agent libre / Réclamation alors qu'un nom inconnu est tapé : le bloc « nouveau joueur » s'ouvre
+    function newFromName(tab, r) { if (r && r.pid == null && r.pname && !r.np && !(r.hc && r.hc.length)) { setInName({ date: r.date }, r, r.pname); delete r.type; } }
     function dropNew(r) { if (r && (r.np || r.hc || r.homo)) { r.np = null; delete r.hc; delete r.homo; delete r.touched; } }
     // alertes d'un nouveau joueur : mêmes règles que le côté reçus d'un échange (trModel)
     function npAlerts(r, a, list) {
@@ -851,8 +873,8 @@
       return a;
     }
     function newPidCell(tab, i, r, a) {
-      var hp = !r.pid && r.hc && r.hc.length && HO.status(trCands(r), r.homo) === 'ask', al = a.filter(function (x) { return x.c === 'pid' || x.c === 'np'; }), list = newList(r);
-      return '<td class="ci' + (hp ? ' warn' : cellClass(al.filter(function (x) { return x.c === 'pid'; }), 'pid')) + '">' + PC.cellHTML({ r: i, c: 'pname', value: r.pid ? nameOf(r.pid) : r.pname || '', list: list, unknown: 'new', listId: 'dl-new-' + tab + '-' + i, label: t('col.player'), touched: r.touched, noSug: true, res: hp ? { st: 'homo', p: null, near: null } : null }, esc, t) +
+      var hp = !r.pid && r.hc && r.hc.length && HO.status(trCands(r), r.homo) === 'ask', al = a.filter(function (x) { return x.c === 'pid' || x.c === 'np'; }), cr = r[NEWP[tab][0]] === NEWP[tab][1], list = cellList(tab, r);
+      return '<td class="ci' + (hp ? ' warn' : cellClass(al.filter(function (x) { return x.c === 'pid'; }), 'pid')) + '">' + PC.cellHTML({ r: i, c: 'pname', value: r.pid ? nameOf(r.pid) : r.pname || '', list: list, unknown: cr ? 'new' : 'free', listId: 'dl-new-' + tab + '-' + i, label: t('col.player'), touched: r.touched, noSug: true, res: hp ? { st: 'homo', p: null, near: null } : null }, esc, t) +
         PC.datalistHTML('dl-new-' + tab + '-' + i, list.slice().sort(function (x, y) { return x.name.localeCompare(y.name, state.lang); }), esc, t) + '</td>';
     }
     // ligne sous la ligne : question « Même joueur ? » et champs du nouveau joueur
@@ -899,6 +921,7 @@
       return items;
     }
     function mvSetCell(ri, c, raw) {
+      if (c === 'pid' && state.tab !== 'inj' && freeCell('mv', mvItems()[ri]) && !/^-?\d+$/.test(String(raw == null ? '' : raw).trim())) c = 'pname';   // nom collé ou tapé sur une nouvelle ligne
       if (c === 'pname' || /^np_/.test(c)) return evNewCell('mv', mvItems()[ri], c, raw);
       var def = SCHEMA[state.tab === 'inj' ? 'inj' : 'mv'].filter(function (d) { return d[0] === c; })[0]; if (!def || c === 'games') return false;
       var v = String(raw == null ? '' : raw).trim(), items = mvItems(), it = items[ri];
@@ -907,6 +930,7 @@
       var tgt = it.kind === 'new' ? entries.mv[it.i] : (mvEdit(it.id) || (entries.mvx.push({ id: it.id }), mvEdit(it.id)));
       tgt[c] = v; if (c === 'pid') { tgt.pname = v == null ? '' : nameOf(v); dropNew(tgt); }
       if (c === 'move' && v !== 'waiver_claim') dropNew(tgt);   // nouveau joueur : réclamation au ballottage seulement
+      if (c === 'move' && v === 'waiver_claim' && it.kind === 'new') newFromName('mv', tgt);
       // formulaire conditionnel : « retour » seulement pour une blessure, « réclamé » seulement pour une cession à la LAH
       if (c === 'move') { if (v !== 'injury') tgt.ret = ''; if (v !== 'send_down') tgt.claimed = ''; }
       persist(); return true;
@@ -917,7 +941,7 @@
       cx.injuriesOf = function (pid, id) { return inj.filter(function (o) { return o.pid === pid && o.id !== id; }); }; return cx;
     }
     function mvAlerts(all) {   // all : les deux onglets (envoi commun) ; sinon les lignes de l'onglet affiché
-      var cx = mvCtx(); return (all ? mvAll() : mvItems()).map(function (it) { var a = V.validateMove(Object.assign({}, it.r, { id: it.kind === 'base' ? it.id : 'n' + it.i }), cx); if (it.r.pid == null && it.r.pname && !a.some(function (x) { return x.c === 'pid'; })) a.push({ c: 'pid', level: 'err', k: 'val.player_missing', p: [] }); if (V.isDate(it.r.date) && V.seasonOf(it.r.date) !== state.season) a.push({ c: 'date', level: 'warn', k: 'val.date_other_season', p: [] }); return newCap('mv', it) ? npAlerts(it.r, a, newList(it.r)) : a; });
+      var cx = mvCtx(); return (all ? mvAll() : mvItems()).map(function (it) { var a = V.validateMove(Object.assign({}, it.r, { id: it.kind === 'base' ? it.id : 'n' + it.i }), cx); if (it.r.pid == null && it.r.pname && !a.some(function (x) { return x.c === 'pid'; })) a.push({ c: 'pid', level: 'err', k: 'val.player_missing', p: [] }); if (V.isDate(it.r.date) && V.seasonOf(it.r.date) !== state.season) a.push({ c: 'date', level: 'warn', k: 'val.date_other_season', p: [] }); return newCap('mv', it) ? npAlerts(it.r, a, newList(it.r)) : pickHint('mv', it, a); });
     }
     // joueurs actifs avec l'équipe à la date de l'événement (le joueur déjà choisi reste affiché pour pouvoir le corriger)
     function mvPlayers(date, current) {
@@ -931,7 +955,7 @@
         total += a.length;
         var opts = '<option value=""></option>' + mvPlayers(r.date, r.pid).map(function (p) { return '<option value="' + p.id + '"' + (p.id === r.pid ? ' selected' : '') + '>' + esc(p.name) + '</option>'; }).join('');
         body += '<tr data-row="' + i + '"' + (it && it.kind === 'base' ? ' class="saved' + (it.edited ? ' edited' : '') + '"' : '') + '>' + cellHTML(def('date'), r, i, a) +
-          (newCap('mv', it) ? newPidCell('mv', i, r, a) : '<td class="ci' + cellClass(a, 'pid') + '"' + cellTitle(a, 'pid') + '><select class="cell" data-r="' + i + '" data-c="pid" aria-label="' + esc(t('col.player')) + '">' + opts + '</select></td>') +
+          (freeCell('mv', it) && !isInj ? newPidCell('mv', i, r, a) : '<td class="ci' + cellClass(a, 'pid') + '"' + cellTitle(a, 'pid') + '><select class="cell" data-r="' + i + '" data-c="pid" aria-label="' + esc(t('col.player')) + '">' + opts + '</select></td>') +
           (isInj ? cellHTML(def('ret'), r, i, a) + '<td class="num d' + cellClass(a, 'games') + '"' + cellTitle(a, 'games') + '>' + (g == null ? '—' : g) + '</td>'
                  : cellHTML(def('move'), r, i, a) + (sd ? cellHTML(def('claimed'), r, i, a) : na)) +
           '<td class="al" title="' + esc(alertsText(a)) + '">' + (a.length ? '<span class="badge' + (a.some(function (x) { return x.level === 'err'; }) ? ' bad' : '') + '">' + a.length + '</span>' : '') + '</td><td>' + (it && (it.kind === 'new' || it.edited) ? '<button class="x" data-rm="' + i + '" title="' + esc(t(it.kind === 'new' ? 'ev.remove' : 'ev.undo_edit')) + '">×</button>' : '') + '</td></tr>' + (newCap('mv', it) ? newRowHTML('mv', i, r, a, sc.length + 2) : '');
@@ -984,6 +1008,7 @@
       return items;
     }
     function ctSetCell(ri, c, raw) {
+      if (c === 'pid' && freeCell('ct', ctItems()[ri]) && !/^-?\d+$/.test(String(raw == null ? '' : raw).trim())) c = 'pname';   // nom collé ou tapé sur une nouvelle ligne
       if (c === 'pname' || /^np_/.test(c)) return evNewCell('ct', ctItems()[ri], c, raw);
       var def = SCHEMA.ct.filter(function (d) { return d[0] === c; })[0]; if (!def) return false;
       var v = String(raw == null ? '' : raw).trim(), items = ctItems(), it = items[ri];
@@ -994,6 +1019,7 @@
       var tgt = it.kind === 'new' ? entries.ct[it.i] : (ctEdit(it.id) || (entries.ctx.push({ id: it.id }), ctEdit(it.id))), k;
       tgt[c] = v; if (c === 'pid') { tgt.pname = v == null ? '' : nameOf(v); dropNew(tgt); }
       if (c === 'event' && v !== 'free_agent') dropNew(tgt);   // nouveau joueur : agent libre seulement
+      if (c === 'event' && v === 'free_agent' && it.kind === 'new') newFromName('ct', tgt);
       // formulaire conditionnel : rachat et libération n'ont ni type, ni années, ni saison, ni salaire, ni clause ; les clauses n'existent que pour un contrat à un volet, une par année du contrat
       if (c === 'event' && V.NO_TERMS.indexOf(v) >= 0) { ['ctype', 'years', 'first', 'aav'].forEach(function (x) { tgt[x] = ''; }); for (k = 1; k <= 8; k++) tgt['cl' + k] = ''; }
       if (c === 'ctype' && v !== 'one_way') for (k = 1; k <= 8; k++) tgt['cl' + k] = '';
@@ -1002,7 +1028,7 @@
     }
     function ctAlerts() {
       var cx = ctx(); cx.stints = DATA.stints || null;
-      return ctItems().map(function (it) { var a = ctAlert0(it, cx); return newCap('ct', it) ? npAlerts(it.r, a, newList(it.r)) : a; });
+      return ctItems().map(function (it) { var a = ctAlert0(it, cx); return newCap('ct', it) ? npAlerts(it.r, a, newList(it.r)) : pickHint('ct', it, a); });
     }
     function ctAlert0(it, cx) { { var a = V.validateContract(Object.assign({}, it.r, { id: it.kind === 'base' ? 'b' + it.id : 'n' + it.i }), cx); if (it.r.pid == null && it.r.pname && !a.some(function (x) { return x.c === 'pid'; })) a.push({ c: 'pid', level: 'err', k: 'val.player_missing', p: [] }); if (V.isDate(it.r.date) && V.seasonOf(it.r.date) !== state.season) a.push({ c: 'date', level: 'warn', k: 'val.date_other_season', p: [] }); return a; } }
     function ctPlayers(date, current, event) { return V.ACTIVE_ONLY.indexOf(event) >= 0 ? mvPlayers(date, current) : allPlayers().sort(function (a, b) { return a.name.localeCompare(b.name, state.lang); }); }
@@ -1015,7 +1041,7 @@
         var it = items[i], r = it ? it.r : blank('ct'), a = al[i] || [], terms = V.NO_TERMS.indexOf(r.event) < 0, one = terms && r.ctype === 'one_way', yrs = +r.years || 0, k, fo = fsOpts.slice();
         if (r.first !== '' && r.first != null && !fo.some(function (o) { return +o[0] === +r.first; })) fo.push([r.first, sl(+r.first)]);
         total += a.length;
-        var d = it && terms ? derived('ct', r, i) : ['—', '—'], row = '<tr data-row="' + i + '"' + (it && it.kind === 'base' ? ' class="saved' + (it.edited ? ' edited' : '') + '"' : '') + '>' + cellHTML(def('date'), r, i, a) + (newCap('ct', it) ? newPidCell('ct', i, r, a) : selTD('pid', i, a, playerOpts(ctPlayers(r.date, r.pid, r.event), r.pid), r.pid)) + cellHTML(def('event'), r, i, a) +
+        var d = it && terms ? derived('ct', r, i) : ['—', '—'], row = '<tr data-row="' + i + '"' + (it && it.kind === 'base' ? ' class="saved' + (it.edited ? ' edited' : '') + '"' : '') + '>' + cellHTML(def('date'), r, i, a) + (freeCell('ct', it) ? newPidCell('ct', i, r, a) : selTD('pid', i, a, playerOpts(ctPlayers(r.date, r.pid, r.event), r.pid), r.pid)) + cellHTML(def('event'), r, i, a) +
           (terms ? cellHTML(def('ctype'), r, i, a) : na) + (terms ? selTD('years', i, a, yrsOpts, r.years) : na) + (terms ? selTD('first', i, a, fo, r.first) : na) + (terms ? cellHTML(def('aav'), r, i, a) : na);
         for (k = 1; k <= 8; k++) row += one && k <= yrs ? selTD('cl' + k, i, a, clOpts, r['cl' + k]) : na;
         body += row + d.map(function (x, n) { return '<td class="num d" data-d="' + n + '">' + esc(x) + '</td>'; }).join('') + alertTD(a, it && (it.kind === 'new' || it.edited), t(it && it.kind === 'new' ? 'ev.remove' : 'ev.undo_edit')).replace('data-rm="@"', 'data-rm="' + i + '"') + '</tr>' +
@@ -1691,7 +1717,7 @@
       redrawEach: true,
       grow: true,   // la dernière ligne de chaque grille est toujours vide : descendre depuis elle vise la ligne qui sera créée
       cols: function () { return app.pasteCols(); },
-      na: function (r, c) { var tr = rootEl.querySelector('tr[data-row="' + r + '"]'); return !!tr && !tr.querySelector(FTGI.cellSel(r, c)); },   // case hachurée ou calculée de la ligne
+      na: function (r, c) { var tr = rootEl.querySelector('tr[data-row="' + r + '"]'); return !!tr && !tr.querySelector(FTGI.cellSel(r, c)) && !(c === 'pid' && tr.querySelector(FTGI.cellSel(r, 'pname'))); },   // nouvelle ligne : Joueur = case pname   // case hachurée ou calculée de la ligne
       // carte d'échange : chaque ligne du bloc va à l'élément suivant du même côté, les colonnes suivent l'ordre de la ligne de l'élément
       targets: function (el, m) {
         if (!el.closest || !el.closest('.tcard')) return null;
