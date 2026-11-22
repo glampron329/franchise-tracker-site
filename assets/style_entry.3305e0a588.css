@@ -1,0 +1,41 @@
+main.entry{max-width:1280px}main.entry .pick{margin-bottom:14px}
+.acts{display:flex;gap:8px;margin-left:auto;flex-wrap:wrap}
+/* (boutons : composant commun .btn de prototype/style.css) */
+/* Grille de saisie : bordures sur les cellules (pas de border-collapse avec des cellules « sticky ») et hauteur identique pour toutes les cellules d'une ligne.
+   La colonne des noms s'appelle « pl » : le nom « who » est déjà pris par la fiche joueur (affichage flex avec marge) et décalait les lignes. */
+table.grid{font-size:var(--fs-2);border-collapse:separate;border-spacing:0;width:auto;min-width:100%}
+table.grid th,table.grid td{box-sizing:border-box;height:34px;padding:0 4px;border-bottom:1px solid var(--line);vertical-align:middle;line-height:1.2;white-space:nowrap}
+table.grid th.pl{position:sticky;left:0;background:var(--panel);z-index:1;min-width:200px;text-align:left;font-size:var(--fs-2);color:var(--fg);border-right:1px solid var(--line-strong)}
+.plin{display:flex;align-items:center;justify-content:space-between;gap:8px}
+/* bouton × : focus = anneau commun (audit E5 : plus d'outline:none) */
+button.rm{font:inherit;font-size:16px;line-height:1;width:22px;height:22px;padding:0;border-radius:50%;border:1px solid transparent;background:transparent;color:var(--muted);cursor:pointer}
+button.rm:hover,button.rm:focus-visible{color:var(--st-err-ink);border-color:var(--st-err)}
+table.grid thead th{position:sticky;top:0;background:var(--panel);z-index:2;font-size:var(--fs-1);border-bottom-color:var(--line-strong)}
+table.grid thead th:first-child{left:0;z-index:3}
+table.grid thead tr.cols.has-grp th{top:34px}
+table.grid th.grp{text-align:center;color:var(--fg);font-weight:700;border-left:1px solid var(--line);border-right:1px solid var(--line)}
+.scroll-top{overflow-x:auto;overflow-y:hidden;height:14px;margin:0 0 2px}.scroll-top>div{height:1px}
+.btn.two{display:inline-flex;flex-direction:column;align-items:flex-start;line-height:1.25;gap:0}.btn.two .b2{font-size:11px;font-weight:var(--w-reg);color:var(--muted)}
+.linkbtn{background:none;border:none;color:var(--ink1);text-decoration:underline;cursor:pointer;font:inherit;padding:0}
+/* Case saisissable : boîte avec contour --field-line (3:1 et plus, audit E6) ; focus : bordure --focus + anneau commun (audit M3) */
+td.ci{padding:0}input.cell{width:56px;height:32px;box-sizing:border-box;font:inherit;font-size:var(--fs-2);text-align:right;padding:5px 6px;border:1px solid var(--field-line);border-radius:var(--r-1);background:var(--panel);color:var(--fg);font-variant-numeric:tabular-nums}
+input.cell:hover{border-color:var(--fg)}input.cell:focus{border-color:var(--focus);background:var(--panel)}
+td.ci.err input.cell{border-color:var(--st-err);background:color-mix(in srgb,var(--st-err) 14%,var(--panel))}td.ci.warn input.cell{border-color:var(--st-warn);background:color-mix(in srgb,var(--st-warn) 14%,var(--panel))}
+/* Case calculée en lecture seule (cellRO) : pas de boîte, fond en creux, texte --fg */
+td.d{color:var(--fg);background:var(--panel-2);box-shadow:inset 0 0 0 2px var(--panel)}th.d{color:var(--muted);font-style:italic}
+/* Pastille d'alertes : texte de statut lisible (--st-*-ink sur une teinte légère), plus de blanc sur orange (2,9:1) */
+.badge{display:inline-block;min-width:18px;padding:0 6px;border-radius:9px;border:1px solid var(--st-warn);background:color-mix(in srgb,var(--st-warn) 14%,var(--panel));color:var(--st-warn-ink);font-size:var(--fs-1);font-weight:600;text-align:center}
+.badge.bad{border-color:var(--st-err);background:color-mix(in srgb,var(--st-err) 12%,var(--panel));color:var(--st-err-ink)}
+.foot{display:flex;gap:18px;flex-wrap:wrap;padding:10px 4px;font-size:var(--fs-2);border-top:1px solid var(--line);margin-top:6px}.foot .bad{color:var(--st-err-ink);font-weight:600}.foot .ok{color:var(--st-ok-ink);font-weight:600}
+a.navlink{color:var(--on-base1);text-decoration:underline;align-self:center;font-size:14px}
+
+/* Titres de colonnes centrés avec les cellules de saisie ; valeurs centrées aussi */
+table.grid thead th.num,table.grid td.num,table.grid th.grp{text-align:center}table.grid td.d{text-align:center}input.cell{text-align:center}
+table.grid th.num{min-width:60px}
+
+
+/* En-tête de la grille fixe : la liste défile dans son cadre, le titre des colonnes reste visible ; le cadre s'arrête sous l'en-tête de page */
+#scrollmain{position:relative;max-height:calc(100vh - 210px);min-height:260px;overflow:auto}
+/* Glisser-déposer des joueurs */
+.dh{cursor:grab;color:var(--muted);font-size:15px;line-height:1;padding:0 4px;user-select:none}.dh:active{cursor:grabbing}.dh:hover,.dh:focus-visible{color:var(--ink1)}
+tr.dragging{opacity:.45}tr.drop-before>th,tr.drop-before>td{box-shadow:inset 0 3px 0 var(--ink1)}tr.drop-after>th,tr.drop-after>td{box-shadow:inset 0 -3px 0 var(--ink1)}

@@ -1,0 +1,901 @@
+/* Saisie : colonnes, statistiques dérivées et règles de validation (sans interface, testable avec Node). */
+(function (root) {
+  // calculs communs (SV%) : connect/ft_stats.js, chargé avant ce fichier dans les pages
+  var FS = typeof module !== 'undefined' && module.exports ? require('../connect/ft_stats.js') : root.FTSTATS;
+  var SK = ['gp', 'g', 'a', 'pm', 'pim', 's', 'gwg', 'ppg', 'ppp', 'shg', 'shp', 'toi', 'fow', 'fot', 'hits', 'bks', 'gv', 'tk', 'oa'];
+  var GK = ['gp', 'w', 'l', 'otl', 'so', 'sv', 'sa', 'min', 'pim', 'g', 'a', 'oa'];
+  var TM_RS = ['gp', 'w', 'l', 'otl', 'rw', 'row', 'gf', 'ga', 'ppg', 'tpp', 'shga', 'ppga', 'tsh', 'shgf', 'hw', 'hl', 'ho', 'aw', 'al', 'ao'];
+  var TM_PO = ['gp', 'w', 'l', 'gf', 'ga', 'ppg', 'tpp', 'shga', 'ppga', 'tsh', 'shgf', 'hw', 'hl', 'aw', 'al'];
+  // clé de libellé de chaque colonne (table label)
+  var LBL = { gp: 'stat.gp', g: 'stat.g', a: 'stat.a', pm: 'stat.plus_minus', pim: 'stat.pim', s: 'stat.shots', gwg: 'stat.gwg', ppg: 'stat.ppg', ppp: 'stat.ppp', shg: 'stat.shg', shp: 'stat.shp',
+              toi: 'stat.toi', fow: 'stat.fow', fot: 'stat.fot', hits: 'stat.hits', bks: 'stat.blocks', gv: 'stat.giveaways', tk: 'stat.takeaways', oa: 'stat.oa',
+              w: 'stat.w', l: 'stat.l', otl: 'stat.otl', so: 'stat.so', sv: 'stat.saves', sa: 'stat.sa', min: 'stat.min', rw: 'stat.rw', row: 'stat.row', gf: 'stat.gf', ga: 'stat.ga',
+              tpp: 'stat.tpp', shga: 'stat.shga', ppga: 'stat.ppga', tsh: 'stat.tsh', shgf: 'stat.shgf', hw: 'stat.home_w', hl: 'stat.home_l', ho: 'stat.home_otl', aw: 'stat.away_w', al: 'stat.away_l', ao: 'stat.away_otl' };
+  var DECIMAL = { toi: 1, min: 1 };
+
+    // Ordre des colonnes à l'écran, comme dans le jeu : « @nom » = colonne calculée (en lecture seule), le reste = cellule à saisir
+  var LAYOUT = {
+    sk: ['gp', 'g', 'a', '@pts', 'pm', 'pim', 's', '@shot_pct', 'gwg', 'ppg', 'ppp', 'shg', 'shp', '@toi_per_game', 'toi', 'fow', 'fot', '@fo_pct', 'hits', 'bks', 'gv', 'tk', '@oa_start', 'oa', '@oa_avg'],
+    gk: ['gp', 'w', 'l', 'otl', 'so', '@sv_pct', '@gaa', 'sv', 'sa', '@ga', 'min', 'pim', 'g', 'a', '@pts', '@oa_start', 'oa', '@oa_avg'],
+    tm_rs: ['gp', '@pts', 'w', 'l', 'otl', 'rw', 'row', '@pts_pct', 'gf', '@gf_pg', 'ga', '@ga_pg', 'ppg', 'tpp', '@pp_pct', 'shga', 'ppga', 'tsh', '@pk_pct', 'shgf', 'hw', 'hl', 'ho', 'aw', 'al', 'ao'],
+    tm_po: ['gp', 'w', 'l', 'gf', '@gf_pg', 'ga', '@ga_pg', 'ppg', 'tpp', '@pp_pct', 'shga', 'ppga', 'tsh', '@pk_pct', 'shgf', 'hw', 'hl', 'aw', 'al']
+  };
+  // colonnes calculées de chaque onglet, dans l'ordre des tableaux renvoyés par rowInfo().derived
+  var DER = { sk: ['pts', 'shot_pct', 'toi_per_game', 'fo_pct', 'oa_start', 'oa_avg'], gk: ['ga', 'sv_pct', 'gaa', 'pts', 'oa_start', 'oa_avg'], tm: ['pts', 'pts_pct', 'pp_pct', 'pk_pct', 'gf_pg', 'ga_pg'] };
+  var DLBL = { pts: 'stat.pts', shot_pct: 'stat.shot_pct', toi_per_game: 'stat.toi_per_game', fo_pct: 'stat.fo_pct', sv_pct: 'stat.sv_pct', gaa: 'stat.gaa', ga: 'stat.ga', pts_pct: 'stat.pts_pct', gf_pg: 'stat.gf_pg', ga_pg: 'stat.ga_pg', pp_pct: 'stat.pp_pct', pk_pct: 'stat.pk_pct', oa_start: 'stat.oa_start', oa_avg: 'stat.oa_avg' };
+  var LINKED = { oa_start: 1 };   // colonnes calculées qui sont en fait liées à une autre saisie
+  function layout(tab, po) { return tab === 'sk' ? LAYOUT.sk : tab === 'gk' ? LAYOUT.gk : (po ? LAYOUT.tm_po : LAYOUT.tm_rs); }
+  // Matchs attendus pour les patineurs : 18 patineurs par match. Saison régulière terminée = 82 matchs ; sinon matchs de l'équipe saisis.
+  var SKATERS_PER_GAME = 18, GAMES = 82;   // GAMES : matchs de la saison régulière (paramètre de la franchise)
+  function setGames(n) { GAMES = n >= 20 && n <= 84 && n % 2 === 0 ? n : 82; }
+  function seasonGames() { return GAMES; }
+  function skaterGpCheck(sumGp, games) {
+    if (games === null || games === undefined || !games) return null;
+    var expected = SKATERS_PER_GAME * games; return { sum: sumGp, expected: expected, games: games, ok: sumGp === expected };
+  }
+
+  function n(v) { return v === null || v === undefined || v === '' || isNaN(v) ? null : +v; }
+  function z(v) { return n(v) || 0; }
+
+  function skaterDerived(v) {
+    var g = z(v.g), a = z(v.a), s = n(v.s), gp = z(v.gp), toi = n(v.toi), fot = n(v.fot);
+    return { pts: g + a, shotPct: s ? g / s : null, toiPerGame: gp && toi != null ? toi / gp : null, foPct: fot ? z(v.fow) / fot : null };
+  }
+  function goalieDerived(v) {
+    var sa = n(v.sa), sv = n(v.sv), min = n(v.min), ga = sa != null && sv != null ? sa - sv : null;
+    // tirs saisis sans arrêts : SV% et MBA vides (« — »), pas 0 (décision C3 du 2026-11-11)
+    return { ga: ga, svPct: FS.svPct(sv, sa), gaa: min && ga != null ? ga * 60 / min : null, pts: z(v.g) + z(v.a) };
+  }
+  function teamDerived(v, po) {
+    var w = z(v.w), l = z(v.l), otl = po ? 0 : z(v.otl), gp = z(v.gp);
+    return { pts: po ? null : 2 * w + otl, ptsPct: !po && gp ? (2 * w + otl) / (2 * gp) : null, ppPct: n(v.tpp) ? z(v.ppg) / v.tpp : null, pkPct: n(v.tsh) ? 1 - z(v.ppga) / v.tsh : null, gfpg: gp ? z(v.gf) / gp : null, gapg: gp ? z(v.ga) / gp : null };
+  }
+
+  // Alerte : { c: colonne, level: 'err'|'warn', k: clé de message, p: paramètres }
+  function validateSkater(v, po) {
+    var out = [], max = po ? 28 : GAMES, gp = n(v.gp), d = skaterDerived(v);
+    function add(c, level, k, p) { out.push({ c: c, level: level, k: k, p: p || [] }); }
+    SK.forEach(function (c) { if (c !== 'pm' && c !== 'oa' && n(v[c]) !== null && n(v[c]) < 0) add(c, 'err', 'val.negative'); });
+    if (gp !== null && gp > max) add('gp', 'err', 'val.gp_range', [max]);
+    if (!gp) { if (['g', 'a', 's', 'pim', 'hits', 'toi'].some(function (c) { return z(v[c]) > 0; })) add('gp', 'err', 'val.stats_without_gp'); return out; }
+    if (n(v.s) !== null && z(v.g) > n(v.s)) add('g', 'err', 'val.goals_gt_shots');
+    if (z(v.gwg) > z(v.g)) add('gwg', 'err', 'val.gwg_gt_g');
+    if (z(v.ppg) > z(v.g)) add('ppg', 'err', 'val.ppg_gt_g');
+    if (z(v.shg) > z(v.g)) add('shg', 'err', 'val.shg_gt_g');
+    if (n(v.ppp) !== null && z(v.ppp) < z(v.ppg)) add('ppp', 'err', 'val.pp_lt');
+    if (n(v.shp) !== null && z(v.shp) < z(v.shg)) add('shp', 'err', 'val.sh_lt');
+    if (z(v.ppp) + z(v.shp) > d.pts) add('ppp', 'err', 'val.special_gt_pts');
+    if (z(v.fow) > z(v.fot)) add('fow', 'err', 'val.fow_gt_fot');
+    if (n(v.toi) === null) add('toi', 'warn', 'val.toi_missing');
+    else if (v.toi / gp > 60) add('toi', 'err', 'val.toi_high');
+    if (n(v.oa) !== null && (v.oa < 40 || v.oa > 99)) add('oa', 'warn', 'val.oa_range');
+    return out;
+  }
+  function validateGoalie(v, po) {
+    var out = [], max = po ? 28 : GAMES, gp = n(v.gp), d = goalieDerived(v);
+    function add(c, level, k, p) { out.push({ c: c, level: level, k: k, p: p || [] }); }
+    GK.forEach(function (c) { if (c !== 'oa' && n(v[c]) !== null && n(v[c]) < 0) add(c, 'err', 'val.negative'); });
+    if (gp !== null && gp > max) add('gp', 'err', 'val.gp_range', [max]);
+    if (!gp) { if (z(v.sa) > 0 || z(v.min) > 0) add('gp', 'err', 'val.stats_without_gp'); return out; }
+    if (z(v.w) + z(v.l) + z(v.otl) > gp) add('gp', 'err', 'val.wlo_gt_gp');
+    if (z(v.so) > gp) add('so', 'err', 'val.so_gt_gp');
+    if (n(v.sa) !== null && n(v.sv) !== null && n(v.sv) > n(v.sa)) add('sv', 'err', 'val.saves_gt_sa');
+    if (n(v.sa) !== null && n(v.sv) === null) add('sv', 'warn', 'val.sa_no_saves');
+    if (n(v.min) !== null && v.min / gp > 75) add('min', 'err', 'val.min_high');
+    if (n(v.min) === null) add('min', 'warn', 'val.min_missing');
+    return out;
+  }
+  function validateTeam(v, po, skaterGoals) {
+    var out = [], gp = n(v.gp);
+    function add(c, level, k, p) { out.push({ c: c, level: level, k: k, p: p || [] }); }
+    if (gp === null) return out;
+    var rec = z(v.w) + z(v.l) + (po ? 0 : z(v.otl));
+    if (rec !== gp) add('gp', 'err', 'val.record_sum', [rec, gp]);
+    if (!po && gp > GAMES) add('gp', 'err', 'val.gp_range', [GAMES]);
+    if (z(v.ppg) > n(v.tpp) && n(v.tpp) !== null) add('ppg', 'err', 'val.ppg_gt_tpp');
+    if (z(v.ppga) > n(v.tsh) && n(v.tsh) !== null) add('ppga', 'err', 'val.ppga_gt_tsh');
+    var home = z(v.hw) + z(v.hl) + (po ? 0 : z(v.ho)), away = z(v.aw) + z(v.al) + (po ? 0 : z(v.ao));
+    if (n(v.hw) !== null && home + away !== gp) add('hw', 'warn', 'val.home_away_sum', [home + away, gp]);
+    if (n(v.hw) !== null && z(v.hw) + z(v.aw) !== z(v.w)) add('hw', 'warn', 'val.home_away_wins', [z(v.hw) + z(v.aw), z(v.w)]);
+    if (skaterGoals !== null && skaterGoals !== undefined && n(v.gf) !== null && skaterGoals !== z(v.gf)) add('gf', 'warn', 'val.team_goals_mismatch', [skaterGoals, z(v.gf)]);
+    return out;
+  }
+  var api = { LINKED: LINKED, LAYOUT: LAYOUT, DER: DER, DLBL: DLBL, layout: layout, skaterGpCheck: skaterGpCheck, SKATERS_PER_GAME: SKATERS_PER_GAME, setGames: setGames, seasonGames: seasonGames, SK: SK, GK: GK, TM_RS: TM_RS, TM_PO: TM_PO, LBL: LBL, DECIMAL: DECIMAL, n: n, z: z, skaterDerived: skaterDerived, goalieDerived: goalieDerived, teamDerived: teamDerived,
+              validateSkater: validateSkater, validateGoalie: validateGoalie, validateTeam: validateTeam };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.FTE = api;
+})(typeof window !== 'undefined' ? window : this);
+
+;/* Moteur commun des grilles de saisie : logique pure (sans DOM), testable sous Node.
+   Collage d'un bloc copié d'un tableur, déplacement vertical, pile d'annulation (Ctrl+Z), résultat d'une écriture. */
+(function (root) {
+  // Un collage est traité comme un bloc dès qu'il contient une tabulation ou un saut de ligne (sinon : collage natif dans la case)
+  function isBlock(text) { return /[\t\n\r]/.test(String(text == null ? '' : text)); }
+
+  // Bloc → matrice de lignes et de cellules. Seule la DERNIÈRE ligne vide (saut de ligne final ajouté par le tableur) est ignorée :
+  // une ligne vide au milieu du bloc reste une ligne (elle vide les cases correspondantes), sinon les lignes suivantes seraient décalées.
+  function parsePaste(text) {
+    var lines = String(text == null ? '' : text).replace(/\r\n?/g, '\n').split('\n');
+    if (lines.length > 1 && lines[lines.length - 1] === '') lines.pop();
+    return lines.map(function (l) { return l.split('\t'); });
+  }
+
+  // Ligne d'arrivée après Entrée (move = 1) ou ↑ (move = -1), dans l'ordre des lignes visibles.
+  // grow : la grille ajoute une ligne vide en bas (journal) ; descendre depuis la dernière ligne vise la ligne suivante, qui existera après l'écriture.
+  function nextRow(list, r, move, grow) {
+    var pos = list.indexOf(r); if (pos < 0) return r;
+    var p = pos + move;
+    if (p < 0) return list[0];
+    if (p >= list.length) return grow && move > 0 ? r + 1 : list[list.length - 1];
+    return list[p];
+  }
+
+  // Cases visées par un collage commençant en (r, c).
+  // rows : lignes visibles dans l'ordre ; cols : colonnes dans l'ordre de l'écran (une colonne non modifiable consomme sa valeur sans l'écrire).
+  // grow : les lignes manquantes sont créées à la suite (journal) ; sinon le bloc s'arrête à la dernière ligne.
+  function pasteTargets(rows, cols, r, c, matrix, grow) {
+    var out = [], pos = rows.indexOf(r), c0 = cols.indexOf(c);
+    if (c0 < 0) return out;
+    if (pos < 0) { if (!grow) return out; rows = [r]; pos = 0; }
+    matrix.forEach(function (line, i) {
+      var p = pos + i, row = p < rows.length ? rows[p] : grow ? rows[rows.length - 1] + (p - rows.length + 1) : undefined;
+      if (row === undefined) return;
+      line.forEach(function (val, j) { var col = cols[c0 + j]; if (col !== undefined) out.push({ r: row, c: col, v: val }); });
+    });
+    return out;
+  }
+
+  // Résultat d'une écriture, quelle que soit la forme rendue par la page :
+  // true → écrite ; null / undefined → case non modifiable (ignorée sans être comptée comme refusée) ;
+  // false → refusée (message générique) ; { ok: false, k, p } → refusée avec un message qui dit comment corriger.
+  function result(x) {
+    if (x === true || (x && x.ok === true)) return { ok: true };
+    if (x === null || x === undefined) return { ok: null };
+    if (x && typeof x === 'object') return { ok: false, k: x.k || 'val.bad_value', p: x.p || [] };
+    return { ok: false, k: 'val.bad_value', p: [] };
+  }
+
+  // Valeur inchangée : Entrée sans rien modifier ne doit pas créer de saisie
+  function same(a, b) { return String(a == null ? '' : a).trim() === String(b == null ? '' : b).trim(); }
+
+  // Pile d'annulation : on y garde l'état des saisies AVANT chaque modification (copie sérialisée)
+  function makeUndo(limit) {
+    var st = [], max = limit || 50;
+    return {
+      push: function (s) { if (s == null || st[st.length - 1] === s) return; st.push(s); if (st.length > max) st.shift(); },
+      pop: function () { return st.length ? st.pop() : null; },
+      clear: function () { st = []; },
+      size: function () { return st.length; }
+    };
+  }
+
+  // Nombre tapé ou collé, selon la langue de l'écran (décision du 2026-11-15) : $ et espaces acceptés partout.
+  // Anglais : la virgule sépare les milliers (8,500,000 ; 1,450), le point est décimal ; une virgule hors groupes de 3 chiffres est refusée.
+  // Français : l'espace sépare les milliers (8 500 000), la virgule est décimale (2,45) ; le point décimal est aussi accepté.
+  // Rend '' (vide), un nombre, ou NaN (refusé).
+  function num(raw, lang) {
+    var s = String(raw == null ? '' : raw).trim().replace(/[\s\u00a0\u202f$]/g, '');
+    if (s === '') return '';
+    if (lang === 'en') { if (s.indexOf(',') >= 0) { if (!/^[-+]?\d{1,3}(,\d{3})+(\.\d+)?$/.test(s)) return NaN; s = s.replace(/,/g, ''); } }
+    else { if ((s.match(/,/g) || []).length > 1 || (s.indexOf(',') >= 0 && s.indexOf('.') >= 0)) return NaN; s = s.replace(',', '.'); }
+    return /^[-+]?(\d+\.?\d*|\.\d+)$/.test(s) ? +s : NaN;
+  }
+  var api = { num: num, isBlock: isBlock, parsePaste: parsePaste, nextRow: nextRow, pasteTargets: pasteTargets, result: result, same: same, makeUndo: makeUndo };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.FTGIC = api;
+})(typeof window !== 'undefined' ? window : this);
+
+;/* Moteur commun des grilles de saisie : clavier, collage, focus après redessin, annulation (Ctrl+Z), avertissement avant de quitter.
+   Branché une fois par page : FTGI.attach({ rootEl, host, adapter }). La logique pure est dans grid_input_core.js (FTGIC).
+
+   adapter (seul write est obligatoire) :
+     write(r, c, raw, el)  → true (écrite) | false ou { ok: false, k, p } (refusée) | null (case non modifiable, ignorée)
+     rows(c, el)           → lignes visibles dans l'ordre (Entrée, ↑/↓, collage) ; par défaut : l'ordre des cases de la colonne à l'écran
+     grow                  → true si la grille ajoute des lignes en bas (journal : une ligne vide attend la saisie suivante)
+     cols(c, el)           → colonnes dans l'ordre de l'écran, pour le collage (une colonne non modifiable prend sa valeur sans l'écrire)
+     na(r, c)              → true si la case ne s'applique pas (hachurée) : le collage la saute
+     snapshot() / restore(s) → copie sérialisée des saisies en attente (Ctrl+Z)
+     pending()             → nombre de lignes en attente d'envoi (avertissement avant de quitter)
+     patch(r, el)          → facultatif : recalculer la ligne sans tout redessiner après une modification (le focus reste en place)
+     redrawEach            → facultatif : redessiner après chaque case collée (cases qui dépendent d'autres cases de la ligne)
+     targets(el, matrix)   → facultatif : cases visées par un collage [{ r, c, v }] quand la grille n'est pas un simple tableau (null : calcul habituel)
+     onKey(e, el)          → facultatif : raccourcis propres à la page ; rend true s'il a traité la touche
+     isCell(el)            → facultatif : élément de la grille géré par le moteur (par défaut : .cell avec data-r et data-c)
+     t(k, short)           → libellé (barre d'état et bulles)
+     alerts()              → nombre d'alertes de la vue affichée (barre d'état)
+     storageOk()           → false si le navigateur a refusé d'enregistrer les saisies (barre en erreur)
+     ctx()                 → clé de la vue affichée (onglet, saison…) : une valeur refusée reste attachée à sa vue
+     rowName(r) / colName(c) → nom de la ligne et abréviation de la colonne (ligne de correction sur téléphone)
+   Barre d'état (maquette docs/maquettes/saisie_moteur_commun.html, variante A) : dernier enfant de <main>, toujours visible ;
+   case refusée : le texte tapé reste, td.err.rej, bulle .gi-tip qui dit comment corriger.
+*/
+(function (root) {
+  var C = root.FTGIC || (typeof require !== 'undefined' ? require('./grid_input_core.js') : null);
+
+  function cellSel(r, c) { return '.cell[data-r="' + r + '"][data-c="' + String(c).replace(/"/g, '\\"') + '"]'; }
+  // valeur affichée au dernier dessin : sert à savoir si la case a vraiment été modifiée
+  function committed(el) {
+    if (el.tagName === 'SELECT') { for (var i = 0; i < el.options.length; i++) if (el.options[i].defaultSelected) return el.options[i].value; return el.options.length ? el.options[0].value : ''; }
+    if (el.dataset && el.dataset.giRaw !== undefined) return el.dataset.giRaw;   // texte refusé remis dans la case : déjà traité, pas « en cours de frappe »
+    return el.defaultValue;
+  }
+  function dirty(el) { return !C.same(el.value, committed(el)); }
+  function markCommitted(el) { if (el.tagName === 'SELECT') { for (var i = 0; i < el.options.length; i++) el.options[i].defaultSelected = el.options[i].selected; } else el.defaultValue = el.value; }
+
+  var IC = {
+    warn: '<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 1.5 15.2 14H.8L8 1.5Zm-.8 4.3v4.4h1.6V5.8H7.2Zm0 5.6v1.6h1.6v-1.6H7.2Z"/></svg>',
+    ok: '<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" d="m3 8.5 3.2 3L13 4.5"/></svg>',
+    undo: '<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" d="M5.5 3 2.5 6l3 3M3 6h6.5a4 4 0 0 1 0 8H6"/></svg>',
+    disk: '<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.6" d="M2.5 2.5h9l2 2v9h-11zM5 2.5v4h6v-4M5 13.5v-4h6v4"/><path stroke="currentColor" stroke-width="2" d="M3 13 13 3"/></svg>'
+  };
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+
+  function attach(o) {
+    var rootEl = o.rootEl, host = o.host, ad = o.adapter, doc = rootEl.ownerDocument || document, win = doc.defaultView || root;
+    var undo = C.makeUndo(50), undoApp = null, leaving = false;
+    var refused = {}, live = { text: '', bad: false, ic: '' }, bar = null, liveEl = null;
+    function on(t, type, fn, cap) { if (t && typeof t.addEventListener === 'function') t.addEventListener(type, fn, cap); }   // DOM simulé des tests : écouteurs absents
+    function app() { return host && host.app ? host.app() : null; }
+    function isCell(el) { return !!el && (ad.isCell ? ad.isCell(el) : !!(el.classList && el.classList.contains('cell') && el.dataset && el.dataset.r !== undefined && el.dataset.c !== undefined)); }
+    function t(k, sh) { return ad.t ? ad.t(k, sh) : k; }
+    function fmt(k, p) { var x = t(k); (p || []).forEach(function (v, i) { x = x.split('{' + i + '}').join(v); }); return x; }
+    function ctx() { return ad.ctx ? String(ad.ctx()) : ''; }
+    function refusedHere() { return refused[ctx()] || (refused[ctx()] = {}); }
+    function announce(kind, info) {
+      info = info || {};
+      if (kind === 'paste') live = info.bad ? { text: fmt('entry.pasted_rejected', [info.ok, info.bad]), bad: true, ic: 'warn' } : { text: fmt('entry.pasted', [info.ok]), bad: false, ic: 'ok' };
+      else if (kind === 'undo') live = { text: t(info.none ? 'entry.undo_empty' : 'entry.undone'), bad: false, ic: info.none ? '' : 'undo' };
+      else if (kind === 'refused') live = { text: fmt('entry.rejected_title', [info.raw]) + ' ' + fmt(info.k, info.p), bad: true, ic: 'warn' };
+      if (ad.announce) ad.announce(kind, info);
+      refreshBar();
+    }
+    // une nouvelle application (nouvelles données reçues, autre franchise) : l'ancienne pile ne s'applique plus
+    function checkApp() { var a = app(); if (a !== undoApp) { undo.clear(); undoApp = a; } }
+    function grows() { return typeof ad.grow === 'function' ? !!ad.grow() : !!ad.grow; }
+    // modification faite hors des cases (bouton ×, « Lier à … ») : elle s'annule aussi par Ctrl+Z
+    function edit(fn) { checkApp(); var before = snap(), x = fn(); if (before !== null && snap() !== before) undo.push(before); return x; }
+    function snap() { return ad.snapshot ? ad.snapshot() : null; }
+
+    // redessine puis donne le focus à la première case trouvée parmi les sélecteurs
+    function redraw(sels) {
+      host.draw(null);
+      for (var i = 0; i < (sels || []).length; i++) { var el = sels[i] && rootEl.querySelector(sels[i]); if (el) { el.focus(); if (el.select) el.select(); return el; } }
+      return null;
+    }
+    // sélecteur de l'élément qui a le focus, pour le retrouver après un redessin
+    function activeSel() {
+      var ae = doc.activeElement; if (!ae || !rootEl.contains(ae)) return null;
+      if (isCell(ae)) return cellSel(ae.dataset.r, ae.dataset.c);
+      if (ae.id) return '#' + ae.id;
+      return null;
+    }
+
+    // écrit une case ; la copie d'avant va dans la pile d'annulation seulement si les saisies ont changé
+    function write(el, r, c, raw, before) {
+      var res = C.result(ad.write(r, c, raw, el)), key = r + '|' + c;
+      if (before !== undefined && before !== null && snap() !== before) undo.push(before);
+      if (res.ok === false) { refusedHere()[key] = { raw: String(raw), k: res.k, p: res.p }; announce('refused', { k: res.k, p: res.p, el: el, r: r, c: c, raw: String(raw) }); }
+      else delete refusedHere()[key];
+      return res;
+    }
+    function commit(el) {
+      if (!dirty(el)) return null;
+      checkApp(); var before = snap();
+      return write(el, +el.dataset.r, el.dataset.c, el.value, before);
+    }
+
+    on(rootEl, 'change', function (e) {
+      var el = e.target; if (!isCell(el)) return;
+      var res = commit(el); if (!res) return;
+      if (ad.patch && el.tagName !== 'SELECT') { ad.patch(+el.dataset.r, el); if (res.ok) markCommitted(el); return; }
+      // avec Tab, le champ suivant n'a pas encore le focus au moment du « change » : on redessine juste après, puis on lui rend le focus
+      setTimeout(function () { var s = activeSel(); redraw(s ? [s] : []); }, 0);
+    });
+
+    on(rootEl, 'keydown', function (e) {
+      var el = e.target;
+      if (ad.onKey && ad.onKey(e, el)) return;
+      if (!isCell(el) || el.tagName === 'SELECT') return;                      // liste déroulante : Entrée garde son comportement natif
+      if (el.classList.contains('pcombo') && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) return;   // ↑/↓ parcourent la liste du navigateur
+      var move = e.key === 'Enter' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowUp' ? -1 : 0;
+      if (!move || e.altKey || e.ctrlKey || e.metaKey) return;
+      e.preventDefault();
+      var r = +el.dataset.r, c = el.dataset.c; commit(el);
+      var list = ad.rows ? ad.rows(c, el) : domRows(c), nx = C.nextRow(list, r, move, grows());
+      redraw([cellSel(nx, c), cellSel(r, c)]);
+    });
+    function domRows(c) {
+      var seen = {}, out = [];
+      [].forEach.call(rootEl.querySelectorAll('.cell[data-c="' + String(c).replace(/"/g, '\\"') + '"]'), function (x) { var r = +x.dataset.r; if (!seen[r]) { seen[r] = 1; out.push(r); } });
+      return out;
+    }
+
+    on(rootEl, 'paste', function (e) {
+      var el = e.target; if (!isCell(el)) return;
+      var text = (e.clipboardData || win.clipboardData).getData('text');
+      if (!C.isBlock(text)) return;                                             // une seule valeur : collage natif dans la case
+      var r = +el.dataset.r, c = el.dataset.c, cols = ad.cols ? ad.cols(c, el) : domCols(el);
+      var matrix = C.parsePaste(text), targets = ad.targets ? ad.targets(el, matrix) : null;   // la page peut placer elle-même le bloc (cartes d'échange)
+      if (!targets) targets = C.pasteTargets(ad.rows ? ad.rows(c, el) : domRows(c), cols, r, c, matrix, grows());
+      if (!targets.length) return;
+      e.preventDefault(); checkApp();
+      var before = snap(), ok = 0, bad = 0, firstBad = null;
+      targets.forEach(function (x) {
+        if (ad.na && ad.na(x.r, x.c)) return;
+        var res = C.result(ad.write(x.r, x.c, x.v, null)), key = x.r + '|' + x.c;
+        if (res.ok && ad.redrawEach) host.draw(null);   // une case peut en ouvrir ou en hacher d'autres (blessure → retour) : na() lit l'écran à jour
+        if (res.ok) { ok++; delete refusedHere()[key]; } else if (res.ok === false) { bad++; refusedHere()[key] = { raw: String(x.v), k: res.k, p: res.p }; if (!firstBad) firstBad = { r: x.r, c: x.c, k: res.k, p: res.p }; }
+      });
+      if (before !== null && snap() !== before) undo.push(before);             // tout le bloc s'annule d'un seul Ctrl+Z
+      redraw([cellSel(r, c)]);
+      announce('paste', { ok: ok, bad: bad, first: firstBad });
+    });
+    // colonnes par défaut : l'ordre des cases de la ligne à l'écran
+    function domCols(el) { var tr = el.closest ? el.closest('tr') : null; return tr ? [].map.call(tr.querySelectorAll('.cell[data-c]'), function (x) { return x.dataset.c; }) : [el.dataset.c]; }
+
+    // Ctrl+Z : annule la dernière modification de la grille. Dans une case dont le texte n'est pas encore validé, l'annulation du champ garde la main.
+    on(doc, 'keydown', function (e) {
+      if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey || String(e.key).toLowerCase() !== 'z') return;
+      var el = doc.activeElement;
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') && el.type !== 'checkbox' && (!isCell(el) || dirty(el))) return;
+      if (el && el !== doc.body && !rootEl.contains(el)) return;
+      checkApp(); var s = undo.pop();
+      e.preventDefault();
+      if (s === null) { announce('undo', { none: true }); return; }
+      var keep = activeSel(); refused[ctx()] = {}; ad.restore(s); redraw(keep ? [keep] : []);
+      announce('undo', {});
+    });
+
+    // un envoi, une lecture de la base, une déconnexion ou « Tout effacer » : les saisies d'avant ne doivent pas revenir par Ctrl+Z
+    on(rootEl, 'click', function (e) {
+      var b = e.target && e.target.closest ? e.target.closest('[data-sb],[data-act="reset"]') : null; if (b) { undo.clear(); refused = {}; }
+    }, true);
+
+    // Avertissement avant de quitter le site ou de fermer l'onglet avec des saisies non envoyées.
+    // Les liens entre les pages du site ne déclenchent rien : les saisies restent enregistrées sur cet ordinateur.
+    on(doc, 'click', function (e) {
+      var a = e.target && e.target.closest ? e.target.closest('a[href]') : null; if (!a || a.target === '_blank') return;
+      try { var u = new URL(a.getAttribute('href'), win.location.href); if (u.origin === win.location.origin || (u.protocol === 'file:' && win.location.protocol === 'file:')) { leaving = true; setTimeout(function () { leaving = false; }, 2000); } } catch (x) { /* adresse invalide : rien */ }
+    }, true);
+    on(win, 'beforeunload', function (e) {
+      if (leaving || !ad.pending || !(ad.pending() > 0)) return;
+      e.preventDefault(); e.returnValue = ''; return '';
+    });
+
+    // ---- cases refusées : texte tapé conservé, case en erreur, bulle qui dit comment corriger ----
+    function applyRefused() {
+      var m = refused[ctx()] || {};
+      Object.keys(m).forEach(function (key) {
+        var i = key.indexOf('|'), r = key.slice(0, i), c = key.slice(i + 1), el = rootEl.querySelector(cellSel(r, c)), x = m[key]; if (!el) return;
+        var td = el.closest ? (el.closest('td,.lcell') || el.parentNode) : null,   // case de tableau, ou étiquette d'un champ (carte d'échange)
+           id = 'gi-tip-' + r + '-' + String(c).replace(/[^\w-]/g, '_');
+        if (el.tagName !== 'SELECT' && el.dataset.giRaw === undefined && el.value !== x.raw && el.value === el.defaultValue) el.value = x.raw;   // case fraîchement dessinée : on remet le texte tapé
+        if (el.tagName !== 'SELECT' && el.value === x.raw) el.dataset.giRaw = x.raw;
+        el.setAttribute('aria-invalid', 'true'); el.setAttribute('aria-describedby', id);
+        if (!td || td.querySelector('.gi-tip')) return;
+        td.classList.add('err', 'rej'); if (td.tagName !== 'TD') td.classList.add('gi-host');
+        var tr = td.parentNode, cells = tr ? [].filter.call(tr.children, function (z) { return z.classList && z.classList.contains('ci'); }) : [];
+        if (cells[0] === td) td.classList.add('first');
+        var body = tr && tr.parentNode, rowsN = body ? body.children.length : 0, idx = body ? [].indexOf.call(body.children, tr) : 0;
+        var tip = doc.createElement('span'); tip.className = 'gi-tip' + (rowsN > 3 && idx >= rowsN - 2 ? ' up' : ''); tip.id = id; tip.setAttribute('role', 'tooltip');
+        tip.innerHTML = '<b>' + IC.warn + esc(fmt('entry.rejected_title', [x.raw])) + '</b>' + esc(fmt(x.k, x.p));
+        td.appendChild(tip);
+      });
+    }
+    // ---- barre d'état : toujours visible, dernier enfant de <main> ; la zone d'annonce (aria-live) n'est jamais recréée ----
+    function refreshBar() {
+      if (!doc.createElement || !rootEl.querySelector) return;
+      var a = app(), main = rootEl.querySelector('main');
+      if (!a || !main) { if (bar && bar.parentNode) bar.parentNode.removeChild(bar); return; }
+      if (!bar) { bar = doc.createElement('div'); bar.className = 'gbar'; bar.id = 'gbar'; bar.setAttribute('role', 'region'); bar.setAttribute('data-tip', '1');
+        liveEl = doc.createElement('span'); liveEl.id = 'gbar-live'; liveEl.setAttribute('role', 'status'); liveEl.setAttribute('aria-live', 'polite'); liveEl.setAttribute('aria-atomic', 'true'); }
+      var n = ad.pending ? ad.pending() : 0, here = refused[ctx()] || {}, nRef = Object.keys(here).length, al = (ad.alerts ? ad.alerts() : 0) + nRef, ok = !ad.storageOk || ad.storageOk() !== false;
+      var pend = n ? esc(fmt(n === 1 ? 'entry.pending_one' : 'entry.pending_other', [n])).replace(String(n), '<b>' + n + '</b>') : esc(t('entry.pending_none'));
+      var fix = '', ae = doc.activeElement;
+      if (ae && isCell(ae) && here[ae.dataset.r + '|' + ae.dataset.c]) {
+        var x = here[ae.dataset.r + '|' + ae.dataset.c];
+        var cn = ad.colName ? ad.colName(ae.dataset.c) : ae.dataset.c, rn = ad.rowName ? ad.rowName(+ae.dataset.r) : '';
+        var head = rn ? fmt('entry.rejected_line', [cn, rn, x.raw]) : cn + ' · ' + fmt('entry.rejected_title', [x.raw]);   // ligne sans nom (carte d'échange, onglet Équipe)
+        fix = '<p class="gbar-fix">' + IC.warn + '<span><b>' + esc(head) + '</b> ' + esc(fmt(x.k, x.p)) + '</span></p>';
+      }
+      var html = (ok ? '' : '<p class="gbar-err" role="alert">' + IC.disk + '<span><b>' + esc(t('ui.storage_error')) + '</b></span><button type="button" class="btn" data-act="json">' + esc(t('entry.export_json')) + '</button></p>') +
+        '<span class="gbar-pend" data-n="' + n + '">' + pend + '</span>' + (n && ok ? '<span class="gbar-saved">' + esc(t('entry.saved')) + '</span>' : '') +
+        '<span class="gbar-al' + (al ? ' bad' : '') + '">' + (al ? IC.warn + al + ' ' + esc(t(al === 1 ? 'entry.alerts_one' : 'entry.alerts')) : IC.ok + esc(t('entry.no_alerts'))) + '</span>' +
+        '<span id="gbar-live-slot"></span><span class="gbar-key"><kbd>Ctrl</kbd>+<kbd>Z</kbd> ' + esc(t('entry.undo_short')) + '</span>' + fix;
+      bar.setAttribute('data-state', ok ? 'ok' : 'err'); bar.setAttribute('aria-label', t('entry.status_region'));
+      if (bar.dataset.html !== html) { bar.innerHTML = html; bar.dataset.html = html; var slot = bar.querySelector('#gbar-live-slot'); slot.parentNode.replaceChild(liveEl, slot); }
+      liveEl.className = 'gbar-live' + (live.bad ? ' bad' : '');
+      var lh = live.text ? (live.ic ? IC[live.ic] : '') + '<span>' + esc(live.text) + '</span>' : '';
+      if (liveEl.dataset.html !== lh) { liveEl.innerHTML = lh; liveEl.dataset.html = lh; }
+      if (bar.parentNode !== main || main.lastElementChild !== bar) main.appendChild(bar);
+    }
+    function render() { if (!rootEl.querySelector) return; if (app()) applyRefused(); refreshBar(); }   // pas encore de données (page lite avant connexion) : rien à reposer
+    // après chaque dessin de la page (ou recalcul d'une ligne) : on repose les cases refusées et la barre
+    var pendingRender = false;
+    if (typeof MutationObserver !== 'undefined') new MutationObserver(function (ms) {
+      if (pendingRender || ms.every(function (m) { return bar && (m.target === bar || bar.contains(m.target)) || (m.target.classList && m.target.classList.contains('gi-tip')) || [].every.call(m.addedNodes, function (x) { return x.classList && x.classList.contains('gi-tip'); }) && m.addedNodes.length && !m.removedNodes.length; })) return;
+      pendingRender = true; Promise.resolve().then(function () { pendingRender = false; render(); });
+    }).observe(rootEl, { childList: true, subtree: true });
+    on(rootEl, 'focusin', function () { refreshBar(); });
+    on(rootEl, 'focusout', function () { setTimeout(refreshBar, 0); });
+
+    return { refresh: render, clearUndo: function () { undo.clear(); }, undoSize: function () { return undo.size(); }, commit: commit, edit: edit };
+  }
+
+  var api = { attach: attach, cellSel: cellSel, committed: committed, dirty: dirty, esc: esc };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.FTGI = api;
+})(typeof window !== 'undefined' ? window : this);
+
+;/* Écran de saisie : grille clavier d'abord, statistiques calculées en direct, alertes, enregistrement local, export. */
+(function (root) {
+  var E = root.FTE || (typeof require !== 'undefined' ? require('./entry_core.js') : null);
+  // format commun du SV% (connect/ft_stats.js, chargé avant ce fichier dans les pages)
+  var GIC = root.FTGIC || (typeof require !== 'undefined' ? require('../connect/grid_input_core.js') : null);
+  var FSTAT = root.FTSTATS || (typeof require !== 'undefined' ? require('../connect/ft_stats.js') : null);
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  var STORE_KEY = 'ft_entries_v1';
+
+  function makeEntryApp(DATA, store) {
+    var skMap = {}, gkMap = {};
+    DATA.skaters.forEach(function (p) { skMap[p.id] = p; }); DATA.goalies.forEach(function (p) { gkMap[p.id] = p; });
+    var entries = { sk: {}, gk: {}, tm: {}, extra: { sk: {}, gk: {} }, removed: { sk: {}, gk: {} } };
+    try { var saved = store && store.get(STORE_KEY); if (saved) entries = JSON.parse(saved); } catch (e) { /* stockage indisponible */ }
+    if (!entries.removed) entries.removed = { sk: {}, gk: {} };
+    if (!entries.order) entries.order = { sk: {}, gk: {} };
+    var TEAMS = {}; (DATA.teams || []).forEach(function (tm) { TEAMS[tm.en] = tm; });
+    var state = { lang: 'fr', tab: 'sk', mode: 0, season: DATA.franchise.current + 1, msg: '' };
+
+    function t(key, short) { var e = DATA.labels[key]; if (!e) return key; var v = e[state.lang] || e.en || [key, key]; return short && v[1] ? v[1] : v[0]; }
+    function fmt(k, p) { var s = t(k); (p || []).forEach(function (x, i) { s = s.replace('{' + i + '}', x); }); return s; }
+    function nf(x, d) { return x == null ? '—' : x.toLocaleString(state.lang === 'fr' ? 'fr-CA' : 'en-CA', { minimumFractionDigits: d || 0, maximumFractionDigits: d || 0 }); }
+    function pct(x) { return x == null ? '—' : nf(x * 100, 1) + ' %'; }
+    function mmss(x) { if (x == null) return '—'; var m = Math.floor(x), s = Math.round((x - m) * 60); if (s === 60) { m++; s = 0; } return m + ':' + (s < 10 ? '0' : '') + s; }
+    function tn(en) { var tm = TEAMS[en]; return tm ? (state.lang === 'fr' && tm.fr ? tm.fr : tm.en) : en; }
+    function key() { return state.season + '|' + state.mode; }
+    function cols() { return state.tab === 'sk' ? E.SK : state.tab === 'gk' ? E.GK : (state.mode ? E.TM_PO : E.TM_RS); }
+    function seasonLabel(y) { return state.mode === 0 ? y + '-' + String((y + 1) % 100).padStart(2, '0') : String(y + 1); }
+
+    // ---- valeurs : saisies de l'utilisateur d'abord, sinon valeurs de la base ----
+    var TM_ORDER = E.TM_RS;
+    function baseRows(tab) { return (DATA[tab] || {})[key()] || []; }
+    function baseRow(tab, pid) { var r = baseRows(tab).filter(function (x) { return x[0] === pid; })[0]; return r || null; }
+    function value(tab, pid, c) {
+      var ov = entries[tab][key()] && entries[tab][key()][pid] && entries[tab][key()][pid][c];
+      if (ov !== undefined) return ov === '' ? null : ov;
+      var r = baseRow(tab, pid), list = tab === 'sk' ? E.SK : E.GK, i = list.indexOf(c);
+      return r && i >= 0 ? r[i + 1] : null;
+    }
+    function teamValue(c) {
+      var ov = entries.tm[key()] && entries.tm[key()][c];
+      if (ov !== undefined) return ov === '' ? null : ov;
+      var r = (DATA.tm || {})[key()], i = TM_ORDER.indexOf(c);
+      return r && i >= 0 ? r[i] : null;
+    }
+    function rowValues(pid) { var o = {}; cols().forEach(function (c) { o[c] = value(state.tab, pid, c); }); return o; }
+    function teamValues() { var o = {}; cols().forEach(function (c) { o[c] = teamValue(c); }); return o; }
+
+    // ---- liste des lignes de la grille ----
+    var prefilledFlag = false;
+    function pidsOf(tab, flag) {
+      var map = tab === 'sk' ? skMap : gkMap, list = [];
+      baseRows(tab).forEach(function (r) { list.push(r[0]); });
+      var pre = list.length === 0;                                  // saison sans données : alignement présumé d'après les contrats
+      if (pre) (DATA.roster[String(state.season)] || []).forEach(function (p) { if (map[p] && list.indexOf(p) < 0) list.push(p); });
+      var ex = (entries.extra[tab] || {})[key()] || []; ex.forEach(function (p) { if (list.indexOf(p) < 0) list.push(p); });
+      Object.keys(entries[tab][key()] || {}).forEach(function (p) { if (list.indexOf(+p) < 0) list.push(+p); });
+      if (pre) list.sort(function (a, b) { return map[a].name.localeCompare(map[b].name); });
+      if (flag) prefilledFlag = pre;
+      var rm = removedList(tab); if (rm.length) list = list.filter(function (p) { return rm.indexOf(p) < 0; });
+      var ord = ((entries.order || {})[tab] || {})[key()];       // ordre choisi à la main (glisser-déposer) : les joueurs ajoutés ensuite se placent à la fin
+      if (ord && ord.length) { var pos = {}; ord.forEach(function (p, i) { pos[p] = i; }); var rest = list.filter(function (p) { return pos[p] === undefined; }); list = list.filter(function (p) { return pos[p] !== undefined; }).sort(function (a, b) { return pos[a] - pos[b]; }).concat(rest); }
+      return list;
+    }
+    function pids() { return pidsOf(state.tab, true); }
+    // Réordonner : le joueur de la ligne « from » est placé à la position « to » ; l'ordre est conservé sur cet appareil (affichage seulement, rien n'est envoyé)
+    function hasOrder() { return state.tab !== 'tm' && !!(((entries.order || {})[state.tab] || {})[key()] || []).length; }
+    function moveRow(from, to) {
+      var tab = state.tab; if (tab === 'tm') return false;
+      var ids = pids().slice(); if (from < 0 || from >= ids.length || to < 0 || to >= ids.length || from === to) return false;
+      var p = ids.splice(from, 1)[0]; ids.splice(to, 0, p);
+      entries.order = entries.order || { sk: {}, gk: {} }; entries.order[tab] = entries.order[tab] || {}; entries.order[tab][key()] = ids; persist(); return true;
+    }
+    function resetOrder() { if (state.tab === 'tm') return; if (entries.order && entries.order[state.tab]) delete entries.order[state.tab][key()]; persist(); }
+    function removedList(tab) { return ((entries.removed || {})[tab] || {})[key()] || []; }
+    function removedCount() { return state.tab === 'tm' ? 0 : removedList(state.tab).length; }
+    function pidName(r) { var id = pids()[r], m = state.tab === 'sk' ? skMap : gkMap; return id !== undefined && m[id] ? m[id].name : ''; }
+    // Retire un joueur de la saison affichée (alignement présumé ou ligne déjà enregistrée) ; la ligne enregistrée est supprimée de la base au prochain envoi
+    function needsConfirmRemove(r) { var id = pids()[r]; if (id === undefined) return false; var e = entries[state.tab][key()]; return !!baseRow(state.tab, id) || !!(e && e[id] && Object.keys(e[id]).length); }
+    function removePlayer(r) {
+      var tab = state.tab; if (tab === 'tm') return false;
+      var p = pids()[r]; if (p === undefined) return false;
+      var k = key(); entries.removed = entries.removed || { sk: {}, gk: {} }; entries.removed[tab] = entries.removed[tab] || {};
+      var rl = entries.removed[tab][k] = entries.removed[tab][k] || []; if (rl.indexOf(p) < 0) rl.push(p);
+      if (entries[tab][k]) delete entries[tab][k][p];
+      if (entries.extra[tab] && entries.extra[tab][k]) entries.extra[tab][k] = entries.extra[tab][k].filter(function (x) { return x !== p; });
+      persist(); return true;
+    }
+    function restoreRemoved() { if (state.tab === 'tm') return; if (entries.removed && entries.removed[state.tab]) delete entries.removed[state.tab][key()]; persist(); }
+
+    function persist() { try { store && store.set(STORE_KEY, JSON.stringify(entries)); state.msg = 'ok'; } catch (e) { state.msg = 'err'; } }
+    function storageOk() { return state.msg !== 'err'; }
+    // valeur refusée : message qui dit comment corriger (moteur commun)
+    // mm:ss par match sans matchs joués : la conversion en minutes totales est impossible, on le dit (val.toi_needs_gp)
+    function needsGp(r, c, raw) { if (c !== 'toi' && c !== 'min') return false; var pr = parse(c, raw), ids = state.tab === 'tm' ? null : pids(); return !!(pr && pr.m && ids && !E.n(value(state.tab, ids[r], 'gp'))); }
+    function refusal(c, raw, r) { return { ok: false, k: r !== undefined && needsGp(r, c, raw) ? 'val.toi_needs_gp' : c === 'toi' || c === 'min' ? 'val.bad_toi' : E.DECIMAL[c] ? 'val.bad_decimal' : 'val.bad_int', p: [] }; }
+    function parse(c, raw) {
+      var s = String(raw == null ? '' : raw).trim();   // nombres : format de la langue de l'écran (FTGIC.num)
+      if (s === '') return '';
+      var m = /^(\d+):(\d{2})$/.exec(s);
+      return { m: m, s: m ? s : GIC.num(s, state.lang) };
+    }
+    // Enregistre une cellule. toi : « mm:ss » = temps par match, converti en minutes totales
+    function setCell(r, c, raw) {
+      var tab = state.tab, k = key(), ids = tab === 'tm' ? null : pids(), p = ids ? ids[r] : null;
+      var pr = parse(c, raw), v;
+      if (pr === '') v = '';
+      else if (pr.m && (c === 'toi' || c === 'min')) { var gp = E.n(ids ? value(tab, p, 'gp') : null); if (!gp) return false; v = Math.round((+pr.m[1] + pr.m[2] / 60) * gp * 10) / 10; }   // sans MJ : refusé, refusal() explique
+      else if (isNaN(pr.s)) return false;
+      else v = E.DECIMAL[c] ? Math.round(+pr.s * 10) / 10 : Math.round(+pr.s);
+      if (tab === 'tm') { entries.tm[k] = entries.tm[k] || {}; entries.tm[k][c] = v; }
+      else { entries[tab][k] = entries[tab][k] || {}; entries[tab][k][p] = entries[tab][k][p] || {}; entries[tab][k][p][c] = v; }
+      persist(); return true;
+    }
+    function applyPaste(r, c, text) {
+      var lines = String(text).replace(/\r/g, '').split('\n').filter(function (x) { return x.trim() !== ''; });
+      var lay = E.layout(state.tab, state.mode === 1), c0 = lay.indexOf(c), ids = state.tab === 'tm' ? [0] : pids(), n = 0;
+      lines.forEach(function (line, i) { line.split('\t').forEach(function (cell, j) { var col = lay[c0 + j]; if (c0 < 0 || col === undefined || col.charAt(0) === '@' || r + i >= ids.length) return; if (setCell(r + i, col, cell)) n++; }); });
+      return n;
+    }
+    function underContract(id) { return ((DATA.contracted || {})[String(state.season)] || []).indexOf(id) >= 0; }
+    // Joueurs proposés à l'ajout : sous contrat pendant la saison affichée et pas déjà dans la liste
+    // étiquette d'homonyme « Nom (D · 2026-27 – 2030-31) » (connect/homonym_ui.js) : seulement si un autre joueur porte le même nom
+    var LBLC = { lang: null, m: {} };
+    function plLabel(p) { var HO = root.FTHOMO || (typeof require !== 'undefined' ? require('../connect/homonym_ui.js') : null); if (!HO) return p.name; if (LBLC.lang !== state.lang) LBLC = { lang: state.lang, m: HO.labels(DATA.homo || [], t) }; return LBLC.m[p.id] || p.name; }
+    function addable() { var tab = state.tab; if (tab === 'tm') return []; var shown = pids(); return (tab === 'sk' ? DATA.skaters : DATA.goalies).filter(function (p) { return underContract(p.id) && shown.indexOf(p.id) < 0; }).map(function (p) { return plLabel(p); }).sort(function (a, b) { return a.localeCompare(b, state.lang); }); }
+    function addPlayer(name) {
+      var tab = state.tab, list = tab === 'sk' ? DATA.skaters : DATA.goalies, nm0 = String(name).trim().toLowerCase(), p = list.filter(function (x) { return plLabel(x).toLowerCase() === nm0; })[0] || list.filter(function (x) { return x.name.toLowerCase() === nm0; })[0];
+      if (!p) return false;
+      if (!underContract(p.id)) { say('warn', 'entry.not_under_contract', [p.name, state.season + '-' + String((state.season + 1) % 100).padStart(2, '0')]); return false; }
+      var rl = ((entries.removed || {})[tab] || {})[key()]; if (rl && rl.indexOf(p.id) >= 0) rl.splice(rl.indexOf(p.id), 1);     // un joueur retiré qu'on rajoute redevient visible
+      entries.extra[tab][key()] = entries.extra[tab][key()] || []; if (entries.extra[tab][key()].indexOf(p.id) < 0 && pids().indexOf(p.id) < 0) entries.extra[tab][key()].push(p.id);
+      persist(); return true;
+    }
+    function reset() { entries = { sk: {}, gk: {}, tm: {}, extra: { sk: {}, gk: {} }, removed: { sk: {}, gk: {} }, order: { sk: {}, gk: {} } }; persist(); }
+    // Saisies en attente = LIGNES à envoyer (toutes saisons) : joueurs avec au moins une case saisie, statistiques d'équipe saisies, lignes enregistrées retirées
+    function countEntries() {
+      var n = 0;
+      ['sk', 'gk'].forEach(function (tb) {
+        Object.keys(entries[tb]).forEach(function (k) { Object.keys(entries[tb][k]).forEach(function (p) { if (Object.keys(entries[tb][k][p]).length) n++; }); });
+        Object.keys((entries.removed || {})[tb] || {}).forEach(function (k) { var base = (DATA[tb] || {})[k] || []; entries.removed[tb][k].forEach(function (p) { if (base.some(function (x) { return x[0] === p; })) n++; }); });
+      });
+      Object.keys(entries.tm).forEach(function (k) { if (Object.keys(entries.tm[k]).length) n++; });
+      return n;
+    }
+    // Ctrl+Z : copie des saisies (moteur commun connect/grid_input.js)
+    function snapshot() { return JSON.stringify(entries); }
+    function restore(s) { try { entries = JSON.parse(s); } catch (e) { return false; } persist(); return true; }
+
+    // ---- calculs par ligne ----
+    function skaterGoals() {
+      var tot = 0, any = false;
+      pidsOf('sk').forEach(function (p) { var g = E.n(value('sk', p, 'g')); if (g !== null) { tot += g; any = true; } });
+      return any ? tot : null;
+    }
+    // 18 patineurs par match : somme des matchs joués attendue (saison régulière terminée = 82 matchs ; sinon matchs de l'équipe saisis)
+    function gpCheck() {
+      if (state.tab !== 'sk') return null;
+      var po = state.mode === 1, tg = E.n(teamValue('gp')), games = !po && state.season <= DATA.franchise.current ? E.seasonGames() : tg, sum = 0;
+      pidsOf('sk').forEach(function (p) { sum += E.z(value('sk', p, 'gp')); });
+      return E.skaterGpCheck(sum, games);
+    }
+    function extraAlerts() { var c = gpCheck(); return c && !c.ok ? 1 : 0; }
+    function alertCount() {
+      var n = extraAlerts(), rowsN = state.tab === 'tm' ? 1 : pids().length;
+      for (var r = 0; r < rowsN; r++) n += rowInfo(r).alerts.length;
+      return n;
+    }
+    // Cote globale de début de saison : liée à la cote saisie dans « Début de saison » (table des cotes)
+    function startOa(pid) { var m = (DATA.ratings || {})[String(state.season)], v = m ? m[String(pid)] : undefined; return v === undefined || v === null ? null : v; }
+    function oaPair(pid, v) { var st = startOa(pid), en = E.n(v.oa); return [st === null ? '—' : nf(st), st !== null && en !== null ? nf((st + en) / 2, 1) : '—']; }
+    function rowInfo(r) {
+      var tab = state.tab, po = state.mode === 1, v, d, al;
+      if (tab === 'sk') { var id = pids()[r]; v = rowValues(id); d = E.skaterDerived(v); al = E.validateSkater(v, po); return { derived: [nf(d.pts), pct(d.shotPct), mmss(d.toiPerGame), pct(d.foPct)].concat(oaPair(id, v)), alerts: al }; }
+      if (tab === 'gk') { var gid = pids()[r]; v = rowValues(gid); d = E.goalieDerived(v); al = E.validateGoalie(v, po); return { derived: [nf(d.ga), FSTAT.fmtSvPct(d.svPct, state.lang), nf(d.gaa, 2), nf(d.pts)].concat(oaPair(gid, v)), alerts: al }; }
+      v = teamValues(); d = E.teamDerived(v, po); al = E.validateTeam(v, po, skaterGoals());
+      return { derived: [po ? '—' : nf(d.pts), po ? '—' : pct(d.ptsPct), pct(d.ppPct), pct(d.pkPct), nf(d.gfpg, 2), nf(d.gapg, 2)], alerts: al };
+    }
+    function derivedHeads() { return E.DER[state.tab].map(function (d) { return E.DLBL[d]; }); }
+
+    function alertsText(al) { return al.map(function (a) { return t(E.LBL[a.c] || a.c, true) + ' : ' + fmt(a.k, a.p); }).join('\n'); }
+    function cellClass(al, c) { var m = al.filter(function (a) { return a.c === c; }); return m.some(function (a) { return a.level === 'err'; }) ? ' err' : m.length ? ' warn' : ''; }
+    function cellTitle(al, c) { var m = al.filter(function (a) { return a.c === c; }); return m.length ? ' title="' + esc(alertsText(m)) + '"' : ''; }   // même texte qu'après un recalcul (patch)
+
+    function inputCell(r, c, val, al) {
+      var shown = val == null ? '' : (E.DECIMAL[c] ? String(val) : String(val));
+      return '<td class="ci' + cellClass(al, c) + '"' + cellTitle(al, c) + '><input class="cell" inputmode="decimal" data-r="' + r + '" data-c="' + c + '" value="' + esc(shown) + '" aria-label="' + esc(t(E.LBL[c] || c)) + '"></td>';
+    }
+    var HOME = ['hw', 'hl', 'ho'];
+    function groupRow(lay) {          // onglet Équipe : « DOMICILE » et « ÉTRANGER » au-dessus de leurs trois colonnes
+      var h = '<tr class="grp"><th></th>', i = 0;
+      while (i < lay.length) {
+        var c = lay[i];
+        if (c === 'hw' || c === 'aw') { var home = c === 'hw', n = 0; while (i + n < lay.length && ['hw', 'hl', 'ho', 'aw', 'al', 'ao'].indexOf(lay[i + n]) >= 0 && (HOME.indexOf(lay[i + n]) >= 0) === home) n++; h += '<th class="grp" colspan="' + n + '" title="' + esc(t(home ? 'stat.home' : 'stat.away')) + '">' + esc(t(home ? 'stat.home' : 'stat.away', true)) + '</th>'; i += n; }
+        else { h += '<th></th>'; i++; }
+      }
+      return h + '<th></th></tr>';
+    }
+    function gridHTML() {
+      var tab = state.tab, po = state.mode === 1, lay = E.layout(tab, po), DN = E.DER[tab], body = '', alertsTotal = extraAlerts();
+      var rowsN = tab === 'tm' ? 1 : pids().length;
+      for (var r = 0; r < rowsN; r++) {
+        var info = rowInfo(r), v = tab === 'tm' ? teamValues() : rowValues(pids()[r]);
+        alertsTotal += info.alerts.length;
+        var plain = tab === 'tm' ? tn(DATA.franchise.name) : (tab === 'sk' ? skMap : gkMap)[pids()[r]].name;
+        var pos = tab === 'sk' ? ' <span class="muted">' + esc(t('pc.' + skMap[pids()[r]].pos) === 'pc.' + skMap[pids()[r]].pos ? skMap[pids()[r]].pos : t('pc.' + skMap[pids()[r]].pos)) + '</span>' : '';
+        var rm = tab === 'tm' ? '' : '<button type="button" class="rm" data-rm="' + r + '" title="' + esc(t('entry.remove_player')) + '" aria-label="' + esc(t('entry.remove_player') + ' : ' + plain) + '">×</button>';
+        var dh = tab === 'tm' ? '' : '<span class="dh" draggable="true" data-drag="' + r + '" title="' + esc(t('entry.drag_hint')) + '" aria-label="' + esc(t('entry.drag_hint') + ' : ' + plain) + '">⠿</span>';
+        body += '<tr data-row="' + r + '"><th class="pl"><div class="plin">' + dh + '<span class="nm">' + esc(plain) + pos + '</span>' + rm + '</div></th>' +
+          lay.map(function (c) {
+            if (c.charAt(0) === '@') { var di = DN.indexOf(c.slice(1)); return '<td class="num d" data-d="' + di + '">' + esc(info.derived[di]) + '</td>'; }
+            return inputCell(r, c, v[c], info.alerts);
+          }).join('') +
+          '<td class="al" data-al="1" title="' + esc(alertsText(info.alerts)) + '">' + (info.alerts.length ? '<span class="badge' + (info.alerts.some(function (a) { return a.level === 'err'; }) ? ' bad' : '') + '">' + info.alerts.length + '</span>' : '') + '</td></tr>';
+      }
+      var head = '<tr class="cols' + (tab === 'tm' ? ' has-grp' : '') + '"><th>' + esc(t(tab === 'tm' ? 'entry.team_stats' : 'ui.player')) + '</th>' + lay.map(function (c) {
+        if (c.charAt(0) === '@') { var k = E.DLBL[c.slice(1)]; return '<th class="num d" title="' + esc(t(k) + ' · ' + t(E.LINKED[c.slice(1)] ? 'entry.linked_tag' : 'entry.calc_tag')) + '">' + esc(t(k, true)) + '</th>'; }
+        return '<th class="num" title="' + esc(t(E.LBL[c] || c)) + '">' + esc(t(E.LBL[c] || c, true)) + '</th>';
+      }).join('') + '<th></th></tr>';
+      var orderNote = hasOrder() ? '<p class="note muted">' + esc(t('entry.order_custom')) + ' <button type="button" class="linkbtn" data-act="order-reset">' + esc(t('entry.order_reset')) + '</button></p>' : '';
+      var removedNote = removedCount() ? '<p class="note muted">' + esc(fmt('entry.removed_note', [removedCount()])) + ' <button type="button" class="linkbtn" data-act="restore">' + esc(t('entry.restore_removed')) + '</button></p>' : '';
+      return { html: removedNote + orderNote + '<div class="scroll-top" id="scrolltop" role="presentation" aria-label="' + esc(t('entry.scroll_top')) + '"><div></div></div><div class="scroll" id="scrollmain"><table class="grid" id="grid"><thead>' + (tab === 'tm' ? groupRow(lay) : '') + head + '</thead><tbody>' + body + '</tbody></table></div>', alerts: alertsTotal };
+    }
+    // Aide en contexte (connect/ft_help.js) : bloc de l'onglet actif (« Où trouver », puis ordre, erreurs, alertes), bloc « Pour tous les onglets » replié dessous.
+    // Fermée par défaut ; l'état ouvert/fermé est mémorisé dans ft_help_entry. Maquette validée : docs/maquettes/aide_saisie.html.
+    var HELP_COLS = {
+      sk: { where: ['sk_where', 'where_oa'], order: ['sk_order_1', 'sk_order_2', 'sk_order_3'], errors: ['sk_err_1', 'sk_err_2', 'sk_err_3'], alerts: ['sk_al_gp', 'sk_al_goals', 'sk_al_totals'] },
+      gk: { where: ['gk_where', 'where_oa'], order: ['gk_order_1', 'gk_order_2'], errors: ['gk_err_1', 'gk_err_2', 'gk_err_3'], alerts: ['gk_al_totals'] },
+      tm: { where: ['tm_where', 'tm_where_split'], order: ['tm_order_1', 'tm_order_2', 'tm_order_3'], errors: ['tm_err_1', 'tm_err_2', 'tm_err_3'], alerts: ['tm_al_goals'] }
+    };
+    var HELP_COMMON = ['period', 'prefilled', 'numbers', 'paste', 'badge', 'refused', 'bar'];
+    function helpHTML() {
+      var H = 'entry.help_', c = HELP_COLS[state.tab], k = function (a) { return a.map(function (x) { return H + x; }); };
+      var FH = root.FTHELP || (typeof require !== 'undefined' ? require('../connect/ft_help.js') : null);
+      return FH.html({
+        screen: 'entry', prefix: 'entry.', t: t, esc: esc, defaults: { open: false, common: false },
+        top: { h: H + 'h_where', items: k(c.where), lead: true },
+        summary: esc(t('entry.hint')), chip: t('entry.tab_' + state.tab),
+        note: state.tab === 'tm' && state.mode === 1 ? H + 'tm_po' : null,
+        cols: [[{ h: H + 'h_order', items: k(c.order), ordered: true }], [{ h: H + 'h_errors', items: k(c.errors), lead: true }], [{ h: H + 'h_alerts', items: k(c.alerts), lead: true }]],
+        common: k(HELP_COMMON.map(function (x) { return 'c_' + x; }))
+      });
+    }
+    function totalsHTML() {
+      if (state.tab === 'tm') return '';
+      var tab = state.tab, ids = pids(), sums = {}, c;
+      var show = tab === 'sk' ? ['gp', 'g', 'a', 'pm'] : ['gp', 'w', 'l', 'otl', 'so'];
+      show.forEach(function (c2) { sums[c2] = 0; });
+      ids.forEach(function (p) { show.forEach(function (c2) { sums[c2] += E.z(value(tab, p, c2)); }); });
+      var h = '<span><b>' + esc(t('entry.totals')) + '</b></span>' + show.map(function (c2) { return '<span>' + esc(t(E.LBL[c2], true)) + ' <b>' + nf(sums[c2]) + '</b></span>'; }).join('');
+      if (tab === 'sk') {
+        var tg = E.n(teamValue('gf')), sg = skaterGoals();
+        h += '<span class="' + (tg !== null && sg !== tg ? 'bad' : '') + '">' + esc(t('entry.goals_check')) + ' <b>' + nf(sg) + ' / ' + nf(tg) + '</b></span>';
+        var gc = gpCheck(); if (gc) h += '<span class="' + (gc.ok ? '' : 'bad') + '" title="' + esc(fmt('entry.gp_check_hint', [gc.games, nf(gc.expected)])) + '">' + esc(t('entry.gp_check')) + ' <b>' + nf(gc.sum) + ' / ' + nf(gc.expected) + '</b></span>';
+      }
+      return h;
+    }
+
+    function view() {
+      var g = gridHTML(), seasons = [];
+      for (var y = DATA.franchise.first; y <= DATA.franchise.current + 1; y++) seasons.push(y);
+      var opts = seasons.map(function (y) { return '<option value="' + y + '"' + (y === state.season ? ' selected' : '') + '>' + esc(seasonLabel(y)) + '</option>'; }).join('');
+      var plist = addable().map(function (n) { return '<option value="' + esc(n) + '"></option>'; }).join('');
+      var tabs = ['sk', 'gk', 'tm'].map(function (k) { return '<button data-tab="' + k + '" aria-pressed="' + (state.tab === k) + '">' + esc(t('entry.tab_' + k)) + '</button>'; }).join('');
+      var moments = '<button data-mode="0" aria-pressed="' + (state.mode === 0) + '">' + esc(t('entry.moment_rs')) + '</button><button data-mode="1" aria-pressed="' + (state.mode === 1) + '">' + esc(t('entry.moment_po')) + '</button>';
+      return '<header class="top"><div class="brand"><span class="crest"></span><div><div class="fr">' + esc(tn(DATA.franchise.name)) + '</div><div class="sub">' + esc(t('entry.title')) + '</div></div></div>' +
+        '<div class="ctl"><div class="seg" role="group" aria-label="' + esc(t('ui.language')) + '"><button data-lang="fr" aria-pressed="' + (state.lang === 'fr') + '">FR</button><button data-lang="en" aria-pressed="' + (state.lang === 'en') + '">EN</button></div></div></header>' +
+        '<main class="entry">' + syncPanel() + '<section class="pick">' +
+        (typeof window !== 'undefined' && window.FT_PAGE ? '' : '<div class="slicer"><span class="lbl">' + esc(t('entry.type')) + '</span><div class="seg page" role="group" aria-label="' + esc(t('entry.type')) + '">' + tabs + '</div></div>') +   // coquille : onglets dans la rangée commune
+        '<div class="slicer"><span class="lbl">' + esc(t('entry.period')) + '</span><div class="seg page" role="group" aria-label="' + esc(t('entry.period')) + '">' + moments + '</div></div>' +
+        '<label>' + esc(t('ui.season')) + '<select id="sn">' + opts + '</select></label>' +
+        (state.tab === 'tm' ? '' : '<label>' + esc(t('entry.add_player')) + '<input id="addp" list="plist" autocomplete="off"></label><datalist id="plist">' + plist + '</datalist>') +
+        '<div class="acts"><button class="btn" data-act="csv">' + esc(t('entry.export_csv')) + '</button><button class="btn two" data-act="json"><span class="b1">' + esc(t('entry.export_json')) + '</span><span class="b2">' + esc(t('entry.export_json_sub')) + '</span></button><button class="btn ghost" data-act="reset">' + esc(t('entry.reset')) + '</button></div></section>' +
+        '<section class="card wide">' + (prefilledFlag && state.tab !== 'tm' ? '<p class="note">' + esc(t('entry.prefilled')) + '</p>' : '') + helpHTML() + g.html +
+        '<div class="foot" id="totals">' + totalsHTML() + '</div>' +   // saisies en attente et alertes : barre d'état du moteur commun (connect/grid_input.js)
+        '<p class="note muted">' + esc(t('entry.local_note')) + '</p></section></main>';
+    }
+
+
+    // ---- synchronisation avec Supabase ----
+    E.setGames(DATA.franchise.games || 82);
+    var sync = { user: null, busy: false, msg: '', level: '' };
+    var SK_DB = ['gp', 'g', 'a', 'plus_minus', 'pim', 'shots', 'gwg', 'ppg', 'ppp', 'shg', 'shp', 'toi_minutes', 'fow', 'fot', 'hits', 'blocks', 'giveaways', 'takeaways', 'oa_end'];
+    var GK_DB = ['gp', 'w', 'l', 'otl', 'so', 'saves', 'shots_against', 'minutes', 'pim', 'g', 'a', 'oa_end'];
+    var TM_DB_RS = { gp: 'gp', w: 'w', l: 'l', otl: 'otl', rw: 'rw', row: 'row_', gf: 'gf', ga: 'ga', ppg: 'ppg', tpp: 'pp_opportunities', shga: 'shga', ppga: 'ppga', tsh: 'times_shorthanded', shgf: 'shgf', hw: 'home_w', hl: 'home_l', ho: 'home_otl', aw: 'away_w', al: 'away_l', ao: 'away_otl' };
+    var NOT_NULL = { gp: 1, g: 1, a: 1, plus_minus: 1, pim: 1, shots: 1, gwg: 1, ppg: 1, ppp: 1, shg: 1, shp: 1, w: 1, l: 1, otl: 1, so: 1 };
+    function dbVal(db, v) { return v == null || v === '' ? (NOT_NULL[db] ? 0 : null) : v; }
+    // Lignes à envoyer pour l'onglet courant : seulement celles qui ont des saisies, complétées par les valeurs de la base
+    function pushPayload(franchiseId) {
+      var tab = state.tab, gt = state.mode ? 'PO' : 'RS', out = { errors: 0, rows: [], table: null, conflict: null, deletes: [] };
+      if (tab === 'sk' || tab === 'gk') {
+        var list = tab === 'sk' ? E.SK : E.GK, dbc = tab === 'sk' ? SK_DB : GK_DB, ids = Object.keys(entries[tab][key()] || {});
+        out.table = tab === 'sk' ? 'skater_season_stats' : 'goalie_season_stats'; out.conflict = 'franchise_id,player_id,season,game_type';
+        ids.forEach(function (p) {
+          var v = {}; list.forEach(function (c) { v[c] = value(tab, +p, c); });
+          var al = tab === 'sk' ? E.validateSkater(v, state.mode === 1) : E.validateGoalie(v, state.mode === 1); out.errors += al.filter(function (a) { return a.level === 'err'; }).length;
+          var row = { franchise_id: franchiseId, player_id: +p, season: state.season, game_type: gt, origin: 'franchise' }; list.forEach(function (c, i) { row[dbc[i]] = dbVal(dbc[i], v[c]); });
+          var os = startOa(+p); if (os !== null) row.oa_start = os;
+          if (tab === 'sk') { row.position = skMap[+p] ? skMap[+p].pos : null; } out.rows.push(row);
+        });
+        if (tab === 'sk') out.rows.forEach(function (r) { delete r.position; });
+        removedList(tab).forEach(function (p) { if (baseRow(tab, p)) out.deletes.push({ table: out.table, match: { player_id: +p, season: state.season, game_type: gt, origin: 'franchise' } }); });   // franchise_id imposé par ft_apply_batch
+      } else {
+        var tv = teamValues(), has = Object.keys(entries.tm[key()] || {}).length > 0;
+        out.table = 'team_season_stats'; out.conflict = 'franchise_id,season,game_type';
+        if (has) {
+          var al2 = E.validateTeam(tv, state.mode === 1, skaterGoals()); out.errors += al2.filter(function (a) { return a.level === 'err'; }).length;
+          var row2 = { franchise_id: franchiseId, season: state.season, game_type: gt };
+          cols().forEach(function (c) { var d = TM_DB_RS[c]; if (d) row2[d] = dbVal(d, tv[c]); });
+          if (state.mode === 1) row2.otl = 0; out.rows.push(row2);
+        }
+      }
+      return out;
+    }
+    function selectQuery(tab) {
+      var gt = state.mode ? 'PO' : 'RS', f = 'season=eq.' + state.season + '&game_type=eq.' + gt;
+      if (tab === 'sk') return { table: 'skater_season_stats', q: 'select=player_id,' + SK_DB.join(',') + '&origin=eq.franchise&' + f + '&order=player_id' };
+      if (tab === 'gk') return { table: 'goalie_season_stats', q: 'select=player_id,' + GK_DB.join(',') + '&origin=eq.franchise&' + f + '&order=player_id' };
+      return { table: 'team_season_stats', q: 'select=' + TM_ORDER.map(function (c) { return TM_DB_RS[c]; }).join(',') + '&' + f };
+    }
+    // Remplace la « base » de l'écran par les lignes reçues de Supabase et efface les saisies locales correspondantes
+    function applyPulled(tab, rowsIn) {
+      var k = key(), dbc = tab === 'sk' ? SK_DB : GK_DB;
+      if (tab === 'tm') { var r = rowsIn[0]; if (r) { DATA.tm = DATA.tm || {}; DATA.tm[k] = TM_ORDER.map(function (c) { var v = r[TM_DB_RS[c]]; return v === undefined ? null : v; }); } else if (DATA.tm) delete DATA.tm[k]; delete entries.tm[k]; }
+      else { DATA[tab] = DATA[tab] || {}; DATA[tab][k] = rowsIn.map(function (r) { return [r.player_id].concat(dbc.map(function (c) { return r[c] === undefined ? null : r[c]; })); }); delete entries[tab][k]; if (entries.extra[tab]) delete entries.extra[tab][k]; }
+      persist(); return rowsIn.length;
+    }
+    function setPlayers(list) {   // list : [{id, name, grp}] depuis la table player (full_name, position_group)
+      skMap = {}; gkMap = {}; DATA.skaters = []; DATA.goalies = [];
+      list.forEach(function (p) { var o = { id: p.id, name: p.name, pos: p.grp }; if (p.grp === 'G') { gkMap[p.id] = o; DATA.goalies.push(o); } else { skMap[p.id] = o; DATA.skaters.push(o); } });
+    }
+
+
+    function say(level, k, p) { sync.level = level; sync.msg = fmt(k, p); }
+    async function doLogin(client, email, pw) {
+      sync.busy = true; try { await client.signIn(email, pw); var u = client.user(); sync.user = u ? (u.email || u.id) : null; say('ok', 'sb.connected'); } catch (e) { say('bad', 'sb.failed', [e.message]); } sync.busy = false;
+      return !!sync.user;
+    }
+    function doLogout(client) { client.signOut(); sync.user = null; sync.msg = ''; }
+    async function doPull(client, quiet) {
+      sync.busy = true;
+      try {
+        var pl = await client.select('player', 'select=id,full_name,position_group&origin=eq.franchise&order=full_name'); setPlayers(pl.map(function (p) { return { id: p.id, name: p.full_name, grp: p.position_group }; }));
+        var sq = selectQuery(state.tab), rows = await client.select(sq.table, sq.q), n = applyPulled(state.tab, rows);
+        if (!quiet) say('ok', 'sb.pulled', [n]);
+      } catch (e) { say('bad', 'sb.failed', [e.message]); }
+      sync.busy = false;
+    }
+    async function doPush(client) {
+      sync.busy = true;
+      try {
+        var fid = await client.ensureFranchise();
+        if (fid == null) { say('bad', 'sb.no_franchise'); sync.busy = false; return false; }
+        var pl = pushPayload(fid);
+        if (!pl.rows.length && !pl.deletes.length) { say('warn', 'sb.nothing'); sync.busy = false; return false; }
+        if (pl.errors) { say('bad', 'sb.errors_block'); sync.busy = false; return false; }
+        // un seul appel transactionnel : tout l'envoi réussit ou rien n'est écrit (ft_apply_batch regroupe lui-même les lignes par liste de colonnes)
+        var ops = []; if (pl.rows.length) ops.push({ op: 'upsert', table: pl.table, conflict: pl.conflict, rows: pl.rows });
+        pl.deletes.forEach(function (d) { ops.push({ op: 'delete', table: d.table, match: d.match }); });
+        await client.rpc('ft_apply_batch', { p_franchise_id: fid, p_ops: ops });
+        await doPull(client, true); say('ok', 'sb.pushed', [pl.rows.length + pl.deletes.length]);
+        sync.busy = false; return true;
+      } catch (e) { say('bad', 'sb.failed', [e.message]); sync.busy = false; return false; }
+    }
+    function syncPanel() {
+      var h = '<section class="card sb"><h3>' + esc(t('sb.title')) + '</h3>';
+      if (sync.user) h += '<p class="ok">' + esc(t('sb.connected')) + ' : ' + esc(sync.user) + '</p><div class="acts left"><button class="btn" data-sb="push"' + (sync.busy ? ' disabled' : '') + '>' + esc(t('sb.push')) + '</button><button class="btn" data-sb="pull"' + (sync.busy ? ' disabled' : '') + '>' + esc(t('sb.pull')) + '</button><button class="btn ghost" data-sb="logout">' + esc(t('sb.logout')) + '</button></div>';
+      else h += '<p class="muted">' + esc(t('sb.not_connected')) + '</p><div class="acts left"><input id="sb-email" type="email" placeholder="' + esc(t('sb.email')) + '" autocomplete="username"><input id="sb-pw" type="password" placeholder="' + esc(t('sb.password')) + '" autocomplete="current-password"><button class="btn" data-sb="login"' + (sync.busy ? ' disabled' : '') + '>' + esc(t('sb.login')) + '</button></div>';
+      return h + (sync.busy ? '<p class="muted">' + esc(t('sb.busy')) + '</p>' : sync.msg ? '<p class="' + sync.level + '">' + esc(sync.msg) + '</p>' : '') + '</section>';
+    }
+
+    // ---- export ----
+    function csvRows() {
+      var tab = state.tab, k = key(), out = [], list = tab === 'sk' ? E.SK : E.GK;
+      var dbc = tab === 'sk' ? ['gp', 'g', 'a', 'plus_minus', 'pim', 'shots', 'gwg', 'ppg', 'ppp', 'shg', 'shp', 'toi_minutes', 'fow', 'fot', 'hits', 'blocks', 'giveaways', 'takeaways', 'oa_end']
+                              : ['gp', 'w', 'l', 'otl', 'so', 'saves', 'shots_against', 'minutes', 'pim', 'g', 'a', 'oa_end'];
+      var head = ['franchise_id', 'player_id', 'season', 'game_type', 'origin'].concat(dbc);
+      out.push(head.join(','));
+      Object.keys(entries[tab][k] || {}).forEach(function (p) {
+        var vals = list.map(function (c) { var v = value(tab, +p, c); return v == null ? '' : v; });
+        out.push([1, p, state.season, state.mode ? 'PO' : 'RS', 'franchise'].concat(vals).join(','));
+      });
+      return out.join('\r\n') + '\r\n';
+    }
+    function jsonExport() { return JSON.stringify({ version: 1, exported_season_filter: null, entries: entries }, null, 1); }
+
+    return { doLogin: doLogin, doLogout: doLogout, doPull: doPull, doPush: doPush, sync: sync, pushPayload: pushPayload, selectQuery: selectQuery, applyPulled: applyPulled, setPlayers: setPlayers, state: state, entries: function () { return entries; }, view: view, t: t, setCell: setCell, applyPaste: applyPaste, addPlayer: addPlayer, addable: addable, underContract: underContract, moveRow: moveRow, resetOrder: resetOrder, hasOrder: hasOrder, reset: reset, rowInfo: rowInfo, totalsHTML: totalsHTML,
+             pids: pids, startOa: startOa, alertCount: alertCount, removePlayer: removePlayer, restoreRemoved: restoreRemoved, needsConfirmRemove: needsConfirmRemove, removedCount: removedCount, pidName: pidName, gpCheck: gpCheck, helpHTML: helpHTML, fmt: fmt, csvRows: csvRows, jsonExport: jsonExport, countEntries: countEntries, storageOk: storageOk, refusal: refusal, snapshot: snapshot, restore: restore, value: value, cols: cols, alertsText: alertsText, derivedHeads: derivedHeads, seasonLabel: seasonLabel };
+  }
+
+  var api = { makeEntryApp: makeEntryApp, esc: esc };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.FTEUI = api;
+
+  // ---------- Montage dans la page ----------
+  if (typeof document !== 'undefined') {
+    var DATA = JSON.parse(document.getElementById('data').textContent);
+    var ls = { get: function (k) { try { return window.localStorage.getItem(k); } catch (e) { return null; } }, set: function (k, v) { window.localStorage.setItem(k, v); }, remove: function (k) { try { window.localStorage.removeItem(k); } catch (e) { /* ignore */ } } };
+    var rootEl = document.getElementById('app'), CFG0 = JSON.parse(document.getElementById('cfg').textContent);
+    var host = FTLM.run({ DATA0: DATA, store: ls, cfg: CFG0, rootEl: rootEl, makeApp: function (d, st) { return makeEntryApp(d, st || ls); }, assemble: FTLIVE.assembleEntry });
+    var app = new Proxy({}, { get: function (_, k) { var a = host.app(); return a ? a[k] : undefined; } });
+    if (window.FTHELP) FTHELP.bind(rootEl);   // aide en contexte : ouvrir/fermer sans redessiner la page
+    function draw(focus) { host.draw(focus ? 'input.cell[data-r="' + focus[0] + '"][data-c="' + focus[1] + '"]' : null); }
+    function patch(r) {
+      var tr = rootEl.querySelector('tr[data-row="' + r + '"]'); if (!tr) return;
+      var info = app.rowInfo(r);
+      tr.querySelectorAll('td.d').forEach(function (td) { td.textContent = info.derived[+td.dataset.d]; });
+      tr.querySelectorAll('td.ci').forEach(function (td) {
+        var c = td.querySelector('input').dataset.c, m = info.alerts.filter(function (a) { return a.c === c; });
+        td.className = 'ci' + (m.some(function (a) { return a.level === 'err'; }) ? ' err' : m.length ? ' warn' : ''); td.title = m.length ? app.alertsText(m) : '';
+      });
+      var al = tr.querySelector('td.al'); al.title = app.alertsText(info.alerts); al.innerHTML = info.alerts.length ? '<span class="badge' + (info.alerts.some(function (a) { return a.level === 'err'; }) ? ' bad' : '') + '">' + info.alerts.length + '</span>' : '';
+      var tot = rootEl.querySelector('#totals'); if (tot) tot.innerHTML = app.totalsHTML();
+    }
+    function download(name, text, type) { var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: type })); a.download = name; document.body.appendChild(a); a.click(); a.remove(); }
+    rootEl.addEventListener('change', function (e) {
+      var el = e.target;
+      if (el.id === 'sn') { app.state.season = +el.value; draw(); }
+      else if (el.id === 'addp') { if (gi.edit(function () { return app.addPlayer(el.value); })) draw(); }   // ajout, retrait et ordre : annulables par Ctrl+Z
+    });
+    // clavier, collage, focus, Ctrl+Z et avertissement avant de quitter : moteur commun (connect/grid_input.js)
+    var gi = FTGI.attach({ rootEl: rootEl, host: host, adapter: {
+      write: function (r, c, raw) { return c.charAt(0) === '@' ? null : app.setCell(r, c, raw) || app.refusal(c, raw, r); },
+      t: function (k, sh) { return app.t(k, sh); },
+      alerts: function () { return app.alertCount(); },
+      storageOk: function () { return app.storageOk(); },
+      ctx: function () { return app.state.tab + '|' + app.state.season + '|' + app.state.mode; },
+      rowName: function (r) { return app.state.tab === 'tm' ? '' : app.pidName(r); },
+      colName: function (c) { return app.t(FTE.LBL[c] || c, true); },
+      rows: function () { var n = app.state.tab === 'tm' ? 1 : app.pids().length, out = []; for (var i = 0; i < n; i++) out.push(i); return out; },
+      cols: function () { return FTE.layout(app.state.tab, app.state.mode === 1); },
+      snapshot: function () { return app.snapshot(); }, restore: function (s) { app.restore(s); },
+      pending: function () { return app.countEntries(); },
+      patch: function (r) { patch(r); },
+      onKey: function (e, el) {   // Alt + flèche : déplace le joueur d'une ligne
+        if (!e.altKey || !el.classList || !el.classList.contains('cell') || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return false;
+        e.preventDefault(); var r = +el.dataset.r, c = el.dataset.c, mv = e.key === 'ArrowDown' ? 1 : -1;
+        if (gi.edit(function () { if (FTGI.dirty(el)) app.setCell(r, c, el.value); return app.moveRow(r, r + mv); })) draw([r + mv, c]); return true;
+      }
+    } });
+    // Glisser-déposer : la poignée ⠿ de la cellule du nom déplace le joueur ; Alt + flèche haut / bas fait la même chose au clavier
+    var dragFrom = null;
+    function rowOf(el) { return el && el.closest ? el.closest('tr[data-row]') : null; }
+    rootEl.addEventListener('dragstart', function (e) { var h = e.target.closest && e.target.closest('[data-drag]'); if (!h) return; dragFrom = +h.dataset.drag; try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(dragFrom)); } catch (x) { /* ignore */ } var tr = rowOf(h); if (tr) tr.classList.add('dragging'); });
+    rootEl.addEventListener('dragover', function (e) { if (dragFrom === null) return; var tr = rowOf(e.target); if (!tr) return; e.preventDefault(); rootEl.querySelectorAll('tr.drop-before,tr.drop-after').forEach(function (x) { x.classList.remove('drop-before', 'drop-after'); }); var r = +tr.dataset.row; tr.classList.add(r < dragFrom ? 'drop-before' : 'drop-after'); });
+    rootEl.addEventListener('drop', function (e) { if (dragFrom === null) return; var tr = rowOf(e.target), app = host.app(); e.preventDefault(); if (tr && app && gi.edit(function () { return app.moveRow(dragFrom, +tr.dataset.row); })) { dragFrom = null; draw(); } else dragFrom = null; });
+    rootEl.addEventListener('dragend', function () { dragFrom = null; rootEl.querySelectorAll('tr.dragging,tr.drop-before,tr.drop-after').forEach(function (x) { x.classList.remove('dragging', 'drop-before', 'drop-after'); }); });
+    rootEl.addEventListener('click', function (e) {
+      var b = e.target.closest('button'); if (!b) return;
+      if (b.dataset.rm !== undefined) { var rr = +b.dataset.rm; if (app.needsConfirmRemove(rr) && !window.confirm(app.fmt('entry.confirm_remove', [app.pidName(rr)]))) return; gi.edit(function () { app.removePlayer(rr); }); }
+      else if (b.dataset.act === 'restore') { gi.edit(function () { app.restoreRemoved(); }); }
+      else if (b.dataset.act === 'order-reset') { gi.edit(function () { app.resetOrder(); }); }
+      else if (b.dataset.lang) app.state.lang = b.dataset.lang; else if (b.dataset.mode) app.state.mode = +b.dataset.mode; else if (b.dataset.tab) app.state.tab = b.dataset.tab;
+      else if (b.dataset.act === 'csv') { download('saisie_' + app.state.tab + '_' + app.state.season + '_' + (app.state.mode ? 'PO' : 'RS') + '.csv', app.csvRows(), 'text/csv'); return; }
+      else if (b.dataset.act === 'json') { download('saisies.json', app.jsonExport(), 'application/json'); return; }
+      else if (b.dataset.act === 'reset') { if (window.confirm(app.t('entry.confirm_reset'))) app.reset(); else return; }
+      else return;
+      draw();
+    });
+    // Barre de défilement des colonnes au-dessus de la grille, synchronisée avec celle du bas
+    var syncing = false;
+    function syncScroll() {
+      var top = rootEl.querySelector('#scrolltop'), main = rootEl.querySelector('#scrollmain'), tbl = rootEl.querySelector('#grid'); if (!top || !main || !tbl) return;
+      top.firstChild.style.width = tbl.scrollWidth + 'px'; top.style.display = tbl.scrollWidth > main.clientWidth + 1 ? '' : 'none';
+      if (!top.dataset.wired) {
+        top.dataset.wired = '1';
+        top.addEventListener('scroll', function () { if (syncing) { syncing = false; return; } syncing = true; main.scrollLeft = top.scrollLeft; });
+        main.addEventListener('scroll', function () { if (syncing) { syncing = false; return; } syncing = true; top.scrollLeft = main.scrollLeft; });
+      }
+      top.scrollLeft = main.scrollLeft;
+    }
+    if (typeof MutationObserver !== 'undefined') new MutationObserver(function () { syncScroll(); }).observe(rootEl, { childList: true, subtree: true });
+    if (typeof window.addEventListener === 'function') window.addEventListener('resize', syncScroll);
+    host.start();
+  }
+})(typeof window !== 'undefined' ? window : this);
