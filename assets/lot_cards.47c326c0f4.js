@@ -146,6 +146,7 @@
     var best = withStats[0], bestGP = -1;   // joueur affiché au départ : celui qui a le plus de matchs en saison régulière
     withStats.forEach(function (p) { var gp = 0; (byP[p.id] || []).forEach(function (r) { if (r[C.type] === 0) gp += r[C.gp] || 0; }); if (gp > bestGP) { bestGP = gp; best = p; } });
     state.pid = best.id;
+    try { var lp = /[?&]player=(\d+)/.exec(typeof location !== 'undefined' ? location.search : ''); if (lp && byId[+lp[1]]) state.pid = +lp[1]; } catch (e) { /* lien direct ?player= (phase 4d) */ }
 
     function t(key, short) {
       var e = DATA.labels[key]; if (!e) return key;

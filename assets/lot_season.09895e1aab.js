@@ -692,12 +692,12 @@
     (dd.initial || []).forEach(function (x) { var k = key(x[0], x[1], x[2]); if (x[3]) init[k] = 1; if (x[3]) held[k] = mk(x[0], x[1], x[2], { via: 'initial', on: null, from: null }); else lost[k] = mk(x[0], x[1], x[2], { via: 'initial', on: null, to: null }); });
     for (var y = first + 1; y <= last; y++) for (var r = 1; r <= ROUNDS; r++) { var k0 = key(y, r, code); if (!held[k0] && !lost[k0]) { held[k0] = mk(y, r, code, { via: 'default', on: null, from: null }); init[k0] = 1; } }
     var ev = [];
-    (dd.trades || []).forEach(function (t, i) { ev.push({ on: t[0], i: i, dir: t[2], y: t[3], r: t[4], t: t[5], via: 'trade', who: t[1] }); });
-    (dd.offers || []).forEach(function (o, i) { ev.push({ on: o[0], i: 10000 + i, dir: o[1] === 'unmatched' ? 'in' : 'out', y: o[2], r: o[3], t: o[4], via: 'offer_sheet', who: null }); });
+    (dd.trades || []).forEach(function (t, i) { ev.push({ on: t[0], i: i, dir: t[2], y: t[3], r: t[4], t: t[5], via: 'trade', who: t[1], id: t[6] == null ? null : t[6] }); });
+    (dd.offers || []).forEach(function (o, i) { ev.push({ on: o[0], i: 10000 + i, dir: o[1] === 'unmatched' ? 'in' : 'out', y: o[2], r: o[3], t: o[4], via: 'offer_sheet', who: null, id: o[5] == null ? null : o[5] }); });
     ev.sort(function (a, b) { return a.on < b.on ? -1 : a.on > b.on ? 1 : a.i - b.i; });
     ev.forEach(function (e) {
       var k = key(e.y, e.r, e.t);
-      (hist[k] = hist[k] || []).push({ dir: e.dir, who: e.who, on: e.on, via: e.via });
+      (hist[k] = hist[k] || []).push({ dir: e.dir, who: e.who, on: e.on, via: e.via, id: e.id });
       if (e.dir === 'in') {
         if (held[k]) issues.push({ kind: 'in_already_held', year: e.y, round: e.r, team: e.t, on: e.on, via: e.via });
         held[k] = mk(e.y, e.r, e.t, { via: e.via, on: e.on, from: e.who }); delete lost[k];
@@ -743,20 +743,29 @@
   // null quand aucun joueur ne correspond au filtre (jamais 0). Un MJ vide compte comme 0 match.
   var GROUP = { C: 'F', LW: 'F', RW: 'F', F: 'F', LD: 'D', RD: 'D', D: 'D', G: 'G' };
   // Options (Gabriel, 2026-11-23) : recent = false retire les deux années de repêchage les plus récentes de la liste (joueurs
-  // pas encore eu le temps de jouer) ; hist = false ne compte pas les MJ avec l'équipe d'avant la franchise (gp_hist).
-  function boardSummary(picks, f) {
+  // pas encore eu le temps de jouer) ; since = première année de repêchage retenue : seulement les joueurs repêchés en mode franchise
+  // (Gabriel, 2026-11-23, option 1 : le nombre de joueurs repêchés baisse aussi ; remplace l'ancienne option hist sur les MJ).
+  // Lignes retenues par les filtres et les options (aussi pour le tableau des choix de l'Analyse)
+  function boardRows(picks, f) { return boardFilter(picks, f).rows; }
+  function boardFilter(picks, f) {
     f = f || {};
     var ys = []; (picks || []).forEach(function (p) { if (ys.indexOf(p.year) < 0) ys.push(p.year); }); ys.sort(function (a, b) { return b - a; });
     var recent = f.recent === false ? ys.slice(0, 2) : [];
     var rows = (picks || []).filter(function (p) {
       if (recent.indexOf(p.year) >= 0) return false;
+      if (f.since != null && p.year < f.since) return false;
       if (f.year != null && f.year !== '' && p.year !== +f.year) return false;
       if (f.round != null && f.round !== '' && p.round !== +f.round) return false;
       if (f.pos) { if (f.pos === 'F' || f.pos === 'D' || f.pos === 'G') { if (GROUP[p.pos] !== f.pos) return false; } else if (p.pos !== f.pos) return false; }
       return true;
     });
+    return { rows: rows, recent: recent };
+  }
+  function boardSummary(picks, f) {
+    f = f || {};
+    var B = boardFilter(picks, f), rows = B.rows, recent = B.recent;
     var n = rows.length, gp1 = 0, gp100 = 0;
-    rows.forEach(function (p) { var g = (p.gp || 0) - (f.hist === false ? p.gp_hist || 0 : 0); if (g >= 1) gp1++; if (g >= 100) gp100++; });
+    rows.forEach(function (p) { var g = p.gp || 0; if (g >= 1) gp1++; if (g >= 100) gp100++; });
     var pct = function (k) { return n ? 100 * k / n : null; };
     return { n: n, gp1: gp1, gp1_pct: pct(gp1), gp100: gp100, gp100_pct: pct(gp100), years_out: recent };
   }
@@ -835,7 +844,7 @@
              owned: owned, lost: L.lost, issues: issues, orders: ordersOut, values: values, board: { top3: (D.base && D.base.top3) || {}, picks: boardPicks(D) } };
   }
 
-  var api = { SEASONS: SEASONS, ROUNDS: ROUNDS, draftYears: draftYears, pickValueDefault: pickValueDefault, valueOf: valueOf, playoffRanks: playoffRanks, draftOrder: draftOrder, overallOf: overallOf, ledger: ledger, boardPicks: boardPicks, boardSummary: boardSummary, validateInitial: validateInitial, pickTimeline: pickTimeline, assemble: assemble };
+  var api = { SEASONS: SEASONS, ROUNDS: ROUNDS, draftYears: draftYears, pickValueDefault: pickValueDefault, valueOf: valueOf, playoffRanks: playoffRanks, draftOrder: draftOrder, overallOf: overallOf, ledger: ledger, boardPicks: boardPicks, boardSummary: boardSummary, boardRows: boardRows, validateInitial: validateInitial, pickTimeline: pickTimeline, assemble: assemble };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.FTDRAFT = api;
 })(typeof window !== 'undefined' ? window : this);
 
@@ -853,7 +862,11 @@
     down: '<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M5 8.5 1 2h8z" fill="currentColor"/></svg>',
     chev: '<svg viewBox="0 0 10 10" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" d="M1.5 3.5 5 7l3.5-3.5"/></svg>',
     info: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 7v4.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="8" cy="4.9" r="1" fill="currentColor"/></svg>',
-    clock: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 7v5l3 2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>'
+    clock: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 7v5l3 2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+    // liens des cartes (transaction : deux flèches opposées ; fiche : silhouette), bouton Retirer (×)
+    trade: '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M1.5 4h8M7.5 2l2 2-2 2M10.5 8h-8M4.5 6l-2 2 2 2" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    card: '<svg viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="4" r="2.2" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M1.8 10.8c.5-2.2 2.2-3.3 4.2-3.3s3.7 1.1 4.2 3.3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>',
+    del: '<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2.2 2.2l5.6 5.6M7.8 2.2 2.2 7.8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>'
   };
 
   // ---- données dérivées, mises en cache par objet DATA (la page recharge DATA après une synchronisation) ----
@@ -872,6 +885,11 @@
   function roundShort(c, r) { return c.t('dft.round_n', true).replace('{0}', r); }
   function dateL(c, d) { if (!d) return ''; var p = String(d).split('-'); return new Intl.DateTimeFormat(c.lang === 'en' ? 'en-CA' : 'fr-CA', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(Date.UTC(+p[0], +p[1] - 1, +p[2])); }
   function tname(c, code) { var x = derived(c.DATA).teams[code]; return x ? (c.lang === 'en' ? x.en : x.fr || x.en) : code; }
+  // pastille d'équipe avec logo (LNH ou équipe personnalisée, c.logo) ; si l'image ne charge pas, le disque aux deux couleurs revient
+  function teamLogoChip(c, code) {
+    var x = derived(c.DATA).teams[code] || {}, img = (c.logo ? c.logo(code) : '').replace(/ onerror="[^"]*"/, ' onerror="this.parentNode.classList.remove(\'logo\');this.remove()"');
+    return '<span class="ft-team" title="' + c.esc(tname(c, code)) + '"><span class="tl' + (img ? ' logo' : '') + '" style="--o1:' + c.esc(x.c1 || '') + ';--o2:' + c.esc(x.c2 || '') + '">' + img + '</span>' + c.esc(code) + '</span>';
+  }
   function teamChip(c, code) { var x = derived(c.DATA).teams[code] || {}; return '<span class="ft-team" title="' + c.esc(tname(c, code)) + '"><span class="tl" style="--o1:' + c.esc(x.c1 || '') + ';--o2:' + c.esc(x.c2 || '') + '"></span>' + c.esc(code) + '</span>'; }
   // nom court de la grille repliée : « J. Milson », « J.-P. Roy » ; un prénom déjà réduit à une initiale reste tel quel
   function shortName(n) { var w = String(n || '').trim().split(/\s+/); if (w.length < 2 || /\.$/.test(w[0])) return w.join(' '); return w[0].split('-').map(function (x) { return x.charAt(0) + '.'; }).join('-') + ' ' + w.slice(1).join(' '); }
@@ -936,15 +954,30 @@
   function detailRow(c, y, list, moves) {
     var src = moves ? list : list.filter(isHeld);
     var items = src.slice().sort(function (a, b) { return a.round - b.round || (a.mine ? -1 : 1); }).map(function (p) {
+      // les étapes restent du texte ; les liens vont dans le coin supérieur droit de la carte (pk-go).
+      // Une étape liée à une transaction (ou à une offre hostile) porte son numéro dans un petit carré, repris par le lien du coin.
       var steps = [];
-      if (p.init) steps.push(c.esc(c.t('dft.own_det_start')));
-      p.hist.forEach(function (x) { if (moves || x.dir === 'in') steps.push(c.esc(c.fmt(x.dir === 'in' ? 'dft.own_det_in' : 'dft.own_det_out', [x.who || '?', dateL(c, x.on)]))); });
-      if (p.used) steps.push(c.esc(c.fmt('dft.own_det_used', [ordL(c, p.overall), p.player || ''])));
-      else if (p.held) steps.push(c.esc(c.t('dft.own_det_held')));
-      return '<li class="' + (isHeld(p) ? 'hi' : '') + '"><span class="h"><span class="r">' + c.esc(roundShort(c, p.round)) + '</span>' + chip(c, p, 'det') + '<span>' + c.esc(c.fmt('dft.own_det_pick', [tname(c, p.team)])) + '</span></span><ol>' + steps.map(function (s) { return '<li>' + s + '</li>'; }).join('') + '</ol></li>';
+      if (p.init) steps.push({ t: c.t('dft.own_det_start') });
+      p.hist.forEach(function (x) { if (moves || x.dir === 'in') steps.push({ t: c.fmt(x.dir === 'in' ? 'dft.own_det_in' : 'dft.own_det_out', [x.who || '?', dateL(c, x.on)]), via: x.via === 'trade' || x.via === 'offer_sheet' ? x.via : null, id: x.id == null ? null : x.id }); });
+      if (p.used) steps.push({ t: c.fmt('dft.own_det_used', [ordL(c, p.overall), p.player || '']) });
+      else if (p.held) steps.push({ t: c.t('dft.own_det_held') });
+      steps.forEach(function (s, i) { s.n = i + 1; });
+      return '<li class="' + (isHeld(p) ? 'hi' : '') + '" data-pk="' + p.year + '-' + p.round + '-' + p.team + '"><div class="pk-top"><span class="h"><span class="r">' + c.esc(roundShort(c, p.round)) + '</span>' + chip(c, p, 'det') + '</span>' + cardLinks(c, p, steps) + '</div>' +
+        '<p class="pk-from">' + c.esc(c.fmt('dft.own_det_pick', [tname(c, p.team)])) + '</p><ol class="pk-steps">' + steps.map(function (s) { return '<li' + (s.via ? ' class="tx"' : '') + ' value="' + s.n + '">' + c.esc(s.t) + '</li>'; }).join('') + '</ol></li>';
     });
     return '<tr class="pk-detail" data-year="' + y + '" id="pk-det-' + y + '"><td colspan="9"><h4 class="help-sh">' + c.esc(c.fmt(moves ? 'dft.own_det_title' : 'dft.own_det_title_held', [y])) + '</h4>' +
       (items.length ? '<ul class="pk-det">' + items.join('') + '</ul>' : '<p class="muted">' + c.esc(c.t('dft.own_det_none')) + '</p>') + '</td></tr>';
+  }
+  // liens d'une carte. Cibles : onglet Transactions (ou Offres hostiles) d'Effectif et fiche du joueur.
+  // Lien direct vers UNE transaction ou UN joueur : pas encore pris en charge par la coquille (question à Gabriel) ; la maquette passe ?tr= et ?player=.
+  function cardLinks(c, p, steps) {
+    var tx = steps.filter(function (s) { return s.via; }), out = [];
+    var href = function (s) { return s.via === 'offer_sheet' ? 'roster.html' + (s.id != null ? '?os=' + s.id : '') + '#offers' : 'roster.html' + (s.id != null ? '?tr=' + s.id : '') + '#trades'; };   // lien direct (Gabriel, 2026-11-23)
+    var aria = function (s) { return c.fmt(s.via === 'offer_sheet' ? 'dft.own_go_offer_step' : 'dft.own_go_step', [s.n, s.t]); };
+    if (tx.length === 1) out.push('<a class="pk-go" href="' + href(tx[0]) + '" data-go="tr" data-n="' + tx[0].n + '" aria-label="' + c.esc(aria(tx[0])) + '" title="' + c.esc(aria(tx[0])) + '">' + IC.trade + '<span>' + c.esc(c.t(tx[0].via === 'offer_sheet' ? 'dft.own_go_offer' : 'dft.own_go_trade', true)) + '</span></a>');
+    else if (tx.length > 1) out.push('<span class="pk-go multi">' + IC.trade + '<span aria-hidden="true">' + c.esc(c.t('dft.own_go_trades', true)) + '</span>' + tx.map(function (s) { return '<a class="sn" href="' + href(s) + '" data-go="tr" data-n="' + s.n + '" aria-label="' + c.esc(aria(s)) + '" title="' + c.esc(aria(s)) + '">' + s.n + '</a>'; }).join('') + '</span>');
+    if (p.used) out.push('<a class="pk-go" href="cards.html?player=' + p.player_id + '#player" data-go="player" aria-label="' + c.esc(c.fmt('dft.own_go_player_n', [p.player || ''])) + '" title="' + c.esc(c.fmt('dft.own_go_player_n', [p.player || ''])) + '">' + IC.card + '<span>' + c.esc(c.t('dft.own_go_player', true)) + '</span></a>');
+    return out.length ? '<span class="pk-links">' + out.join('') + '</span>' : '';
   }
   var owned = {
     k: 'owned', lbl: 'nav.t.draft.owned', mode: 'view', schema: [], fixed: function () { return []; }, validate: function () { return []; }, seasons: function () { return []; },
@@ -983,7 +1016,7 @@
       var mv = j == null ? '<span class="muted">—</span>' : j > 0 ? '<span class="mv up" title="' + c.esc(c.fmt('dft.ord_up', [j])) + '">' + IC.up + '+' + j + '<span class="vh">' + c.esc(c.fmt('dft.ord_up', [j])) + '</span></span>' : j < 0 ? '<span class="mv down" title="' + c.esc(c.fmt('dft.ord_down', [-j])) + '">' + IC.down + '−' + (-j) + '<span class="vh">' + c.esc(c.fmt('dft.ord_down', [-j])) + '</span></span>' : '<span class="muted">0</span>';
       var holder = m ? '<span class="mk-mine">' + IC.mine + c.esc(code) + '<span class="vh">' + c.esc(c.t('dft.ord_mine')) + '</span></span>' : g ? '<span class="ft-hold"><b>' + c.esc(g) + '</b></span>' : '<span class="muted">—</span>';
       var pl = m && m.used ? c.esc(m.player) + ' <span class="muted">' + c.esc(posL(c, m)) + '</span>' : top[k] ? c.esc(top[k].name) + (top[k].pos ? ' <span class="muted">' + c.esc(c.t('pc.' + top[k].pos, true)) + '</span>' : '') : '<span class="muted">—</span>';
-      h += '<tr data-pick="' + k + '"' + (m ? ' class="mine"' : '') + '><td>' + k + '</td><td class="num">' + (lx && lx.pre != null ? lx.pre : '<span class="muted">—</span>') + '</td><td class="num">' + mv + '</td><td class="tl">' + (o ? teamChip(c, o) : '<span class="muted">—</span>') + '</td><td class="tl">' + holder + '</td><td class="tl">' + pl + '</td></tr>';
+      h += '<tr data-pick="' + k + '"' + (m ? ' class="mine"' : '') + '><td>' + k + '</td><td class="num">' + (lx && lx.pre != null ? lx.pre : '<span class="muted">—</span>') + '</td><td class="num">' + mv + '</td><td class="tl">' + (o ? teamLogoChip(c, o) : '<span class="muted">—</span>') + '</td><td class="tl">' + holder + '</td><td class="tl">' + pl + '</td></tr>';
     }
     h += '</tbody></table></div></div>';
     h += '<div><h4 class="help-sh">' + c.esc(c.t('dft.ord_r27')) + '</h4><div class="ft-scroll" style="max-height:none"><table class="ft-order" data-ord="r27"><colgroup><col class="rk">' + '<col>'.repeat(ROUNDS - 1) + '</colgroup><thead><tr><th class="rk"><abbr title="' + c.esc(c.t('dft.ord_col_rank')) + '">' + c.esc(c.t('dft.ord_col_rank', true)) + '</abbr></th>';
@@ -1042,9 +1075,10 @@
     V.forEach(function (v, i) { pd += (i ? 'L' : 'M') + Xp(v.overall).toFixed(1) + ' ' + Yv(v.standard).toFixed(1); pc += (i ? 'L' : 'M') + Xp(v.overall).toFixed(1) + ' ' + Yv(v.value).toFixed(1); if (v.value !== v.standard) mod += '<circle class="dot-mod" cx="' + Xp(v.overall) + '" cy="' + Yv(v.value) + '" r="4"><title>' + v.overall + ' : ' + nf(v.value, 1, c.lang) + '</title></circle>'; });
     return s + '<path class="line-def" d="' + pd + '"/><path class="line-cur" d="' + pc + '"/>' + mod + '<text class="axl" x="' + l + '" y="' + (H - 2) + '">' + c.esc(c.t('dft.brd_axis_rank')) + '</text></svg>';
   }
+  function sucFilter(vs, D) { return { pos: vs.pos || '', year: vs.syear || '', round: vs.round || '', recent: vs.recent ? false : undefined, since: vs.hist && D ? D.franchise.first + 1 : undefined }; }   // since : repêchés en mode franchise
   function pctCell(c, k, n) { var pc = n ? 100 * k / n : null; return '<td class="pct"><span class="pw"><span class="ft-pbar" aria-hidden="true"><span style="width:' + (pc || 0).toFixed(1) + '%"></span></span><span class="v">' + (pc == null ? '—' : nf(pc, 0, c.lang) + ' %') + '</span></span></td>'; }
   function successHTML(c, X) {
-    var vs = c.vs, picks = X.A.board.picks, f = { pos: vs.pos || '', year: vs.syear || '', round: vs.round || '', recent: vs.recent ? false : undefined, hist: vs.hist ? false : undefined };
+    var vs = c.vs, picks = X.A.board.picks, f = sucFilter(vs, c.DATA);
     var S = DR.boardSummary(picks, f), firstSeason = c.DATA.franchise.first + '-' + String((c.DATA.franchise.first + 1) % 100).padStart(2, '0');
     var years = []; picks.forEach(function (p) { if (years.indexOf(p.year) < 0) years.push(p.year); }); years.sort(function (a, b) { return b - a; });
     var o = function (v, l, cur) { return '<option value="' + v + '"' + (String(cur) === String(v) ? ' selected' : '') + '>' + c.esc(l) + '</option>'; };
@@ -1055,20 +1089,24 @@
     var fRound = '<label>' + c.esc(c.t('picks.col_round')) + '<select data-vf="round">' + o('', c.t('dft.suc_all_rounds'), f.round) + [1, 2, 3, 4, 5, 6, 7].map(function (r) { return o(r, c.fmt('dft.round_n', [r]), f.round); }).join('') + '</select></label>';
     var ry = years.slice(0, 2);
     var opt = '<label class="chk"><input type="checkbox" data-vf="recent"' + (vs.recent ? ' checked' : '') + (ry.length < 2 ? ' disabled' : '') + '> ' + c.esc(c.fmt('dft.suc_recent', [ry[0] || '', ry[1] || ''])) + '</label>' +
-      '<label class="chk"><input type="checkbox" data-vf="hist"' + (vs.hist ? ' checked' : '') + '> ' + c.esc(c.fmt('dft.suc_hist', [firstSeason])) + '</label>';
+      '<label class="chk"><input type="checkbox" data-vf="hist"' + (vs.hist ? ' checked' : '') + '> ' + c.esc(c.fmt('dft.suc_hist', [c.DATA.franchise.first + 1])) + '</label>';
     var h = '<div class="ft-cardhead"><div><h3>' + c.esc(c.t('dft.suc_heading')) + '</h3><p class="suc-lead">' + c.esc(S.n ? c.fmt('dft.suc_title', [S.gp1, S.n, S.gp100]) : c.t('dft.suc_title_none')) + '</p><p class="sub">' + c.esc(c.t('dft.suc_sub')) + '</p></div></div>';
     h += '<div class="ft-filters" role="group" aria-label="' + c.esc(c.t('dft.suc_filters')) + '">' + fPos + fYear + fRound + '</div><div class="ft-filters opts">' + opt + '</div>';
-    if (vs.recent && S.years_out.length) h += '<p class="note muted">' + c.esc(c.fmt('dft.suc_recent_note', [S.years_out[0], S.years_out[1] || ''])) + '</p>';
     if (!picks.length) return h + '<p class="muted">' + c.esc(c.t('dft.suc_empty')) + '</p>';
+    // tableau « Réussite » mis en forme (colonnes de largeur fixe, en-têtes groupés, nombre puis proportion et barre alignées,
+    // meilleure proportion de chaque groupe soulignée comme dans les autres tableaux (.best), ligne Total sur fond en creux)
     var TH = function (k, cls, extra) { return '<th class="' + (cls || '') + '"' + (extra || ' scope="col"') + '><abbr title="' + c.esc(c.t(k)) + '">' + c.esc(c.t(k, true)) + '</abbr></th>'; };
-    h += '<div class="ft-scroll" style="max-height:none"><table class="ft-stats suc" data-brd="success"><thead><tr><th rowspan="2" scope="col">' + c.esc(c.t('dft.suc_by_round')) + '</th>' + TH('dft.suc_drafted', '', ' rowspan="2" scope="col"') + TH('dft.suc_gp1', 'grp', ' colspan="2" scope="colgroup"') + TH('dft.suc_gp100', 'grp', ' colspan="2" scope="colgroup"') + '</tr><tr>' +
-      TH('dft.suc_n') + TH('dft.suc_pct', 'pct') + TH('dft.suc_n') + TH('dft.suc_pct', 'pct') + '</tr></thead><tbody>';
-    for (var r = 1; r <= ROUNDS; r++) {
-      if (f.round && r !== +f.round) continue;
-      var R = DR.boardSummary(picks, Object.assign({}, f, { round: r }));
-      h += '<tr data-round="' + r + '"><td>' + c.esc(c.fmt('dft.round_n', [r])) + '</td><td>' + R.n + '</td><td>' + R.gp1 + '</td>' + pctCell(c, R.gp1, R.n) + '<td>' + R.gp100 + '</td>' + pctCell(c, R.gp100, R.n) + '</tr>';
-    }
-    return h + '</tbody><tfoot><tr><td>' + c.esc(c.t('dft.brd_total')) + '</td><td>' + S.n + '</td><td>' + S.gp1 + '</td>' + pctCell(c, S.gp1, S.n) + '<td>' + S.gp100 + '</td>' + pctCell(c, S.gp100, S.n) + '</tr></tfoot></table></div>';
+    var rowsR = [];
+    for (var r = 1; r <= ROUNDS; r++) { if (f.round && r !== +f.round) continue; rowsR.push({ r: r, S: DR.boardSummary(picks, Object.assign({}, f, { round: r })) }); }
+    var bestOf = function (k) { var m = -1; rowsR.forEach(function (x) { if (x.S.n) m = Math.max(m, x.S[k] / x.S.n); }); return rowsR.length > 1 && m > 0 ? m : null; };
+    var b1 = bestOf('gp1'), b100 = bestOf('gp100');
+    var cell = function (k, n, best) { var pc = n ? 100 * k / n : null, isB = best != null && n && k / n === best;
+      return '<td class="k">' + (n ? k : '<span class="muted">—</span>') + '</td><td class="pct' + (pc == null ? ' nil' : '') + '"><span class="pw"><span class="v' + (isB ? ' best' : '') + '">' + (pc == null ? '—' : nf(pc, 0, c.lang) + ' %') + '</span><span class="ft-pbar" aria-hidden="true"><span style="width:' + (pc || 0).toFixed(1) + '%"></span></span></span></td>'; };
+    h += '<div class="ft-scroll suc-wrap" style="max-height:none"><table class="ft-stats suc2" data-brd="success"><colgroup><col class="c-r"><col class="c-n"><col class="c-k"><col class="c-p"><col class="c-k"><col class="c-p"></colgroup><thead>' +
+      '<tr class="grp"><th rowspan="2" scope="col">' + c.esc(c.t('dft.suc_by_round')) + '</th>' + TH('dft.suc_drafted', 'n', ' rowspan="2" scope="col"') + TH('dft.suc_gp1', 'g', ' colspan="2" scope="colgroup"') + TH('dft.suc_gp100', 'g', ' colspan="2" scope="colgroup"') + '</tr><tr>' +
+      TH('dft.suc_n', 'k g0') + TH('dft.suc_pct', 'pct') + TH('dft.suc_n', 'k g0') + TH('dft.suc_pct', 'pct') + '</tr></thead><tbody>';
+    rowsR.forEach(function (x) { h += '<tr data-round="' + x.r + '"><td>' + c.esc(c.fmt('dft.round_n', [x.r])) + '</td><td class="n">' + x.S.n + '</td>' + cell(x.S.gp1, x.S.n, b1) + cell(x.S.gp100, x.S.n, b100) + '</tr>'; });
+    return h + '</tbody><tfoot><tr><td>' + c.esc(c.t('dft.brd_total')) + '</td><td class="n">' + S.n + '</td>' + cell(S.gp1, S.n, null) + cell(S.gp100, S.n, null) + '</tr></tfoot></table></div>';
   }
   function boardView(c) {
     var X = derived(c.DATA), yv = yearValues(X), ys = Object.keys(yv).map(Number), best = ys.filter(function (y) { return y < X.next && yv[y].u; }).sort(function (a, b) { return yv[b].u - yv[a].u; })[0];
@@ -1077,23 +1115,29 @@
       '<div class="ft-legend" style="margin:0"><span><svg width="14" height="12" aria-hidden="true"><rect width="14" height="12" rx="2" style="fill:var(--c1);stroke:var(--ink1)"/></svg>' + c.esc(c.t('dft.brd_s_used')) + '</span><span><svg width="14" height="12" aria-hidden="true"><rect width="14" height="12" rx="2" style="fill:var(--panel);stroke:var(--ink1);stroke-dasharray:3 2"/><path d="M0 12 12 0M4 12 14 2" style="stroke:var(--c1);stroke-width:2.4"/></svg>' + c.esc(c.t('dft.brd_s_proj')) + '</span><span><svg width="18" height="4" aria-hidden="true"><path d="M0 2h18" style="stroke:var(--muted);stroke-width:2;stroke-dasharray:5 4"/></svg>' + c.esc(c.t('dft.brd_s_avg')) + '</span></div></div>' +
       '<div class="ft-chart">' + barsSVG(c, X, yv) + '</div></section>';
     h += '<section class="card wide" id="success">' + successHTML(c, X) + '</section>';
-    var rows = X.A.board.picks.slice().sort(function (a, b) { return b.year - a.year || a.pick - b.pick; }), val = DR.valueOf(c.DATA.draft && c.DATA.draft.values);
+    // tableau des choix : mêmes filtres et options que la carte Réussite (Gabriel, 2026-11-23)
+    var rows = DR.boardRows(X.A.board.picks, sucFilter(c.vs, c.DATA)).slice().sort(function (a, b) { return b.year - a.year || a.pick - b.pick; }), val = DR.valueOf(c.DATA.draft && c.DATA.draft.values);
     var bestP = 0; rows.forEach(function (p) { if (p.pos !== 'G') bestP = Math.max(bestP, p.pts || 0); });
     var TH = function (k, cls) { return '<th class="' + (cls || '') + '"><abbr title="' + c.esc(c.t(k)) + '">' + c.esc(c.t(k, true)) + '</abbr></th>'; };
     h += '<section class="card wide"><div class="ft-cardhead"><div><h3>' + c.esc(c.t('dft.brd_picks')) + '</h3><p class="sub">' + c.esc(c.t('dft.brd_picks_sub')) + '</p></div></div>';
     if (!rows.length) h += '<div class="ft-empty" role="status">' + IC.clock + '<p class="lead">' + c.esc(c.t('dft.brd_empty_lead')) + '</p><p>' + c.esc(c.t('dft.brd_empty_body')) + '</p></div>';
     else {
-      h += '<div class="ft-scroll" style="max-height:460px"><table class="ft-stats" data-brd="picks"><thead><tr>' + TH('col.player') + TH('picks.col_year') + TH('picks.col_round') + TH('picks.col_overall') + TH('col.position') + TH('col.value', 'ro') +
-        TH('stat.gp') + TH('stat.g') + TH('stat.a') + TH('stat.pts', 'ro') + TH('stat.plus_minus') + TH('stat.w') + TH('stat.so') + TH('stat.sv_pct', 'ro') + TH('stat.gaa', 'ro') + '</tr></thead><tbody>';
-      var tot = { v: 0, gp: 0, g: 0, a: 0 }, na = '<td class="na" aria-hidden="true"></td>';
+      // colonnes de largeur fixe, en-têtes groupés (Repêchage, Patineurs, Gardiens), Poste à côté du joueur, séparateur entre les années
+      // (l'année répétée passe en gris), ligne Total sur fond en creux avec le nombre de joueurs sous leur colonne
+      var TG = function (k, span, cls) { return '<th scope="colgroup" colspan="' + span + '" class="g ' + (cls || '') + '">' + c.esc(c.t(k)) + '</th>'; };
+      var T2 = function (k, cls) { return '<th rowspan="2" scope="col" class="' + (cls || '') + '"><abbr title="' + c.esc(c.t(k)) + '">' + c.esc(c.t(k, true)) + '</abbr></th>'; };
+      h += '<div class="ft-scroll pk-wrap" style="max-height:460px"><table class="ft-stats pk2" data-brd="picks"><colgroup><col class="c-pl"><col class="c-pos"><col class="c-y"><col class="c-r"><col class="c-o"><col class="c-v"><col class="c-gp"><col span="4" class="c-s"><col span="4" class="c-gk"></colgroup><thead>' +
+        '<tr class="grp">' + T2('col.player') + T2('col.position', 'tl') + TG('ui.draft', 4, 'gs') + T2('stat.gp', 'gs') + TG('entry.tab_sk', 4, 'gs') + TG('entry.tab_gk', 4, 'gs') + '</tr><tr>' +
+        TH('picks.col_year', 'gs') + TH('picks.col_round') + TH('picks.col_overall') + TH('col.value', 'ro') + TH('stat.g', 'gs') + TH('stat.a') + TH('stat.pts', 'ro') + TH('stat.plus_minus') + TH('stat.w', 'gs') + TH('stat.so') + TH('stat.sv_pct', 'ro') + TH('stat.gaa', 'ro') + '</tr></thead><tbody>';
+      var tot = { v: 0, gp: 0, g: 0, a: 0 }, na = '<td class="na" aria-hidden="true"></td>', prevY = null;
       rows.forEach(function (p) {
-        var gk = p.pos === 'G', v = p.pick != null ? val(p.pick) : null; tot.v += v || 0; tot.gp += p.gp || 0;
-        var cells = '<td>' + (p.gp || 0) + '</td>';
-        if (gk) cells += na + na + na + na + '<td>' + (p.w || 0) + '</td><td>' + (p.so || 0) + '</td><td>' + (p.sv_pct != null ? nf(p.sv_pct, 3, c.lang).replace(/^0/, '') : '—') + '</td><td>' + (p.gaa != null ? nf(p.gaa, 2, c.lang) : '—') + '</td>';
-        else { cells += '<td>' + (p.g || 0) + '</td><td>' + (p.a || 0) + '</td><td' + (p.pts && p.pts === bestP ? ' class="best"' : '') + '>' + (p.pts || 0) + '</td><td>' + (p.pm > 0 ? '+' : '') + (p.pm || 0) + '</td>' + na + na + na + na; tot.g += p.g || 0; tot.a += p.a || 0; }
-        h += '<tr data-pick="' + p.year + '-' + p.pick + '"><td>' + c.esc((p.first + ' ' + p.last).trim()) + '</td><td>' + p.year + '</td><td>' + (p.round || '—') + '</td><td>' + (p.pick || '—') + '</td><td>' + c.esc(posL(c, p) || '—') + '</td><td>' + nf(v, 1, c.lang) + '</td>' + cells + '</tr>';
+        var gk = p.pos === 'G', v = p.pick != null ? val(p.pick) : null, y0 = p.year !== prevY; prevY = p.year; tot.v += v || 0; tot.gp += p.gp || 0;
+        var cells = '<td class="gs">' + (p.gp || 0) + '</td>';
+        if (gk) cells += '<td class="na gs" aria-hidden="true"></td>' + na + na + na + '<td class="gs">' + (p.w || 0) + '</td><td>' + (p.so || 0) + '</td><td>' + (p.sv_pct != null ? nf(p.sv_pct, 3, c.lang).replace(/^0/, '') : '—') + '</td><td>' + (p.gaa != null ? nf(p.gaa, 2, c.lang) : '—') + '</td>';
+        else { cells += '<td class="gs">' + (p.g || 0) + '</td><td>' + (p.a || 0) + '</td><td' + (p.pts && p.pts === bestP ? ' class="best"' : '') + '>' + (p.pts || 0) + '</td><td>' + (p.pm > 0 ? '+' : p.pm < 0 ? '−' : '') + Math.abs(p.pm || 0) + '</td><td class="na gs" aria-hidden="true"></td>' + na + na + na; tot.g += p.g || 0; tot.a += p.a || 0; }
+        h += '<tr data-pick="' + p.year + '-' + p.pick + '"' + (y0 ? ' class="y0"' : '') + '><td>' + c.esc((p.first + ' ' + p.last).trim()) + '</td><td class="tl">' + c.esc(posL(c, p) || '—') + '</td><td class="gs' + (y0 ? '' : ' rep') + '">' + p.year + '</td><td>' + (p.round || '—') + '</td><td>' + (p.pick || '—') + '</td><td class="ro">' + nf(v, 1, c.lang) + '</td>' + cells + '</tr>';
       });
-      h += '</tbody><tfoot><tr><td>' + c.esc(c.t('dft.brd_total')) + '</td><td></td><td></td><td>' + rows.length + '</td><td></td><td>' + nf(tot.v, 1, c.lang) + '</td><td>' + tot.gp + '</td><td>' + tot.g + '</td><td>' + tot.a + '</td><td>' + (tot.g + tot.a) + '</td><td></td><td></td><td></td><td></td><td></td></tr></tfoot></table></div>';
+      h += '</tbody><tfoot><tr><td>' + c.esc(c.t('dft.brd_total')) + ' <span class="tc">' + c.esc(c.fmt('start.count', [rows.length])) + '</span></td><td></td><td class="gs"></td><td></td><td></td><td class="ro">' + nf(tot.v, 1, c.lang) + '</td><td class="gs">' + tot.gp + '</td><td class="gs">' + tot.g + '</td><td>' + tot.a + '</td><td>' + (tot.g + tot.a) + '</td><td></td><td class="gs"></td><td></td><td></td><td></td></tr></tfoot></table></div>';
     }
     h += '</section>';
     var V = X.A.values, v1 = V[0] ? V[0].value : null, n = (c.DATA.league && c.DATA.league.size) || 32, v32 = V[n - 1], v64 = V[2 * n - 1];
@@ -1204,7 +1248,10 @@
           var add = '<button type="button" class="p0-add" data-vact="p0-add" data-y="' + y + '" data-r="' + r + '" aria-label="' + c.esc(c.fmt('start.picks_add', [r, y])) + '" title="' + c.esc(c.fmt('start.picks_add', [r, y])) + '">' + c.esc(c.t('start.picks_other_ph')) + '</button>';
           if (li < ot.length) {
             var bad = al.filter(function (a) { return a.level === 'err' && a.i === li; })[0];
-            inner += '<span class="p0-oth' + (bad ? ' rej' : '') + '"><select class="cell oth" data-vf="oth" data-y="' + y + '" data-r="' + r + '" data-i="' + li + '" aria-label="' + c.esc(c.fmt('start.picks_other', [r, y])) + '"' + (bad ? ' aria-invalid="true"' : '') + '><option value=""></option>' + codes.map(function (x) { return '<option' + (x === ot[li] ? ' selected' : '') + '>' + c.esc(x) + '</option>'; }).join('') + '</select></span>';
+            // bouton « Retirer » (×) à droite de chaque liste ; il retire la liste (même vide) et rend le focus par sélecteur stable
+            var delL = c.fmt('start.picks_del', [ot[li] || '—', r, y]);
+            inner += '<span class="p0-oth' + (bad ? ' rej' : '') + '"><select class="cell oth" data-vf="oth" data-y="' + y + '" data-r="' + r + '" data-i="' + li + '" aria-label="' + c.esc(c.fmt('start.picks_other', [r, y])) + '"' + (bad ? ' aria-invalid="true"' : '') + '><option value=""></option>' + codes.map(function (x) { return '<option' + (x === ot[li] ? ' selected' : '') + '>' + c.esc(x) + '</option>'; }).join('') + '</select>' +
+              '<button type="button" class="p0-del" data-vact="p0-del" data-y="' + y + '" data-r="' + r + '" data-i="' + li + '" aria-label="' + c.esc(delL) + '" title="' + c.esc(delL) + '">' + IC.del + '</button></span>';
             if (bad) { cls += ' rej'; tip = '<span class="gi-tip" role="tooltip">' + IC2.err + c.esc(c.fmt(bad.k, bad.p)) + '</span>'; }
             if (li === ot.length - 1) inner += add;
           } else if (li === 0) inner += add;
@@ -1232,6 +1279,13 @@
     },
     act: function (vs, ds, c) {
       if (ds.vact === 'p0-reset') { c.drop(); return true; }
+      // retirer un choix d'une autre équipe ajouté par erreur ; focus : la liste qui prend sa place, sinon la précédente, sinon « + choix »
+      if (ds.vact === 'p0-del') {
+        var st2 = p0clone(c.row().p || p0base(c.DATA)), k2 = ds.y + '|' + ds.r, l2 = (st2.oth[k2] || []).slice(), i2 = +ds.i;
+        l2.splice(i2, 1); while (l2.length && !l2[l2.length - 1] && l2.length > i2) l2.pop(); if (l2.length) st2.oth[k2] = l2; else delete st2.oth[k2]; c.put('p', st2);
+        var sel2 = '[data-vf="oth"][data-y="' + ds.y + '"][data-r="' + ds.r + '"]';
+        return l2.length ? sel2 + '[data-i="' + Math.min(i2, l2.length - 1) + '"]' : '[data-vact="p0-add"][data-y="' + ds.y + '"][data-r="' + ds.r + '"]';
+      }
       if (ds.vact === 'p0-add') { var st = p0clone(c.row().p || p0base(c.DATA)), k = ds.y + '|' + ds.r, l = st.oth[k] = st.oth[k] || []; l.push(''); c.put('p', st); return '[data-vf="oth"][data-y="' + ds.y + '"][data-r="' + ds.r + '"][data-i="' + (l.length - 1) + '"]'; }
       return false;
     },

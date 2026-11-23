@@ -151,7 +151,11 @@
   function on(t, ev, f, cap) { if (t && typeof t.addEventListener === 'function') t.addEventListener(ev, f, cap); }
   function attr() { return S.page.attr || 'tab'; }
 
+  // hauteur de l'en-tête collant de la page, publiée dans --ft-top-h : l'en-tête d'un long tableau colle juste dessous (phase 4d)
+  function topH() { try { var h = root.document.querySelector('header.top'); if (h) root.document.documentElement.style.setProperty('--ft-top-h', h.getBoundingClientRect().height + 'px'); } catch (e) { /* hors navigateur */ } }
+  function watchTop() { if (typeof root.document === 'undefined' || !root.document.body) return; topH(); if (root.ResizeObserver) new root.ResizeObserver(topH).observe(root.document.body); }
   function init(page) {
+    watchTop();
     S.page = page; var g = NAV.group(page.group); if (!g) return;
     var h = hashTab(), x = NAV.tab(g.id, h), saved = NAV.tab(g.id, lsGet('ft_tab_' + g.id) || '');
     if (!x) x = saved && !saved.soon ? saved : NAV.firstReady(g);

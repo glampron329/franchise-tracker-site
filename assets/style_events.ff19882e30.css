@@ -442,3 +442,4 @@ table.grid.ev.standings td.ro.own svg{width:11px;height:11px;flex:none;color:var
 .std-legend .std-q{cursor:default}
 /* phase 4d : colonne Poste secondaire dans Sélections ; les 13 colonnes tiennent dans la largeur */
 table.grid.ev.picks select.cell[data-c="pos"],table.grid.ev.picks select.cell[data-c="pos2"]{min-width:52px;max-width:60px}table.grid.ev.picks select.cell[data-c="ptype"],table.grid.ev.picks input.cell[data-c="ptype"]{min-width:140px;max-width:150px}table.grid.ev.picks th{white-space:normal;hyphens:auto}
+.trlist .trc.focus{outline:2px solid var(--ink1);outline-offset:2px}

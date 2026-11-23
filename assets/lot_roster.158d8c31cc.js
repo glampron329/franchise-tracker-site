@@ -704,6 +704,9 @@
     var entries = { mv: [], ct: [], tr: [], pc: [], np: [], mvx: [], ctx: [], os: [], trf: [] };   // trf : échanges saisis (deux équipes × 5 éléments)   // mvx : modifications d'événements déjà enregistrés (par identifiant)
     try { var sv = store && store.get(STORE_KEY); if (sv) entries = Object.assign(entries, JSON.parse(sv)); } catch (e) { /* stockage indisponible */ }
     var state = { lang: 'fr', tab: 'mv', season: DATA.franchise.current + 1, plq: '', plpos: '', plst: '', plmiss: false };
+    // lien direct depuis Repêchage › Choix détenus (phase 4d) : ?tr=<id de la transaction> ou ?os=<id de l'offre hostile> ouvre sa saison
+    (function () { try { var m = /[?&](tr|os)=(\d+)/.exec(typeof location !== 'undefined' ? location.search : ''); if (!m) return; var id = +m[2], l = m[1] === 'tr' ? DATA.base.tr || [] : DATA.base.os || [], x = l.filter(function (o) { return o.id === id; })[0];
+      if (x) { state.season = V.seasonOf(x.date); state['focus_' + m[1]] = id; } } catch (e) { /* adresse illisible : ouverture normale */ } })();
     var PLE = { open: null, d: null, o: null, save: 'idle', msg: '', just: null, live: '', liveCls: '' };   // panneau de modification (non gardé dans localStorage)
     var TEAMS = {}; DATA.teams.forEach(function (tm) { TEAMS[tm.code] = tm; }); (DATA.teams || []).forEach(function (tm) { TEAMS[tm.en] = tm; });
     var capBy = {}; DATA.cap.forEach(function (c) { capBy[c[0]] = c.slice(1); });
@@ -1265,7 +1268,7 @@
       return '<details class="base trbase" open><summary>' + esc(t('ev.already')) + ' · ' + list.length + '</summary><div class="trlist">' + list.map(function (x) {
         var out = x.assets.filter(function (a) { return a[0] === 'out'; }), inn = x.assets.filter(function (a) { return a[0] === 'in'; });
         var who = function (code, label, items) { return '<div class="trcol"><h5 class="who">' + logoHTML(code) + '<b>' + esc(teamNm(code)) + '</b></h5><div class="sub">' + esc(label) + '</div><ul>' + items.map(item).join('') + '</ul></div>'; };
-        return '<article class="trc' + (editing[x.id] ? ' editing' : '') + '"><header><span class="d">' + esc(x.date) + '</span><button class="btn small" data-act="edit-trade" data-id="' + x.id + '" type="button"' + (editing[x.id] ? ' disabled' : '') + '>' + esc(t(editing[x.id] ? 'tr.in_edit' : 'tr.edit')) + '</button></header><div class="cols">' + who(DATA.franchise.code, t('tr.sent'), out) + who(x.partner, t('tr.received'), inn) + '</div></article>'; }).join('') + '</div></details>';
+        return '<article class="trc' + (editing[x.id] ? ' editing' : '') + (state.focus_tr === x.id ? ' focus' : '') + '" id="tr-' + x.id + '"><header><span class="d">' + esc(x.date) + '</span><button class="btn small" data-act="edit-trade" data-id="' + x.id + '" type="button"' + (editing[x.id] ? ' disabled' : '') + '>' + esc(t(editing[x.id] ? 'tr.in_edit' : 'tr.edit')) + '</button></header><div class="cols">' + who(DATA.franchise.code, t('tr.sent'), out) + who(x.partner, t('tr.received'), inn) + '</div></article>'; }).join('') + '</div></details>';
     }
     function fmtMoney(v) { return String(v).replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0'); }
     function editTrade(id) { if (entries.trf.some(function (x) { return x.editId === id; })) return false; var b = DATA.base.tr.filter(function (x) { return x.id === id; })[0]; if (!b) return false; entries.trf.push(trFromBase(b)); persist(); return true; }
@@ -1709,6 +1712,7 @@
     var host = FTLM.run({ DATA0: DATA, store: ls, cfg: CFG0, rootEl: rootEl, makeApp: function (d, st) { return makeEventsApp(d, st || ls); }, assemble: FTLIVE.assembleEvents });
     var app = new Proxy({}, { get: function (_, k) { var a = host.app(); return a ? a[k] : undefined; } });
     if (window.FTHELP) FTHELP.bind(rootEl);   // aide en contexte : ouvrir/fermer sans redessiner la page
+    (function scrollToLinked(n) { var a = host.app(), el = a && a.state.focus_tr ? document.getElementById('tr-' + a.state.focus_tr) : null; if (el) { el.scrollIntoView({ block: 'center' }); return; } if (n < 40 && /[?&]tr=\d/.test(location.search)) setTimeout(function () { scrollToLinked(n + 1); }, 250); })(0);   // lien ?tr= (les données peuvent arriver après la connexion)
     function draw(focus) { host.draw(focus ? '.cell[data-r="' + focus[0] + '"][data-c="' + focus[1] + '"]' : null); }
     function download(name, text, type) { var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: type })); a.download = name; document.body.appendChild(a); a.click(); a.remove(); }
     rootEl.addEventListener('input', function (e) {

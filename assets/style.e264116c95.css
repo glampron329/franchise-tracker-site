@@ -811,3 +811,112 @@ table.grid.ev.np-dft td.ro.calc{font-style:italic;background:var(--panel-2)!impo
 
 .ft-filters.opts{gap:4px 18px}.ft-filters .chk{display:inline-flex;gap:6px;align-items:center}
 .ft-stats th.tl,.ft-stats td.tl{text-align:left}
+/* Ordre : icônes à la taille du texte ; les cellules gardent leur hauteur (correctif du 2026-11-23) */
+.ft-order td svg,.ft-stats .mk-mine svg,.ft-stats .ft-hold svg,.ft-legend .mk-mine svg,.ft-legend .ft-hold svg{width:10px;height:10px;display:inline-block;vertical-align:-1px;flex:none}
+.ft-stats .mv svg{width:9px;height:9px;display:inline-block;vertical-align:0}
+
+/* ===== Ajustements 4d après mise en ligne (maquette docs/maquettes/4d_ajustements.html, approuvée le 2026-11-23) ===== */
+
+/* ---------- A. Choix de départ : case à cocher à la taille du texte, bouton « Retirer » (×) ----------
+   Défaut corrigé : la règle des grilles « table.grid.ev td.ci input.cell » (events/style_events.css : 56 × 30 px, bordure) s'appliquait
+   aussi à la case à cocher et l'emportait sur « .p0-own input » (15 px). Case de 14 px, couleur neutre (--fg) : le rouge de Montréal
+   se confondait avec le rouge d'erreur ; l'équipe reste signalée par le filet --ink1 de l'étiquette. */
+table.grid.ev.p0 td.ci .p0-own input.cell[type=checkbox]{flex:none;width:14px;height:14px;min-width:0;margin:0;padding:0;border:0;border-radius:3px;background:none;box-shadow:none;accent-color:var(--fg);cursor:pointer}
+table.grid.ev.p0 td.ci .p0-own input.cell[type=checkbox]:focus{outline:none;box-shadow:none}   /* l'anneau est porté par l'étiquette (.p0-own:has(:focus-visible)) */
+.p0-own{height:22px;gap:7px;padding:0 8px 0 8px}
+/* liste d'une autre équipe + bouton × collé à droite ; les deux font 22 px de haut, comme l'étiquette */
+.p0-oth{display:flex;align-items:center;gap:2px;margin-top:3px}
+table.grid.ev.p0 td.ci .p0-oth select.cell.oth{flex:1 1 auto;width:auto;min-width:0;height:22px}
+.p0-del{flex:none;display:inline-grid;place-items:center;width:22px;height:22px;padding:0;border:1px solid transparent;border-radius:var(--r-1);background:transparent;color:var(--muted);cursor:pointer}
+.p0-del svg{width:9px;height:9px}
+.p0-del:hover{color:var(--fg);background:var(--panel-2);border-color:var(--line-strong)}
+.p0-del:focus-visible{outline:2px solid var(--focus);outline-offset:1px;box-shadow:0 0 0 4px var(--focus-halo);color:var(--fg)}
+.p0-add{height:22px}.p0-oth+.p0-add{height:18px}
+
+/* ---------- B. Choix détenus : en-tête du tableau collé sous l'en-tête de la page ----------
+   Défaut : .ft-ledger-wrap (overflow:auto) était le conteneur de défilement de l'en-tête collant, sans hauteur limitée : rien ne collait.
+   overflow:clip garde les coins arrondis sans créer de conteneur de défilement ; --ft-top-h = hauteur de header.top (publiée par la coquille). */
+.ft-ledger-wrap{overflow:clip}
+table.ft-ledger thead th{top:var(--ft-top-h,0px);box-shadow:0 1px 0 var(--line-strong)}
+
+/* ---------- C. Choix détenus : cartes du détail d'une année, liens dans le coin supérieur droit ----------
+   Variante A (recommandée) : « Transaction » (une seule) ou « Transactions 1 3 » (plusieurs : un lien par étape, numéroté comme l'étape),
+   puis « Fiche » si le choix a été exercé. Les étapes liées à une transaction portent leur numéro dans le même petit carré. */
+.pk-det>li{gap:5px;padding:8px 10px 10px}
+.pk-top{display:flex;align-items:flex-start;justify-content:space-between;gap:6px 10px;min-width:0}
+.pk-top .h{min-width:0}
+.pk-det .pk-from{margin:0;font-size:var(--fs-2);font-weight:var(--w-bold)}
+.pk-links{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:2px 4px;flex:none;margin:-2px -5px 0 0}
+.pk-det .pk-go{display:inline-flex;align-items:center;gap:4px;height:22px;padding:0 5px;border-radius:var(--r-1);font-size:var(--fs-1);font-weight:var(--w-semi);color:var(--ink1);text-decoration:none;white-space:nowrap}
+.pk-go svg{width:11px;height:11px;flex:none}
+a.pk-go:hover>span{text-decoration:underline;text-underline-offset:2px}
+.pk-go.multi{color:var(--muted);gap:4px}.pk-go.multi>svg{color:var(--ink1)}
+/* carré de numéro : neutre (un filet rouge ou or se lirait comme une alerte) ; au survol, rempli de la couleur de l'équipe */
+.pk-det .sn,.pk-det ol.pk-steps li.tx::before{display:inline-grid;place-items:center;box-sizing:border-box;width:17px;height:17px;border:1px solid var(--field-line);border-radius:3px;background:var(--panel);color:var(--fg);font-size:11px;font-weight:var(--w-bold);line-height:1;font-variant-numeric:tabular-nums;text-decoration:none}
+.pk-det a.sn{color:var(--ink1);border-color:var(--ink1)}
+.pk-det a.sn:hover{background:var(--ink1);color:var(--panel)}
+:is(a.pk-go,a.sn,.pk-menu>summary,.pk-menu a):focus-visible{outline:2px solid var(--focus);outline-offset:1px;box-shadow:0 0 0 4px var(--focus-halo)}
+/* étapes : numéro à gauche dans une gouttière fixe ; carré pour celles qui ont un lien */
+.pk-det ol.pk-steps{list-style:none;margin:0;padding:0;display:grid;gap:3px;counter-reset:st}
+.pk-det ol.pk-steps li{display:grid;grid-template-columns:17px minmax(0,1fr);gap:7px;align-items:center;counter-increment:st;font-size:var(--fs-1);line-height:1.35}
+.pk-det ol.pk-steps li::before{content:counter(st);text-align:center;color:var(--muted);font-weight:var(--w-semi);font-variant-numeric:tabular-nums}
+.pk-det ol.pk-steps li.tx::before{content:counter(st)}
+/* Variante B : petit menu « Liens » (details/summary : clavier natif, Entrée ou Espace ouvre) */
+.pk-menu{position:relative;flex:none}
+.pk-menu>summary{display:inline-flex;align-items:center;gap:5px;height:22px;padding:0 7px;border:1px solid var(--line-strong);border-radius:var(--r-1);background:var(--panel);color:var(--fg);font-size:var(--fs-1);font-weight:var(--w-semi);cursor:pointer;list-style:none}
+.pk-menu>summary::-webkit-details-marker{display:none}
+.pk-menu>summary svg{width:9px;height:9px}.pk-menu[open]>summary svg{transform:rotate(180deg)}
+.pk-det .pk-menu ul{position:absolute;right:0;top:calc(100% + 4px);z-index:5;display:grid;gap:1px;min-width:250px;margin:0;padding:4px;list-style:none;background:var(--panel);border:1px solid var(--line-strong);border-radius:var(--r-2);box-shadow:var(--sh-2)}
+.pk-det .pk-menu li{display:block;padding:0;border:0;background:none;box-shadow:none}
+.pk-det .pk-menu a{display:grid;grid-template-columns:17px minmax(0,1fr);gap:8px;align-items:center;padding:6px 8px;border-radius:var(--r-1);color:var(--fg);font-size:var(--fs-1);font-weight:var(--w-reg);text-decoration:none}
+.pk-det .pk-menu a svg{width:12px;height:12px;justify-self:center;color:var(--ink1)}
+.pk-det .pk-menu a:hover{background:var(--tint1)}
+@media (prefers-reduced-motion:reduce){.pk-menu>summary svg{transition:none}}
+
+/* ---------- D. Ordre : logos en 1re ronde ; rondes 2 à 7 à la hauteur d'une ligne normale, icônes de 10 px ---------- */
+table.ft-stats[data-ord=r1] td .ft-team{vertical-align:middle}
+table.ft-stats[data-ord=r1] .ft-team .tl.logo{width:24px;height:24px;padding:1px}
+table.ft-order td svg{display:inline-block;width:10px;height:10px;margin:0 1px;vertical-align:-1px;flex:none}
+table.ft-order td.mine svg{color:var(--ink1)}
+table.ft-order td.gone svg{color:var(--muted)}
+.ft-legend .mk-mine svg,.ft-legend .ft-hold svg,.ft-stats .mk-mine svg{width:10px;height:10px;display:inline-block;vertical-align:-1px}
+
+/* ---------- E. Analyse › Réussite : tableau soigné (largeurs fixes, groupes, nombre + proportion + barre alignés) ---------- */
+.ft-scroll.suc-wrap{width:fit-content;max-width:100%}
+table.ft-stats.suc2{width:auto;table-layout:fixed}
+table.ft-stats.suc2 col.c-r{width:116px}table.ft-stats.suc2 col.c-n{width:96px}table.ft-stats.suc2 col.c-k{width:64px}table.ft-stats.suc2 col.c-p{width:184px}
+table.ft-stats.suc2 thead tr.grp th{height:28px}
+table.ft-stats.suc2 thead th[rowspan]{vertical-align:bottom;padding-bottom:7px}
+table.ft-stats.suc2 thead th.g{text-align:center;color:var(--fg);border-left:1px solid var(--line-strong);border-bottom:1px solid var(--line)}
+table.ft-stats.suc2 thead tr+tr th{top:28px}
+table.ft-stats.suc2 :is(th.g0,td.k){border-left:1px solid var(--line-strong)}
+table.ft-stats.suc2 th.pct{text-align:left}
+table.ft-stats.suc2 th.pct abbr{display:inline-block;width:44px;text-align:right}
+table.ft-stats.suc2 td.pct .pw{display:grid;grid-template-columns:44px minmax(0,1fr);gap:12px;align-items:center}   /* largeur fixe en px : la ligne Total, en gras, garde le même départ de barre */
+table.ft-stats.suc2 td.pct .v{text-align:right}
+table.ft-stats.suc2 .ft-pbar{width:100%;height:8px;border-radius:2px;background:var(--panel-2);box-shadow:inset 0 0 0 1px var(--line);
+  background-image:linear-gradient(90deg,transparent calc(50% - .5px),var(--line-strong) calc(50% - .5px) calc(50% + .5px),transparent 0)}   /* repère discret à 50 % */
+table.ft-stats.suc2 .ft-pbar>span{border-radius:2px 0 0 2px}
+table.ft-stats.suc2 td.pct.nil .ft-pbar{background:repeating-linear-gradient(135deg,transparent 0 4px,var(--hatch) 4px 5px)}
+table.ft-stats.suc2 td.pct.nil .v{color:var(--muted)}
+/* en-têtes sur deux lignes : la 1re cellule de la 2e ligne ne colle pas à gauche (règle :first-child de .ft-stats) */
+table.ft-stats:is(.suc2,.pk2) thead tr+tr th:first-child{left:auto;box-shadow:none;z-index:2;text-align:right}
+table.ft-stats:is(.suc2,.pk2) tfoot td{background:var(--panel-2);height:32px}
+table.ft-stats:is(.suc2,.pk2) tfoot td:first-child{background:var(--panel-2)}
+table.ft-stats.suc2 tfoot .ft-pbar>span{background:var(--ink1)}
+
+/* ---------- F. Analyse › Tes choix et la carrière : mêmes principes ---------- */
+table.ft-stats.pk2{table-layout:fixed;width:max-content;min-width:100%}
+table.ft-stats.pk2 col.c-pl{width:184px}table.ft-stats.pk2 col.c-pos{width:68px}table.ft-stats.pk2 col.c-y{width:66px}table.ft-stats.pk2 col.c-r{width:62px}
+table.ft-stats.pk2 col.c-o{width:62px}table.ft-stats.pk2 col.c-v{width:72px}table.ft-stats.pk2 col.c-gp{width:60px}table.ft-stats.pk2 col.c-s{width:54px}table.ft-stats.pk2 col.c-gk{width:62px}
+table.ft-stats.pk2 thead tr.grp th{height:28px}
+table.ft-stats.pk2 thead tr+tr th{top:28px}
+table.ft-stats.pk2 thead th[rowspan]{vertical-align:bottom;padding-bottom:7px}
+table.ft-stats.pk2 thead th.g{text-align:center;color:var(--fg);border-bottom:1px solid var(--line)}
+table.ft-stats.pk2 :is(th,td).gs{border-left:1px solid var(--line-strong)}
+table.ft-stats.pk2 :is(th,td).tl{text-align:left}
+table.ft-stats.pk2 tbody tr.y0:not(:first-child)>td{box-shadow:inset 0 1px 0 var(--line-strong)}
+table.ft-stats.pk2 tbody tr.y0:not(:first-child)>td:first-child{box-shadow:inset 0 1px 0 var(--line-strong),inset -1px 0 0 var(--line-strong)}
+table.ft-stats.pk2 td.rep{color:var(--muted)}
+table.ft-stats.pk2 td.ro{color:var(--fg)}
+table.ft-stats.pk2 tfoot .tc{margin-left:6px;font-weight:var(--w-reg);color:var(--muted)}

@@ -573,9 +573,9 @@
     return {
       initial: sortBy(R.draft_pick_initial || [], function (d) { return [d.draft_year, d.round, d.original_team_code]; }).map(function (d) { return [d.draft_year, d.round, d.original_team_code, b01(d.owned)]; }),
       trades: sortBy(R.trade_asset.filter(function (a) { return a.asset_type === 'pick' && trById[a.trade_id]; }), function (a) { return [trById[a.trade_id].traded_on, a.trade_id]; })
-        .map(function (a) { var t = trById[a.trade_id]; return [t.traded_on, t.partner_team_code || null, a.direction, a.pick_year, a.pick_round, tc[a.pick_original_team_id] || null]; }),
+        .map(function (a) { var t = trById[a.trade_id]; return [t.traded_on, t.partner_team_code || null, a.direction, a.pick_year, a.pick_round, tc[a.pick_original_team_id] || null, t.id]; }),   // id : lien direct depuis Choix détenus
       offers: sortBy((R.offer_sheet_pick || []).filter(function (x) { var o = osById[x.offer_sheet_id]; return o && (o.compensation === true || o.compensation === 1); }), function (x) { return [osById[x.offer_sheet_id].signed_on, x.offer_sheet_id, x.slot]; })
-        .map(function (x) { var o = osById[x.offer_sheet_id]; return [o.signed_on, o.event_type, x.pick_year, x.pick_round, x.team_code]; }),
+        .map(function (x) { var o = osById[x.offer_sheet_id]; return [o.signed_on, o.event_type, x.pick_year, x.pick_round, x.team_code, o.id]; }),
       values: sortBy(R.draft_pick_value || [], function (v) { return [v.overall_pick]; }).map(function (v) { return [v.overall_pick, v.value == null ? null : +v.value]; }),
       po: po,
       board: sortBy(R.player.filter(function (p) { return p.draft_team && names[p.draft_team] && p.draft_year != null; }), function (p) { return [p.draft_year, p.draft_round == null ? 99 : p.draft_round, p.draft_pick == null ? 9999 : p.draft_pick, p.id]; })
@@ -826,7 +826,11 @@
   function on(t, ev, f, cap) { if (t && typeof t.addEventListener === 'function') t.addEventListener(ev, f, cap); }
   function attr() { return S.page.attr || 'tab'; }
 
+  // hauteur de l'en-tête collant de la page, publiée dans --ft-top-h : l'en-tête d'un long tableau colle juste dessous (phase 4d)
+  function topH() { try { var h = root.document.querySelector('header.top'); if (h) root.document.documentElement.style.setProperty('--ft-top-h', h.getBoundingClientRect().height + 'px'); } catch (e) { /* hors navigateur */ } }
+  function watchTop() { if (typeof root.document === 'undefined' || !root.document.body) return; topH(); if (root.ResizeObserver) new root.ResizeObserver(topH).observe(root.document.body); }
   function init(page) {
+    watchTop();
     S.page = page; var g = NAV.group(page.group); if (!g) return;
     var h = hashTab(), x = NAV.tab(g.id, h), saved = NAV.tab(g.id, lsGet('ft_tab_' + g.id) || '');
     if (!x) x = saved && !saved.soon ? saved : NAV.firstReady(g);
