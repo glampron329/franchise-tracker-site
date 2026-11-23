@@ -571,3 +571,243 @@ table.ft-stats th.ro{font-style:italic}
 table.ft-stats .best{font-weight:var(--w-bold);text-decoration:underline 2px var(--ink1);text-underline-offset:4px}
 table.ft-stats td.nil{color:var(--muted)}
 table.ft-stats tfoot td{font-weight:var(--w-bold);border-top:2px solid var(--line-strong);border-bottom:0;background:var(--panel)}
+
+/* ===== Phase 4d : Repêchage (Choix détenus, Ordre, Analyse), Point de départ, nouveau joueur (maquettes docs/maquettes/4d_*, approuvées le 2026-11-23) ===== */
+/* ---------- 1. En-tête de carte avec titre-conclusion et sous-titre ---------- */
+.ft-cardhead{display:flex;flex-wrap:wrap;gap:var(--sp-2) var(--sp-4);align-items:flex-start;justify-content:space-between;margin:0 0 var(--sp-3)}
+.ft-cardhead h3{margin:0}.ft-cardhead .sub{margin:2px 0 0;font-size:var(--fs-2);color:var(--muted);max-width:78ch}
+.ft-cardhead .acts{flex:none}
+.ft-legend{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;margin:0 0 var(--sp-2);font-size:var(--fs-1);color:var(--muted)}
+.ft-legend>span{display:inline-flex;gap:6px;align-items:center}
+.ft-legend .dpk{pointer-events:none}
+.ft-keys{font-size:var(--fs-1);color:var(--muted);margin:var(--sp-2) 0 0}
+
+/* ---------- 2. Jeton de choix au repêchage (.dpk) : un choix = une pastille ; l'état est dit par la forme, une icône et le texte ----------
+   own  : ton propre choix détenu (filet --ink1, texte gras)
+   acq  : choix d'une autre équipe détenu (filet --ink1 + flèche entrante + code d'origine)
+   used : choix exercé (rang global en gras + nom du joueur ; code d'origine si acquis)
+   out  : choix cédé (pointillé, fond hachuré, flèche sortante vers le détenteur ; texte --muted, jamais barré seul) */
+.dpk{display:flex;align-items:center;gap:4px;min-width:0;height:22px;padding:0 6px 0 7px;border-radius:var(--r-1);font-size:var(--fs-1);line-height:1;white-space:nowrap;color:var(--fg);background:var(--panel)}
+.dpk+.dpk{margin-top:3px}
+.dpk svg{width:11px;height:11px;flex:none}
+.dpk .c{font-weight:var(--w-semi);letter-spacing:.01em}
+.dpk .n{font-weight:var(--w-bold);font-variant-numeric:tabular-nums;min-width:2.2ch;text-align:right}
+.dpk .nm{overflow:hidden;text-overflow:ellipsis;min-width:0}
+.dpk .o{font-size:11px;color:var(--muted)}
+.dpk[data-st=own],.dpk[data-st=acq]{background:var(--panel-2);box-shadow:inset 3px 0 0 var(--ink1),inset 0 0 0 1px var(--line-strong)}
+.dpk[data-st=own] .c{font-weight:var(--w-bold)}
+.dpk[data-st=acq] svg{color:var(--ink1)}
+.dpk[data-st=used]{box-shadow:inset 0 0 0 1px var(--line)}
+.dpk[data-st=out]{color:var(--muted);background:repeating-linear-gradient(135deg,transparent 0 5px,var(--hatch) 5px 6px);border:1px dashed var(--field-line)}
+.dpk[data-st=used]{height:auto;flex-wrap:wrap;row-gap:1px;padding:3px 6px 3px 7px;line-height:1.15}
+.dpk[data-st=used] .nm{flex-basis:100%}
+/* année détaillée : poste devant le nom, nom complet sur deux lignes au besoin plutôt que tronqué */
+.dpk[data-st=used][data-m=det] .nm{white-space:normal;overflow:visible;overflow-wrap:anywhere}
+.dpk .ps{font-weight:var(--w-semi);color:var(--muted);font-variant-numeric:tabular-nums}
+.dpk[data-st=transit]{height:auto;padding:1px 2px;background:none;box-shadow:none}
+.dpk[data-st=out] .c{font-weight:var(--w-reg)}
+
+/* ---------- 3. Grand livre des choix (Choix détenus) : années × rondes, consultation ---------- */
+.ft-ledger-wrap{border:1px solid var(--line);border-radius:var(--r-2);overflow:auto;max-height:none}
+table.ft-ledger{border-collapse:separate;border-spacing:0;width:100%;table-layout:fixed;font-size:var(--fs-2)}
+table.ft-ledger col.y{width:62px}table.ft-ledger col.t{width:58px}
+table.ft-ledger thead th{position:sticky;top:0;z-index:2;height:30px;padding:0 6px;background:var(--panel-2);border-bottom:1px solid var(--line-strong);font-size:var(--fs-1);font-weight:var(--w-semi);color:var(--muted);text-align:left}
+table.ft-ledger thead th.num,table.ft-ledger td.num{text-align:right}
+table.ft-ledger abbr{text-decoration:none;cursor:help}
+table.ft-ledger tbody th{padding:6px 8px;text-align:left;vertical-align:top;font-weight:var(--w-bold);font-variant-numeric:tabular-nums;border-bottom:1px solid var(--line);background:var(--panel)}
+table.ft-ledger tbody th .ys{display:block;font-size:11px;font-weight:var(--w-reg);color:var(--muted);margin-top:2px}
+table.ft-ledger td{padding:4px;vertical-align:top;border-bottom:1px solid var(--line);border-left:1px solid var(--line);min-width:0}
+table.ft-ledger td.num{padding:6px 8px;font-variant-numeric:tabular-nums;font-weight:var(--w-bold)}
+table.ft-ledger td.num .d{display:block;font-size:11px;font-weight:var(--w-reg);color:var(--muted)}
+table.ft-ledger td.empty::before{content:"—";display:block;padding:3px 6px;color:var(--muted);font-size:var(--fs-1)}
+table.ft-ledger td[tabindex]{cursor:pointer}
+table.ft-ledger td[tabindex]:hover{background:color-mix(in srgb,var(--fg) 3.5%,var(--panel))}
+table.ft-ledger td:focus-visible{outline:2px solid var(--focus);outline-offset:-3px;box-shadow:inset 0 0 0 5px var(--focus-halo)}
+table.ft-ledger tr.cur>th{box-shadow:inset 3px 0 0 var(--ink1)}
+table.ft-ledger tr.open>*{background:var(--tint1)}
+table.ft-ledger tr.sep>th{height:26px;padding:0 8px;background:var(--panel-2);font-size:var(--fs-1);font-weight:var(--w-semi);color:var(--muted);border-bottom:1px solid var(--line-strong);vertical-align:middle}
+/* détail d'une année, sous sa ligne (même principe que la liste des joueurs modifiable) */
+table.ft-ledger tr.pk-detail>td{padding:10px 12px 12px;background:var(--tint1);border-left:0}
+.pk-det{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:8px 12px;margin:0;padding:0;list-style:none}
+.pk-det li{display:grid;gap:2px;padding:7px 10px;border:1px solid var(--line);border-radius:var(--r-2);background:var(--panel);font-size:var(--fs-2);white-space:normal}
+.pk-det li.hi{border-color:var(--ink1);box-shadow:inset 3px 0 0 var(--ink1)}
+.pk-det .h{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;font-weight:var(--w-bold)}.pk-det .h .dpk{flex:none;max-width:150px}
+.pk-det .h .r{color:var(--muted);font-weight:var(--w-semi)}
+.pk-det ol{margin:2px 0 0;padding:0 0 0 16px;color:var(--fg)}.pk-det ol li{display:list-item;border:0;padding:0;background:none;font-size:var(--fs-1)}
+.pk-det a{font-size:var(--fs-1);font-weight:var(--w-semi)}
+
+/* ---------- 4. Ordre de sélection : 1re ronde (loterie) et rondes 2 à 7 ---------- */
+.mv{display:inline-flex;align-items:center;gap:3px;font-weight:var(--w-bold);font-variant-numeric:tabular-nums}
+.mv svg{width:10px;height:10px}
+.mv.up{color:var(--fg)}.mv.down{color:var(--muted);font-weight:var(--w-semi)}
+table.ft-stats td.mine,table.ft-stats tr.mine>td{background:var(--tint1)}
+table.ft-stats tr.mine>td:first-child{box-shadow:inset 3px 0 0 var(--ink1),inset -1px 0 0 var(--line-strong)}
+.mk-mine{display:inline-flex;align-items:center;gap:4px;font-weight:var(--w-bold);color:var(--fg)}
+.mk-mine svg{width:10px;height:10px;color:var(--ink1)}
+.ft-hold{color:var(--muted)}.ft-hold b{color:var(--fg)}
+table.ft-order{border-collapse:separate;border-spacing:0;width:100%;table-layout:fixed;font-size:var(--fs-1);font-variant-numeric:tabular-nums}
+table.ft-order th,table.ft-order td{height:26px;padding:0 6px;border-bottom:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+table.ft-order thead th{position:sticky;top:0;background:var(--panel-2);color:var(--muted);font-weight:var(--w-semi);border-bottom-color:var(--line-strong);text-align:left}
+table.ft-order tbody th{color:var(--muted);font-weight:var(--w-semi);text-align:right;padding-right:10px;width:44px}
+table.ft-order td{border-left:1px solid var(--line)}
+table.ft-order td .n{display:inline-block;min-width:3ch;text-align:right;color:var(--muted);margin-right:6px}
+table.ft-order td.mine{background:var(--tint1);box-shadow:inset 3px 0 0 var(--ink1);font-weight:var(--w-bold)}
+table.ft-order td.mine .n{color:var(--fg)}
+table.ft-order td.gone{color:var(--muted)}
+table.ft-order col.rk{width:44px}
+
+/* ---------- 5. Graphiques : barres, courbe de valeur (repli SVG ; ECharts reprend les mêmes variables) ---------- */
+.ft-chart{position:relative;min-height:220px}
+.ft-chart svg{width:100%;height:auto;overflow:visible}
+.ft-chart .bar-g{fill:var(--c1);stroke:var(--ink1);stroke-width:1.2}
+.ft-chart .bar-p{fill:url(#hatch-c1);stroke:var(--ink1);stroke-width:1.2;stroke-dasharray:3 2}
+.ft-chart .axl{font-size:11px;fill:var(--muted)}
+.ft-chart .lbl{font-size:11px;fill:var(--fg);font-weight:600}
+.ft-chart .line-def{fill:none;stroke:var(--muted);stroke-width:2;stroke-dasharray:5 4}
+.ft-chart .line-cur{fill:none;stroke:var(--ink1);stroke-width:2.4}
+.ft-chart .dot-mod{fill:var(--panel);stroke:var(--ink1);stroke-width:2}
+.ft-chart .hl{fill:var(--ink1)}
+.ft-chart-note{font-size:var(--fs-1);color:var(--muted);margin:4px 0 0}
+.ft-2col{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:var(--sp-4);align-items:start}
+@media (max-width:860px){.ft-2col{grid-template-columns:1fr}}
+
+/* ---------- 6. Barème modifiable (rang global → valeur) : 32 rangs × 7 rondes ---------- */
+.ft-disc{display:inline-flex;align-items:center;gap:7px}
+.ft-disc svg{width:10px;height:10px;transition:transform .15s ease-out}.ft-disc[aria-expanded=true] svg{transform:rotate(180deg)}
+table.grid.ev.scale{width:100%;table-layout:fixed}
+table.grid.ev.scale th,table.grid.ev.scale td{height:30px;padding:0 3px}
+table.grid.ev.scale thead th{text-align:center}
+table.grid.ev.scale tbody th{width:40px;text-align:right;padding-right:8px;color:var(--muted);font-weight:var(--w-semi);font-size:var(--fs-1)}
+table.grid.ev.scale input.cell{width:100%;height:26px;text-align:right;font:inherit;font-size:var(--fs-2);font-variant-numeric:tabular-nums;padding:0 6px}
+table.grid.ev.scale td.ci.ed input.cell{border-color:var(--st-warn);background:color-mix(in srgb,var(--st-warn) 14%,var(--panel));font-weight:var(--w-bold)}
+table.grid.ev.scale td.ci .rk{display:none}
+.scale-status{display:flex;flex-wrap:wrap;align-items:center;gap:6px 16px;margin:10px 0 0;padding:8px 12px;border:1px solid var(--line);border-radius:var(--r-2);background:var(--panel);font-size:var(--fs-2)}
+.scale-status .ed{display:inline-flex;align-items:center;gap:6px;font-weight:var(--w-semi);color:var(--st-warn-ink)}
+.scale-status .ed svg{width:14px;height:14px;color:var(--st-warn)}
+.scale-status .btn{margin-left:auto}
+
+/* ---------- 7. Point de départ ---------- */
+.ft-factline{display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center;margin:0 0 var(--sp-2);font-size:var(--fs-2)}
+.ft-factline .ro{display:inline-flex;gap:6px;align-items:center;padding:3px 10px;border-radius:var(--r-1);background:var(--panel-2);font-style:italic}
+table.grid.ev.r0 td.ro.calc{font-style:italic;color:var(--fg);background:var(--panel-2)!important;min-width:84px}
+table.grid.ev.r0 th.ro{font-style:italic}
+table.grid.ev.r0 tr.new>td,table.grid.ev.r0 tr.new>th{background:color-mix(in srgb,var(--st-warn) 8%,transparent)}
+table.grid.ev.r0 tr.new>td.na{background:repeating-linear-gradient(135deg,transparent 0 5px,var(--hatch) 5px 6px),color-mix(in srgb,var(--st-warn) 8%,transparent)}
+table.grid.ev.r0 tr.npx-row>td{height:auto;padding:4px 3px 10px 8px}
+/* Effectif de départ : profil complet + contrat (34 colonnes) ; Prénom et Nom collés à gauche au défilement horizontal */
+.r0-wrap{max-height:none}
+table.grid.ev.r0{border-collapse:separate;border-spacing:0}
+table.grid.ev.r0 thead tr.grp th{height:24px;padding:0 8px;font-size:var(--fs-1);font-weight:var(--w-semi);color:var(--muted);text-align:left;border-bottom:1px solid var(--line-strong);background:var(--panel-2)}
+table.grid.ev.r0 thead tr.grp th.g{border-left:1px solid var(--line-strong)}table.grid.ev.r0 thead tr.grp th.st12{border-left:0;box-shadow:inset -1px 0 0 var(--line-strong)}
+table.grid.ev.r0 :is(th,td).cs{border-left:2px solid var(--line-strong)}
+table.grid.ev.r0 :is(th,td).st1,table.grid.ev.r0 :is(th,td).st2,table.grid.ev.r0 th.st12{position:sticky;z-index:3;background:var(--panel)}
+table.grid.ev.r0 :is(th,td).st1,table.grid.ev.r0 th.st12{left:0}
+table.grid.ev.r0 :is(th,td).st2{left:112px;box-shadow:inset -1px 0 0 var(--line-strong)}
+table.grid.ev.r0 thead :is(th.st1,th.st2,th.st12){z-index:4;background:var(--panel-2)}
+table.grid.ev.r0 tr.new>td.st1,table.grid.ev.r0 tr.new>td.st2{background:color-mix(in srgb,var(--st-warn) 8%,var(--panel))}
+table.grid.ev.r0 select.cell{min-width:0}table.grid.ev.r0 input.cell[data-c="fn"]{width:104px}table.grid.ev.r0 input.cell[data-c="ln"]{width:122px}
+table.grid.ev.r0 select.cell:is([data-c="pos"],[data-c="pos2"]){width:62px}table.grid.ev.r0 input.cell[data-c="no"]{width:44px;text-align:center}
+table.grid.ev.r0 input.cell:is([data-c="ht"],[data-c="wt"]){width:56px;text-align:right}table.grid.ev.r0 input.cell[data-c="birth"]{width:104px}
+table.grid.ev.r0 select.cell[data-c="hand"]{width:84px}table.grid.ev.r0 select.cell[data-c="ptype"]{width:168px}
+table.grid.ev.r0 input.cell:is([data-c="dy"],[data-c="dp"]){width:58px;text-align:right}table.grid.ev.r0 input.cell[data-c="dr"]{width:44px;text-align:right}
+table.grid.ev.r0 select.cell[data-c="dt"]{width:74px}table.grid.ev.r0 select.cell[data-c="ctry"]{width:132px}table.grid.ev.r0 select.cell[data-c="st"]{width:96px}
+table.grid.ev.r0 input.cell:is([data-c="gp1"],[data-c="gp2"]){width:58px;text-align:right}
+table.grid.ev.r0 select.cell[data-c="ev"]{width:222px}table.grid.ev.r0 select.cell[data-c="ct"]{width:106px}
+table.grid.ev.r0 select.cell[data-c="years"]{width:52px}table.grid.ev.r0 select.cell[data-c="fs"]{width:86px}
+table.grid.ev.r0 input.cell[data-c="aav"]{width:104px;text-align:right}table.grid.ev.r0 select.cell[data-c^="cl"]{width:92px;font-size:12px}
+table.grid.ev.r0 td.ci.ed :is(input,select).cell{border-color:var(--st-warn);font-weight:var(--w-bold)}
+table.grid.ev.r0 td.ci.st1>.gi-tip,table.grid.ev.r0 td.ci.st2>.gi-tip{left:0;transform:none}
+
+/* Choix de départ : années × rondes ; case « ton choix » cochée par défaut ; choix d'autres équipes : une liste d'abréviations par choix,
+   « + équipe » ajoute une ligne sous l'année pour un 2e choix dans la même ronde */
+table.grid.ev.p0{table-layout:fixed;width:100%;min-width:780px;border-collapse:separate;border-spacing:0}
+table.grid.ev.p0 col.y{width:58px}table.grid.ev.p0 col.t{width:50px}
+table.grid.ev.p0 thead th{text-align:left;padding:0 6px}
+table.grid.ev.p0 tbody th{text-align:left;vertical-align:top;padding:8px 8px 0;font-weight:var(--w-bold);font-variant-numeric:tabular-nums;border-right:1px solid var(--line-strong);border-bottom:1px solid var(--line)}
+table.grid.ev.p0 td{height:auto;padding:4px 4px 5px;vertical-align:top;border-left:1px solid var(--line);border-bottom:1px solid var(--line)}
+table.grid.ev.p0 tr:has(+tr.p0-more)>td{border-bottom-style:dotted}
+table.grid.ev.p0 tr.p0-more>td{padding-top:0}
+table.grid.ev.p0 td.ro.calc{vertical-align:middle;text-align:right;padding-right:10px;font-style:italic;background:var(--panel-2)!important}
+.p0-own{display:flex;align-items:center;gap:6px;height:24px;padding:0 6px;border-radius:var(--r-1);font-size:var(--fs-1);font-weight:var(--w-bold);color:var(--fg);cursor:pointer;box-shadow:inset 0 0 0 1px var(--line-strong);background:var(--panel)}
+.p0-own input{width:15px;height:15px;margin:0;accent-color:var(--ink1)}
+.p0-own:has(input:checked){background:var(--panel-2);box-shadow:inset 3px 0 0 var(--ink1),inset 0 0 0 1px var(--line-strong)}
+.p0-own:has(input:not(:checked)){color:var(--muted);font-weight:var(--w-reg);background:repeating-linear-gradient(135deg,transparent 0 5px,var(--hatch) 5px 6px)}
+.p0-own:has(input:focus-visible){outline:2px solid var(--focus);outline-offset:1px;box-shadow:0 0 0 4px var(--focus-halo)}
+.p0-oth{display:block;margin-top:3px}
+table.grid.ev.p0 select.cell.oth{display:block;width:100%;height:24px;padding:0 4px;font:inherit;font-size:var(--fs-1);font-weight:var(--w-semi);box-shadow:inset 3px 0 0 var(--ink1)}
+.p0-add{display:flex;align-items:center;width:100%;height:24px;margin-top:3px;padding:0 6px;border:1px dashed var(--field-line);border-radius:var(--r-1);background:transparent;color:var(--muted);font:inherit;font-size:var(--fs-1);cursor:pointer;text-align:left}
+.p0-oth+.p0-add{height:20px;font-size:11px}
+.p0-add:hover{color:var(--fg);border-color:var(--fg);border-style:solid}
+.p0-add:focus-visible{outline:2px solid var(--focus);outline-offset:1px;box-shadow:0 0 0 4px var(--focus-halo);color:var(--fg)}
+table.grid.ev.p0 td.ci.ed .p0-own{outline:2px solid var(--st-warn);outline-offset:-1px}
+table.grid.ev.p0 td.ci.rej select.cell.oth{border-color:var(--st-err);background:color-mix(in srgb,var(--st-err) 14%,var(--panel));box-shadow:none}
+/* avertissement (pas une erreur) : ronde sans aucun choix ; coin orange + bulle orange + icône */
+td.ci.wrn::after{content:"";position:absolute;top:2px;right:2px;border-style:solid;border-width:0 8px 8px 0;border-color:transparent var(--st-warn) transparent transparent;border-radius:0 5px 0 0;pointer-events:none}
+td.ci.wrn .p0-own{box-shadow:inset 0 0 0 2px var(--st-warn)}
+.gi-tip.wn,.gi-tip.wn::before{border-color:var(--st-warn)}
+td.ci.wrn:focus-within>.gi-tip,td.ci.wrn:hover>.gi-tip{display:block}
+.gi-tip .tip-ic{width:13px;height:13px;flex:none;vertical-align:-2px;margin-right:5px;color:var(--st-err)}.gi-tip.wn .tip-ic{color:var(--st-warn)}
+table.grid.ev.p0 tr>td:nth-last-child(-n+3)>.gi-tip{left:auto;right:0;transform:none}table.grid.ev.p0 tr>td:nth-last-child(-n+3)>.gi-tip::before{left:auto;right:22px}
+
+/* ---------- 8. Case Expansion (formulaire d'équipe personnalisée) ---------- */
+.chk.sub{margin:2px 0 8px 26px;flex-wrap:wrap;align-items:flex-start}
+.chk.sub>span{display:grid;gap:2px}
+.chk.sub .hint{font-size:var(--fs-1);color:var(--muted);max-width:62ch}
+.chk.sub:has(input:disabled)>span>b{color:var(--muted);font-weight:var(--w-reg)}
+.chk.sub:has(input:disabled) .hint{color:var(--fg)}
+.chk.sub:has(input:disabled) .hint svg{color:var(--muted)}
+.chk.sub .hint{display:inline-flex;gap:6px;align-items:flex-start}.chk.sub .hint svg{width:14px;height:14px;flex:none;margin-top:1px}
+.chk input{width:16px;height:16px;margin:2px 0 0;accent-color:var(--ink1)}
+.demo-variant{font-size:var(--fs-1);color:var(--muted);margin:14px 0 4px;font-weight:var(--w-semi)}
+.ft-stack{display:grid;gap:var(--sp-5)}
+.ft-stack .help-sh{margin:0 0 6px}
+.demo-show>.gi-tip{display:block}  /* maquette : bulle visible sans focus, pour la capture */
+
+/* ---------- 9. Choix détenus : bascule d'affichage et bouton « Détail » par année ---------- */
+.ft-cardhead>.sub.lead{flex:1 1 380px;margin:0;font-size:var(--fs-2);color:var(--muted);max-width:72ch}
+.ft-cardhead .acts{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.ft-seg{display:inline-flex;padding:2px;border-radius:var(--r-2);box-shadow:inset 0 0 0 1px var(--line-strong);background:var(--panel-2)}
+.ft-seg button{min-height:30px;padding:0 12px;border:0;border-radius:6px;background:transparent;color:var(--muted);font:inherit;font-size:var(--fs-2);font-weight:var(--w-semi);cursor:pointer}
+.ft-seg button[aria-pressed=true]{background:var(--panel);color:var(--fg);box-shadow:inset 0 -2px 0 var(--ink1),0 0 0 1px var(--line-strong)}
+.ft-seg button:focus-visible{outline:2px solid var(--focus);outline-offset:1px;box-shadow:0 0 0 4px var(--focus-halo)}
+table.ft-ledger col.y{width:96px}
+table.ft-ledger tbody th .yv{display:block}
+.yr-tg{display:inline-flex;align-items:center;gap:4px;margin-top:5px;height:22px;padding:0 7px 0 5px;border:1px solid var(--line-strong);border-radius:var(--r-1);background:var(--panel);color:var(--fg);font:inherit;font-size:11px;font-weight:var(--w-semi);cursor:pointer}
+.yr-tg svg{width:9px;height:9px;transition:transform .15s ease-out}.yr-tg[aria-expanded=true] svg{transform:rotate(180deg)}
+.yr-tg[aria-expanded=true]{box-shadow:inset 3px 0 0 var(--ink1)}
+.yr-tg:hover{border-color:var(--fg)}
+.yr-tg:focus-visible{outline:2px solid var(--focus);outline-offset:1px;box-shadow:0 0 0 4px var(--focus-halo)}
+@media (prefers-reduced-motion:reduce){.yr-tg svg,.ft-disc svg{transition:none}}
+
+/* ---------- 10. Analyse : succès des joueurs repêchés (filtres + tableau par ronde, barre de proportion) ---------- */
+.ft-filters{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:flex-end;margin:0 0 var(--sp-3)}
+.ft-filters label{display:grid;gap:3px;font-size:var(--fs-1);color:var(--muted);font-weight:var(--w-semi)}
+.ft-filters select{height:32px;min-width:150px;padding:0 8px;border:1px solid var(--field-line);border-radius:var(--r-2);background:var(--panel);color:var(--fg);font:inherit;font-size:var(--fs-2)}
+table.ft-stats.suc{width:auto;min-width:min(100%,620px)}
+table.ft-stats.suc thead th.grp{text-align:center;border-left:1px solid var(--line-strong)}
+table.ft-stats.suc :is(th,td).pct{min-width:150px}
+table.ft-stats.suc td.pct .pw{display:flex;align-items:center;gap:8px;justify-content:flex-end}
+.ft-pbar{flex:none;width:96px;height:10px;border-radius:2px;background:var(--panel-2);box-shadow:inset 0 0 0 1px var(--line-strong);overflow:hidden}
+.ft-pbar>span{display:block;height:100%;background:var(--c1);box-shadow:inset 0 0 0 1px var(--ink1)}
+table.ft-stats.suc td.pct .v{min-width:4.2ch;text-align:right;font-variant-numeric:tabular-nums}
+table.ft-stats.suc tfoot td{font-weight:var(--w-bold)}
+
+/* ---------- 11. Bloc « nouveau joueur » (ajouts au .npx de production) ---------- */
+.npx.npx2{max-width:min(860px,calc(100vw - 120px))}
+.npx-br{flex-basis:100%;height:0}
+.npx label.err>:is(input,select){border-color:var(--st-err)!important;background:color-mix(in srgb,var(--st-err) 12%,var(--panel))!important}
+.npx input.cell.gp{width:72px;text-align:right}
+.npx label:has(input.gp){max-width:150px}
+.npx select.cell[data-c$="pos2"]{width:70px}
+.npx select.cell[data-c$="np_st"]{width:104px}
+.npx-na{display:flex;flex-direction:column;gap:3px;font-size:11px;color:var(--muted);max-width:150px}
+.npx-na .box{display:block;width:72px;height:30px;border:1px solid var(--line);border-radius:var(--r-1);background:repeating-linear-gradient(135deg,transparent 0 5px,var(--hatch) 5px 6px)}
+.npx-only{align-self:center;font-size:11px;color:var(--muted);font-style:italic}
+.np-ctx{margin:0 0 var(--sp-3)}
+.np-ctx>.npx{position:static;max-width:none}
+table.grid.ev.np-dft :is(th,td).newcol{box-shadow:inset 0 3px 0 var(--ink1)}
+table.grid.ev.np-dft th.newcol{color:var(--fg)}
+table.grid.ev.np-dft td.ro.calc{font-style:italic;background:var(--panel-2)!important;padding:0 8px}
+
+.ft-filters.opts{gap:4px 18px}.ft-filters .chk{display:inline-flex;gap:6px;align-items:center}
+.ft-stats th.tl,.ft-stats td.tl{text-align:left}

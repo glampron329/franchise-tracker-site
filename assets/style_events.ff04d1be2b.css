@@ -74,6 +74,10 @@ table.grid.ev.ratings th.pl{min-width:200px}
 .cust{list-style:none;margin:6px 0;padding:0}.cust li{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);font-size:14px;flex-wrap:wrap}.cust .sw{width:14px;height:14px;border-radius:50%;display:inline-block}.cust .tlogo{width:26px;height:26px}
 .cust-form{border:1px solid color-mix(in srgb,var(--c1) 35%,var(--line));border-radius:12px;padding:12px 16px;margin:10px 0;background:color-mix(in srgb,var(--c1) 4%,var(--panel))}.cust-form h4{margin:0 0 8px}.cust-form fieldset{border:1px solid var(--line);border-radius:10px;margin:8px 0;padding:8px 12px}.cust-form legend{font-size:13px;font-weight:600;padding:0 6px}.cust-form label{font-size:13px}
 .cust-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px 16px;align-items:end;margin:8px 0}.cust-grid .fld{margin:0;max-width:none}.colrow{display:flex;gap:6px;align-items:center}.colrow input[type=color]{width:38px;height:32px;padding:0;border:1px solid var(--field-line);border-radius:6px;background:var(--panel)}.colrow input:not([type=color]){width:100px}
+/* Couleur 3 facultative (phase 4d) : sélecteur hachuré quand vide, aide et aperçu de l'en-tête */
+.colrow.unset{position:relative}.colrow.unset input[type=color]{opacity:0}.colrow.unset::before{content:"";position:absolute;left:0;top:0;width:38px;height:100%;border:1px dashed var(--field-line);border-radius:6px;background:repeating-linear-gradient(135deg,transparent 0 4px,var(--hatch) 4px 5px);pointer-events:none}
+.cu-c3hint{margin:2px 0 8px;max-width:72ch}
+.cu-prev{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;margin:0 0 10px;font-size:var(--fs-1);color:var(--muted)}.cu-prev .cu-bar{display:inline-flex;gap:10px;align-items:center;min-width:240px;padding:8px 14px 10px;border-radius:var(--r-2);font-size:var(--fs-2)}
 .logo-prev img{width:64px;height:64px;object-fit:contain;background:var(--logo-bg);border-radius:50%;padding:4px;border:1px solid var(--line)}.chk{display:flex;gap:8px;align-items:center;margin:8px 0}
 .divs{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;margin:8px 0}.div{border:1px solid var(--line);border-radius:10px;padding:8px 10px}.div h5{margin:0 0 6px;font-size:var(--fs-2);font-weight:700;color:var(--fg)}.div .cnt{background:var(--panel-2);font-weight:600;border-radius:9px;padding:0 8px;margin-left:4px}
 .dv{display:flex;justify-content:space-between;align-items:center;gap:6px;padding:2px 0;font-size:13px}.dv.cust span{font-weight:700;color:var(--ink1)}.dv.moved span{text-decoration:underline dotted}.dv select{font:inherit;font-size:12px;padding:1px 4px;border:1px solid var(--field-line);border-radius:6px;background:var(--panel);color:var(--fg)}
@@ -283,6 +287,7 @@ table.trg tr.has-np>td,table.trg tr.has-np>th{border-bottom:0}
 .npx label{display:flex;flex-direction:column;gap:3px;font-size:11px;color:var(--muted)}
 .npx label.err>:is(input,select){border-color:var(--st-err)!important;background:color-mix(in srgb,var(--st-err) 12%,var(--panel))!important}
 .npx label.wn>:is(input,select){border-color:var(--st-warn)!important}
+.npx-na{align-self:flex-end;padding:6px 8px;border:1px dashed var(--field-line);border-radius:6px;font-size:11px;color:var(--muted);background:repeating-linear-gradient(135deg,transparent 0 4px,var(--hatch) 4px 5px)}
 .npx input.cell,.npx select.cell{height:30px;box-sizing:border-box;border:1px solid var(--field-line);border-radius:var(--r-1);background:var(--panel)}.npx :is(input,select).cell:focus{border-color:var(--focus);background:var(--panel)}.npx input.cell{width:120px;text-align:left}.npx input.cell.date{width:104px}.npx select.cell{min-width:64px;width:70px}
 .npx-msg{flex-basis:100%;display:flex;gap:6px;align-items:flex-start;margin:2px 0 0;font-size:12px;color:var(--muted)}.npx-msg svg{width:14px;height:14px;flex:none;margin-top:2px}.npx-msg.er{color:var(--st-err-ink);font-weight:600}.npx-msg.wn{color:var(--st-warn-ink);font-weight:600}
 
@@ -435,3 +440,5 @@ table.grid.ev.standings td.ro.own svg{width:11px;height:11px;flex:none;color:var
 .std-legend{display:flex;flex-wrap:wrap;align-items:center;gap:6px 16px;margin:10px 0 4px;font-size:13px;color:var(--muted)}
 .std-legend .std-leg{display:inline-flex;align-items:center;gap:6px;color:var(--fg)}
 .std-legend .std-q{cursor:default}
+/* phase 4d : colonne Poste secondaire dans Sélections ; les 13 colonnes tiennent dans la largeur */
+table.grid.ev.picks select.cell[data-c="pos"],table.grid.ev.picks select.cell[data-c="pos2"]{min-width:52px;max-width:60px}table.grid.ev.picks select.cell[data-c="ptype"],table.grid.ev.picks input.cell[data-c="ptype"]{min-width:140px;max-width:150px}table.grid.ev.picks th{white-space:normal;hyphens:auto}

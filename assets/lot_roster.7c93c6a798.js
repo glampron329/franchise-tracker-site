@@ -846,7 +846,7 @@
       }
       if (!newCap(tab, it)) return false; var r = it.r;
       if (c === 'pname') { setInName({ date: r.date }, r, v); delete r.type; }
-      else { v = v.trim(); r.np = r.np || { first: '', last: '', pos: '', birth: '' }; r.np[c.slice(3)] = c === 'np_pos' ? v.toUpperCase() : v; }
+      else { v = v.trim(); r.np = r.np || { first: '', last: '', pos: '', birth: '' }; r.np[c.slice(3)] = c === 'np_pos' || c === 'np_pos2' ? v.toUpperCase() : c === 'np_status' ? v : v; }
       persist(); return true;
     }
     // nom inconnu sur une nouvelle ligne sans événement : on indique quel événement crée le joueur
@@ -864,7 +864,7 @@
       if (r.np) {
         a = a.filter(function (x) { return x.c !== 'pid' && x.k !== 'val.player_missing'; });
         if (hst === 'no') { var nmh = (r.np.first + ' ' + r.np.last).trim(); if (!r.np.birth) a.push({ c: 'np', level: 'err', k: 'val.homonym_birth_missing', p: [nmh] }); else if (V.isDate(r.np.birth) && HO.sameBirth(hcs, r.np.birth)) a.push({ c: 'np', level: 'err', k: 'val.homonym_same_birth', p: [nmh, r.np.birth] }); }
-        var miss = []; if (!r.np.first) miss.push(t('col.first_name')); if (!r.np.last) miss.push(t('col.last_name')); if (!r.np.pos) miss.push(t('col.position'));
+        var miss = []; if (!r.np.first) miss.push(t('col.first_name')); if (!r.np.last) miss.push(t('col.last_name')); if (!r.np.pos) miss.push(t('col.position')); npArrivalCheck(r.np, miss, a);
         if (miss.length) a.push({ c: 'np', level: 'err', k: 'val.np_missing', p: [miss.join(', ')] });
         if (r.np.birth && !V.isDate(r.np.birth)) a.push({ c: 'np', level: 'err', k: 'val.date_format', p: [] });
         else if (!r.np.birth && hst !== 'no') a.push({ c: 'np', level: 'warn', k: 'val.np_birth_later', p: [t('ev.tab_pl')] });
@@ -885,8 +885,22 @@
       else if (r.np) inner = npx();
       return inner ? '<tr class="npx-row"><td colspan="' + span + '">' + inner + '</td></tr>' : '';
     }
-    function newPlayerPayload(r) {   // forme de ft_private.event_new_player (migration 77)
-      var np = r.np, o = { first_name: np.first, last_name: np.last, position_original: np.pos, birth_date: np.birth || null }, x = np.extra || {};
+    // migration 79 (Gabriel, 2026-11-23) : toute création de joueur demande le poste secondaire (facultatif), le statut à l'arrivée
+    // (obligatoire) et, pour une recrue, les matchs des critères 1 (saison de l'arrivée) et 2 (saison précédente), de 0 à 84
+    function npArrivalCheck(np, miss, a) {
+      if (!np.status) miss.push(t('pl.col_status'));
+      if (np.status === 'Rookie') { if (np.gp1 === '' || np.gp1 == null) miss.push(t('col.gp_prior1')); if (np.gp2 === '' || np.gp2 == null) miss.push(t('col.gp_prior2')); }
+      if (np.status === 'Rookie' && ['gp1', 'gp2'].some(function (k) { var v = np[k]; return v !== '' && v != null && !(/^\d{1,2}$/.test(String(v)) && +v <= 84); })) a.push({ c: 'np', level: 'err', k: 'val.np_gp_prior', p: [] });
+      if (np.pos2 && np.pos2 === np.pos) a.push({ c: 'np', level: 'err', k: 'val.pos2_same', p: [] });
+      else if (np.pos2 && np.pos && V.secondaryOptions(np.pos).indexOf(np.pos2) < 0) a.push({ c: 'np', level: 'err', k: 'val.pos2_group', p: [] });
+    }
+    function npArrival(np) {
+      var o = {}; if (np.pos2 && np.pos !== 'G') o.position_secondary_original = np.pos2; if (np.status) o.status_at_acquisition = np.status;
+      if (np.status === 'Rookie') { o.rookie_gp_current = +np.gp1; o.rookie_gp_previous = +np.gp2; }
+      return o;
+    }
+    function newPlayerPayload(r) {   // forme de ft_private.event_new_player (migrations 77 et 79)
+      var np = r.np, o = Object.assign({ first_name: np.first, last_name: np.last, position_original: np.pos, birth_date: np.birth || null }, npArrival(np)), x = np.extra || {};
       Object.keys(x).forEach(function (k) { if (x[k] !== '' && x[k] != null) o[k] = x[k]; });
       if (HO.status(r.hc && r.hc.length ? trCands(r) : [], r.homo) === 'no') o.distinct_from = HO.find(DATA.homo, np.first + ' ' + np.last, POSGRP[np.pos]).map(function (p) { return p.id; });
       return o;
@@ -1133,7 +1147,7 @@
         if (r.np) {   // nouveau joueur reçu : prénom, nom et poste obligatoires ; date facultative (à compléter plus tard), obligatoire pour un homonyme
           a = a.filter(function (x) { return x.c !== 'pid'; });
           if (hst === 'no') { var nmh = (r.np.first + ' ' + r.np.last).trim(); if (!r.np.birth) a.push({ c: 'np', level: 'err', k: 'val.homonym_birth_missing', p: [nmh] }); else if (V.isDate(r.np.birth) && HO.sameBirth(hcs, r.np.birth)) a.push({ c: 'np', level: 'err', k: 'val.homonym_same_birth', p: [nmh, r.np.birth] }); }
-          var miss = []; if (!r.np.first) miss.push(t('col.first_name')); if (!r.np.last) miss.push(t('col.last_name')); if (!r.np.pos) miss.push(t('col.position'));
+          var miss = []; if (!r.np.first) miss.push(t('col.first_name')); if (!r.np.last) miss.push(t('col.last_name')); if (!r.np.pos) miss.push(t('col.position')); npArrivalCheck(r.np, miss, a);
           if (miss.length) a.push({ c: 'np', level: 'err', k: 'val.np_missing', p: [miss.join(', ')] });
           if (r.np.birth && !V.isDate(r.np.birth)) a.push({ c: 'np', level: 'err', k: 'val.date_format', p: [] });
           else if (!r.np.birth && hst !== 'no') a.push({ c: 'np', level: 'warn', k: 'val.np_birth_later', p: [t('ev.tab_pl')] });
@@ -1226,6 +1240,8 @@
       var np = o.sl.np, pre = o.pre, id = o.id, ti = o.r, a = o.al.filter(function (x) { return x.c === 'np'; });
       var er = a.filter(function (x) { return x.level === 'err'; }), wn = a.filter(function (x) { return x.level !== 'err' && x.k !== 'val.pl_near_new'; });
       var bad = function (k) { return er.some(function (x) { return x.k === 'val.np_missing' && !np[k] || x.k === 'val.date_format' && k === 'birth'; }) ? ' class="err"' : ''; };
+      // listes du bloc : poste secondaire (sans objet pour un gardien), statut à l'arrivée (obligatoire : rouge tant qu'il est vide)
+      var npxSel = function (k, lbl, opts, req) { if (!opts) return '<span class="npx-na">' + esc(lbl) + ' : —</span>'; return '<label' + (req && er.some(function (x) { return x.k === 'val.np_missing'; }) ? ' class="err"' : '') + '>' + esc(lbl) + '<select class="cell" data-r="' + ti + '" data-c="' + pre + k + '" aria-describedby="' + id + '"><option value=""></option>' + opts.map(function (o) { return '<option value="' + o[0] + '"' + (np[k] === o[0] ? ' selected' : '') + '>' + esc(o[1]) + '</option>'; }).join('') + '</select></label>'; };
       var f = function (k, lbl, cls, ph) { return '<label' + bad(k) + '>' + esc(lbl) + '<input class="cell ' + cls + '" data-r="' + ti + '" data-c="' + pre + k + '" value="' + esc(np[k]) + '"' + (ph ? ' placeholder="' + esc(ph) + '"' : '') + ' autocomplete="off" aria-describedby="' + id + '"></label>'; };
       var rs = o.sl.touched ? PC.resolve(o.sl.pname, null, o.list, 'new') : null;
       var sug = rs && rs.st === 'near' ? '<button type="button" class="pcb-sug" data-act="pcb-accept" data-r="' + ti + '" data-c="' + o.pc + '" data-name="' + esc(rs.near.name) + '" title="' + esc(PC.fill(t('val.pl_near_new'), [rs.near.name])) + '">' + esc(PC.fill(t('ui.pl_link_to'), [rs.near.name])) + '</button><span class="npx-near">' + PC.IC.warn + esc(PC.fill(t('val.pl_near_new'), [rs.near.name])) + '</span>' : '';
@@ -1234,6 +1250,9 @@
         f('first', t('col.first_name'), 'text') + f('last', t('col.last_name'), 'text') +
         '<label' + bad('pos') + '>' + esc(t('col.position')) + '<select class="cell" data-r="' + ti + '" data-c="' + pre + 'pos" aria-describedby="' + id + '"><option value=""></option>' + ['C', 'LW', 'RW', 'LD', 'RD', 'G'].map(function (p) { return '<option value="' + p + '"' + (np.pos === p ? ' selected' : '') + '>' + esc(t('pc.' + p)) + '</option>'; }).join('') + '</select></label>' +
         f('birth', t('picks.col_birth'), 'date', t('ui.date_ph')) +
+        npxSel('pos2', t('col.position2'), np.pos === 'G' ? null : V.secondaryOptions(np.pos).filter(function (p) { return p !== np.pos; }).map(function (p) { return [p, t('pc.' + p)]; })) +
+        npxSel('status', t('pl.col_status'), [['Rookie', t('pl.st_rookie')], ['Veteran', t('pl.st_veteran')]], !np.status) +
+        (np.status === 'Rookie' ? f('gp1', t('col.gp_prior1'), 'int' + (bad('gp1') ? '' : '')) + f('gp2', t('col.gp_prior2'), 'int') : '<span class="npx-na" title="' + esc(t('ev.np_rookie_only')) + '">' + esc(t('col.gp_prior1', true)) + ' · ' + esc(t('col.gp_prior2', true)) + ' : ' + esc(t('ev.np_rookie_only')) + '</span>') +
         '<p class="npx-msg' + (er.length ? ' er' : '') + '" id="' + id + '">' + (er.length ? PC.IC.err : '') + '<span>' + esc((msg ? msg + ' ' : '') + o.note) + '</span></p></div>';
     }
     function npxHTML(tr, ti, s, sl, al) {
@@ -1578,7 +1597,7 @@
         if (rows.length) await client.rpc('ft_save_offer_sheets', { p_franchise_id: fid, p_sheets: rows.map(function (r) { var pk = []; for (var k = 1; k <= 4; k++) if (r['p' + k + 't']) pk.push({ slot: k, team_code: r['p' + k + 't'], pick_year: +r['p' + k + 'y'], pick_round: +r['p' + k + 'r'] }); return { signed_on: r.date, player_id: r.pid, event_type: r.event, compensation: r.comp === 'yes', picks: pk }; }) });
       } else if (tab === 'tr') {
         if (!lk) await lookups(client);
-        var g = V.tradeGroups(rows), assetOf = function (r) { return r.type === 'player' && r.np ? { direction: 'in', asset_type: 'player', new_player: Object.assign({ first_name: r.np.first, last_name: r.np.last, position_original: r.np.pos, birth_date: r.np.birth || null }, HO.status(r.hc && r.hc.length ? trCands(r) : [], r.homo) === 'no' ? { distinct_from: HO.find(DATA.homo, r.np.first + ' ' + r.np.last, POSGRP[r.np.pos]).map(function (p) { return p.id; }) } : {}), retained_salary: nn(r.ret), retained_years: nn(r.ryears) } : r.type === 'player' ? { direction: r.dir, asset_type: 'player', player_id: r.pid, retained_salary: nn(r.ret), retained_years: nn(r.ryears) } : { direction: r.dir, asset_type: 'pick', pick_year: nn(r.year), pick_round: nn(r.round), pick_original_team_id: lk.idByCode[r.orig] || null }; };
+        var g = V.tradeGroups(rows), assetOf = function (r) { return r.type === 'player' && r.np ? { direction: 'in', asset_type: 'player', new_player: Object.assign({ first_name: r.np.first, last_name: r.np.last, position_original: r.np.pos, birth_date: r.np.birth || null }, npArrival(r.np), HO.status(r.hc && r.hc.length ? trCands(r) : [], r.homo) === 'no' ? { distinct_from: HO.find(DATA.homo, r.np.first + ' ' + r.np.last, POSGRP[r.np.pos]).map(function (p) { return p.id; }) } : {}), retained_salary: nn(r.ret), retained_years: nn(r.ryears) } : r.type === 'player' ? { direction: r.dir, asset_type: 'player', player_id: r.pid, retained_salary: nn(r.ret), retained_years: nn(r.ryears) } : { direction: r.dir, asset_type: 'pick', pick_year: nn(r.year), pick_round: nn(r.round), pick_original_team_id: lk.idByCode[r.orig] || null }; };
         var tiOf = function (k) { return +k.split('|')[2].slice(1); };
         g.order.forEach(function (k) { var f = rows[g.g[k][0]]; if (!lk.idByCode[f.partner]) throw new Error(fmt('sb.unknown_team') + ' ' + f.partner); });
         // création (editId vide) et modification en un seul appel transactionnel (ft_save_trades) ; les éléments sont remplacés en entier

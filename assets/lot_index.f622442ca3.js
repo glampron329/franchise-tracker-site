@@ -6,13 +6,13 @@
   // kind : saisie (enter) ou consultation (view) ; store : clé des saisies en attente de la page (suffixe _f<franchise>, connect/live_mount.js)
   var GROUPS = [
     { id: 'franchise', sec: 'enter', store: null, tabs: [{ id: 'franchise', pane: 'setup' }, { id: 'history_fix', pane: 'hist' }] },
-    { id: 'start', sec: 'enter', tabs: [{ id: 'roster0', soon: 1 }, { id: 'picks0', soon: 1 }] },
+    { id: 'start', sec: 'enter', tabs: [{ id: 'roster0', app: 'roster0' }, { id: 'picks0', app: 'picks0' }] },
     { id: 'preseason', sec: 'enter', store: 'ft_pre_v1', tabs: [{ id: 'cap', app: 'cap' }, { id: 'lineup', app: 'roles' }, { id: 'ratings', app: 'ratings' }, { id: 'schedule', app: 'schedule' }] },
     { id: 'stats', sec: 'enter', store: 'ft_entries_v1', tabs: [{ id: 'skaters', app: 'sk' }, { id: 'goalies', app: 'gk' }, { id: 'team', app: 'tm' }] },
     { id: 'roster', sec: 'enter', store: 'ft_events_v1', tabs: [{ id: 'injuries', app: 'inj' }, { id: 'moves', app: 'mv' }, { id: 'trades', app: 'tr' }, { id: 'contracts', app: 'ct' }, { id: 'offers', app: 'os' }, { id: 'positions', app: 'pc' }, { id: 'players', app: 'pl' }] },
     { id: 'results', sec: 'enter', store: 'ft_results_v1', tabs: [{ id: 'standings', app: 'standings' }, { id: 'series', app: 'series' }, { id: 'cup', app: 'cup' }] },
     { id: 'honors', sec: 'enter', store: 'ft_honors_v1', tabs: [{ id: 'awards', app: 'awards' }, { id: 'allstar', app: 'allstar' }, { id: 'retire', app: 'retire' }] },
-    { id: 'draft', sec: 'enter', store: 'ft_draft_v1', tabs: [{ id: 'owned', soon: 1, kind: 'view' }, { id: 'lottery', app: 'lottery' }, { id: 'ranks', soon: 1, kind: 'view' }, { id: 'top3', app: 'top3' }, { id: 'picks', app: 'picks' }, { id: 'board', soon: 1, kind: 'view' }] },
+    { id: 'draft', sec: 'enter', store: 'ft_draft_v1', tabs: [{ id: 'owned', app: 'owned', kind: 'view' }, { id: 'lottery', app: 'lottery' }, { id: 'ranks', app: 'ranks', kind: 'view' }, { id: 'top3', app: 'top3' }, { id: 'picks', app: 'picks' }, { id: 'board', app: 'board', kind: 'view' }] },
     { id: 'cards', sec: 'view', tabs: [{ id: 'player', app: 'player' }, { id: 'goalie', soon: 1 }, { id: 'team', app: 'team' }] },
     { id: 'team_records', sec: 'view', tabs: [{ id: 'skaters', soon: 1 }, { id: 'goalies', soon: 1 }, { id: 'team', soon: 1 }] },
     { id: 'league_records', sec: 'view', tabs: [{ id: 'players', soon: 1 }, { id: 'teams', soon: 1 }, { id: 'hof', soon: 1 }] },

@@ -304,6 +304,950 @@
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.FTS = api;
 })(typeof window !== 'undefined' ? window : this);
 
+;/* Saisie : colonnes, statistiques dérivées et règles de validation (sans interface, testable avec Node). */
+(function (root) {
+  // calculs communs (SV%) : connect/ft_stats.js, chargé avant ce fichier dans les pages
+  var FS = typeof module !== 'undefined' && module.exports ? require('../connect/ft_stats.js') : root.FTSTATS;
+  var SK = ['gp', 'g', 'a', 'pm', 'pim', 's', 'gwg', 'ppg', 'ppp', 'shg', 'shp', 'toi', 'fow', 'fot', 'hits', 'bks', 'gv', 'tk', 'oa'];
+  var GK = ['gp', 'w', 'l', 'otl', 'so', 'sv', 'sa', 'min', 'pim', 'g', 'a', 'oa'];
+  var TM_RS = ['gp', 'w', 'l', 'otl', 'rw', 'row', 'gf', 'ga', 'ppg', 'tpp', 'shga', 'ppga', 'tsh', 'shgf', 'hw', 'hl', 'ho', 'aw', 'al', 'ao'];
+  var TM_PO = ['gp', 'w', 'l', 'gf', 'ga', 'ppg', 'tpp', 'shga', 'ppga', 'tsh', 'shgf', 'hw', 'hl', 'aw', 'al'];
+  // clé de libellé de chaque colonne (table label)
+  var LBL = { gp: 'stat.gp', g: 'stat.g', a: 'stat.a', pm: 'stat.plus_minus', pim: 'stat.pim', s: 'stat.shots', gwg: 'stat.gwg', ppg: 'stat.ppg', ppp: 'stat.ppp', shg: 'stat.shg', shp: 'stat.shp',
+              toi: 'stat.toi', fow: 'stat.fow', fot: 'stat.fot', hits: 'stat.hits', bks: 'stat.blocks', gv: 'stat.giveaways', tk: 'stat.takeaways', oa: 'stat.oa',
+              w: 'stat.w', l: 'stat.l', otl: 'stat.otl', so: 'stat.so', sv: 'stat.saves', sa: 'stat.sa', min: 'stat.min', rw: 'stat.rw', row: 'stat.row', gf: 'stat.gf', ga: 'stat.ga',
+              tpp: 'stat.tpp', shga: 'stat.shga', ppga: 'stat.ppga', tsh: 'stat.tsh', shgf: 'stat.shgf', hw: 'stat.home_w', hl: 'stat.home_l', ho: 'stat.home_otl', aw: 'stat.away_w', al: 'stat.away_l', ao: 'stat.away_otl' };
+  var DECIMAL = { toi: 1, min: 1 };
+
+    // Ordre des colonnes à l'écran, comme dans le jeu : « @nom » = colonne calculée (en lecture seule), le reste = cellule à saisir
+  var LAYOUT = {
+    sk: ['gp', 'g', 'a', '@pts', 'pm', 'pim', 's', '@shot_pct', 'gwg', 'ppg', 'ppp', 'shg', 'shp', '@toi_per_game', 'toi', 'fow', 'fot', '@fo_pct', 'hits', 'bks', 'gv', 'tk', '@oa_start', 'oa', '@oa_avg'],
+    gk: ['gp', 'w', 'l', 'otl', 'so', '@sv_pct', '@gaa', 'sv', 'sa', '@ga', 'min', 'pim', 'g', 'a', '@pts', '@oa_start', 'oa', '@oa_avg'],
+    tm_rs: ['gp', '@pts', 'w', 'l', 'otl', 'rw', 'row', '@pts_pct', 'gf', '@gf_pg', 'ga', '@ga_pg', 'ppg', 'tpp', '@pp_pct', 'shga', 'ppga', 'tsh', '@pk_pct', 'shgf', 'hw', 'hl', 'ho', 'aw', 'al', 'ao'],
+    tm_po: ['gp', 'w', 'l', 'gf', '@gf_pg', 'ga', '@ga_pg', 'ppg', 'tpp', '@pp_pct', 'shga', 'ppga', 'tsh', '@pk_pct', 'shgf', 'hw', 'hl', 'aw', 'al']
+  };
+  // colonnes calculées de chaque onglet, dans l'ordre des tableaux renvoyés par rowInfo().derived
+  var DER = { sk: ['pts', 'shot_pct', 'toi_per_game', 'fo_pct', 'oa_start', 'oa_avg'], gk: ['ga', 'sv_pct', 'gaa', 'pts', 'oa_start', 'oa_avg'], tm: ['pts', 'pts_pct', 'pp_pct', 'pk_pct', 'gf_pg', 'ga_pg'] };
+  var DLBL = { pts: 'stat.pts', shot_pct: 'stat.shot_pct', toi_per_game: 'stat.toi_per_game', fo_pct: 'stat.fo_pct', sv_pct: 'stat.sv_pct', gaa: 'stat.gaa', ga: 'stat.ga', pts_pct: 'stat.pts_pct', gf_pg: 'stat.gf_pg', ga_pg: 'stat.ga_pg', pp_pct: 'stat.pp_pct', pk_pct: 'stat.pk_pct', oa_start: 'stat.oa_start', oa_avg: 'stat.oa_avg' };
+  var LINKED = { oa_start: 1 };   // colonnes calculées qui sont en fait liées à une autre saisie
+  function layout(tab, po) { return tab === 'sk' ? LAYOUT.sk : tab === 'gk' ? LAYOUT.gk : (po ? LAYOUT.tm_po : LAYOUT.tm_rs); }
+  // Matchs attendus pour les patineurs : 18 patineurs par match. Saison régulière terminée = 82 matchs ; sinon matchs de l'équipe saisis.
+  var SKATERS_PER_GAME = 18, GAMES = 82;   // GAMES : matchs de la saison régulière (paramètre de la franchise)
+  function setGames(n) { GAMES = n >= 20 && n <= 84 && n % 2 === 0 ? n : 82; }
+  function seasonGames() { return GAMES; }
+  function skaterGpCheck(sumGp, games) {
+    if (games === null || games === undefined || !games) return null;
+    var expected = SKATERS_PER_GAME * games; return { sum: sumGp, expected: expected, games: games, ok: sumGp === expected };
+  }
+
+  function n(v) { return v === null || v === undefined || v === '' || isNaN(v) ? null : +v; }
+  function z(v) { return n(v) || 0; }
+
+  function skaterDerived(v) {
+    var g = z(v.g), a = z(v.a), s = n(v.s), gp = z(v.gp), toi = n(v.toi), fot = n(v.fot);
+    return { pts: g + a, shotPct: s ? g / s : null, toiPerGame: gp && toi != null ? toi / gp : null, foPct: fot ? z(v.fow) / fot : null };
+  }
+  function goalieDerived(v) {
+    var sa = n(v.sa), sv = n(v.sv), min = n(v.min), ga = sa != null && sv != null ? sa - sv : null;
+    // tirs saisis sans arrêts : SV% et MBA vides (« — »), pas 0 (décision C3 du 2026-11-11)
+    return { ga: ga, svPct: FS.svPct(sv, sa), gaa: min && ga != null ? ga * 60 / min : null, pts: z(v.g) + z(v.a) };
+  }
+  function teamDerived(v, po) {
+    var w = z(v.w), l = z(v.l), otl = po ? 0 : z(v.otl), gp = z(v.gp);
+    return { pts: po ? null : 2 * w + otl, ptsPct: !po && gp ? (2 * w + otl) / (2 * gp) : null, ppPct: n(v.tpp) ? z(v.ppg) / v.tpp : null, pkPct: n(v.tsh) ? 1 - z(v.ppga) / v.tsh : null, gfpg: gp ? z(v.gf) / gp : null, gapg: gp ? z(v.ga) / gp : null };
+  }
+
+  // Alerte : { c: colonne, level: 'err'|'warn', k: clé de message, p: paramètres }
+  function validateSkater(v, po) {
+    var out = [], max = po ? 28 : GAMES, gp = n(v.gp), d = skaterDerived(v);
+    function add(c, level, k, p) { out.push({ c: c, level: level, k: k, p: p || [] }); }
+    SK.forEach(function (c) { if (c !== 'pm' && c !== 'oa' && n(v[c]) !== null && n(v[c]) < 0) add(c, 'err', 'val.negative'); });
+    if (gp !== null && gp > max) add('gp', 'err', 'val.gp_range', [max]);
+    if (!gp) { if (['g', 'a', 's', 'pim', 'hits', 'toi'].some(function (c) { return z(v[c]) > 0; })) add('gp', 'err', 'val.stats_without_gp'); return out; }
+    if (n(v.s) !== null && z(v.g) > n(v.s)) add('g', 'err', 'val.goals_gt_shots');
+    if (z(v.gwg) > z(v.g)) add('gwg', 'err', 'val.gwg_gt_g');
+    if (z(v.ppg) > z(v.g)) add('ppg', 'err', 'val.ppg_gt_g');
+    if (z(v.shg) > z(v.g)) add('shg', 'err', 'val.shg_gt_g');
+    if (n(v.ppp) !== null && z(v.ppp) < z(v.ppg)) add('ppp', 'err', 'val.pp_lt');
+    if (n(v.shp) !== null && z(v.shp) < z(v.shg)) add('shp', 'err', 'val.sh_lt');
+    if (z(v.ppp) + z(v.shp) > d.pts) add('ppp', 'err', 'val.special_gt_pts');
+    if (z(v.fow) > z(v.fot)) add('fow', 'err', 'val.fow_gt_fot');
+    if (n(v.toi) === null) add('toi', 'warn', 'val.toi_missing');
+    else if (v.toi / gp > 60) add('toi', 'err', 'val.toi_high');
+    if (n(v.oa) !== null && (v.oa < 40 || v.oa > 99)) add('oa', 'warn', 'val.oa_range');
+    return out;
+  }
+  function validateGoalie(v, po) {
+    var out = [], max = po ? 28 : GAMES, gp = n(v.gp), d = goalieDerived(v);
+    function add(c, level, k, p) { out.push({ c: c, level: level, k: k, p: p || [] }); }
+    GK.forEach(function (c) { if (c !== 'oa' && n(v[c]) !== null && n(v[c]) < 0) add(c, 'err', 'val.negative'); });
+    if (gp !== null && gp > max) add('gp', 'err', 'val.gp_range', [max]);
+    if (!gp) { if (z(v.sa) > 0 || z(v.min) > 0) add('gp', 'err', 'val.stats_without_gp'); return out; }
+    if (z(v.w) + z(v.l) + z(v.otl) > gp) add('gp', 'err', 'val.wlo_gt_gp');
+    if (z(v.so) > gp) add('so', 'err', 'val.so_gt_gp');
+    if (n(v.sa) !== null && n(v.sv) !== null && n(v.sv) > n(v.sa)) add('sv', 'err', 'val.saves_gt_sa');
+    if (n(v.sa) !== null && n(v.sv) === null) add('sv', 'warn', 'val.sa_no_saves');
+    if (n(v.min) !== null && v.min / gp > 75) add('min', 'err', 'val.min_high');
+    if (n(v.min) === null) add('min', 'warn', 'val.min_missing');
+    return out;
+  }
+  function validateTeam(v, po, skaterGoals) {
+    var out = [], gp = n(v.gp);
+    function add(c, level, k, p) { out.push({ c: c, level: level, k: k, p: p || [] }); }
+    if (gp === null) return out;
+    var rec = z(v.w) + z(v.l) + (po ? 0 : z(v.otl));
+    if (rec !== gp) add('gp', 'err', 'val.record_sum', [rec, gp]);
+    if (!po && gp > GAMES) add('gp', 'err', 'val.gp_range', [GAMES]);
+    if (z(v.ppg) > n(v.tpp) && n(v.tpp) !== null) add('ppg', 'err', 'val.ppg_gt_tpp');
+    if (z(v.ppga) > n(v.tsh) && n(v.tsh) !== null) add('ppga', 'err', 'val.ppga_gt_tsh');
+    var home = z(v.hw) + z(v.hl) + (po ? 0 : z(v.ho)), away = z(v.aw) + z(v.al) + (po ? 0 : z(v.ao));
+    if (n(v.hw) !== null && home + away !== gp) add('hw', 'warn', 'val.home_away_sum', [home + away, gp]);
+    if (n(v.hw) !== null && z(v.hw) + z(v.aw) !== z(v.w)) add('hw', 'warn', 'val.home_away_wins', [z(v.hw) + z(v.aw), z(v.w)]);
+    if (skaterGoals !== null && skaterGoals !== undefined && n(v.gf) !== null && skaterGoals !== z(v.gf)) add('gf', 'warn', 'val.team_goals_mismatch', [skaterGoals, z(v.gf)]);
+    return out;
+  }
+  var api = { LINKED: LINKED, LAYOUT: LAYOUT, DER: DER, DLBL: DLBL, layout: layout, skaterGpCheck: skaterGpCheck, SKATERS_PER_GAME: SKATERS_PER_GAME, setGames: setGames, seasonGames: seasonGames, SK: SK, GK: GK, TM_RS: TM_RS, TM_PO: TM_PO, LBL: LBL, DECIMAL: DECIMAL, n: n, z: z, skaterDerived: skaterDerived, goalieDerived: goalieDerived, teamDerived: teamDerived,
+              validateSkater: validateSkater, validateGoalie: validateGoalie, validateTeam: validateTeam };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.FTE = api;
+})(typeof window !== 'undefined' ? window : this);
+
+;/* Événements de la saison : règles de validation et valeurs calculées (sans interface, testable avec Node). */
+(function (root) {
+  var HO = root.FTHOMO || (typeof require !== 'undefined' ? require('../connect/homonym_ui.js') : null);   // joueurs homonymes
+  var POS = ['C', 'LW', 'RW', 'LD', 'RD', 'G'];
+  // types de joueur par groupe de poste (mêmes listes que l'entrée des joueurs repêchés) et clé de libellé
+  var PTYPES = { F: ['Power Forward', '2 Way Forward', 'Grinder', 'Sniper', 'Playmaker', 'Enforcer'], D: ['Enforcer', '2 Way Defenseman', 'Offensive Defenseman', 'Defensive Defenseman'], G: ['Butterfly', 'Hybrid', 'Stand-up'] };
+  var PTSLUG = { 'Power Forward': 'power_forward', '2 Way Forward': 'two_way_forward', 'Grinder': 'grinder', 'Sniper': 'sniper', 'Playmaker': 'playmaker', 'Enforcer': 'enforcer', '2 Way Defenseman': 'two_way_defenseman', 'Offensive Defenseman': 'offensive_defenseman', 'Defensive Defenseman': 'defensive_defenseman', 'Butterfly': 'butterfly', 'Hybrid': 'hybrid', 'Stand-up': 'stand_up' };
+  var GROUP_OF = { C: 'F', LW: 'F', RW: 'F', LD: 'D', RD: 'D', G: 'G' };
+  // poste secondaire : un attaquant ne peut être que C, LW ou RW (autre que son poste), un défenseur que LD ou RD ; un gardien n'en a pas
+  function secondaryOptions(pos) { var g = GROUP_OF[pos]; if (!g || g === 'G') return []; return POS.filter(function (x) { return GROUP_OF[x] === g && x !== pos; }); }
+  // acquis par (calculé) : repêchage si l'information de repêchage est connue, sinon l'événement lié, sinon début de franchise ou joueur autonome
+  function viaFrom(r, evt, firstDate) { if (r.dyear || r.dround || r.dpick || r.dteam) return 'draft'; if (evt) return evt; return isDate(r.date) && firstDate && r.date <= firstDate ? 'start' : 'free_agent'; }
+  var MOVES = ['injury', 'call_up', 'send_down', 'waiver_claim'];
+  var EVENTS = ['entry_level', 'rfa_extension', 'ufa_extension', 'free_agent', 'acquired', 'traded_for', 'buy_out', 'release'];
+  var NO_TERMS = ['buy_out', 'release'];                     // rachat et libération : pas de type, de nombre d'années, de première saison, de salaire ni de clause
+  var ACTIVE_ONLY = ['rfa_extension', 'ufa_extension', 'buy_out', 'release'];   // événements qui visent un joueur déjà avec l'équipe
+  var NTC_N = [4, 8, 10, 12, 16, 20, 24, 29];
+  // clauses possibles pour chaque année d'un contrat à un volet : NMC, NTC, M-NTC-n, et les combinaisons NMC | M-NTC-n
+  var CLAUSES = ['NMC', 'NTC'].concat(NTC_N.map(function (n) { return 'M-NTC-' + n; })).concat(NTC_N.map(function (n) { return 'NMC | M-NTC-' + n; }));
+  function isDate(s) { return typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(Date.parse(s)); }
+  function seasonOf(d) { var y = +d.slice(0, 4), m = +d.slice(5, 7); return m >= 7 ? y : y - 1; }
+  function num(v) { return v === null || v === undefined || v === '' || isNaN(v) ? null : +v; }
+  function A(c, level, k, p) { return { c: c, level: level, k: k, p: p || [] }; }
+  function addDays(d, n) { var t = new Date(d + 'T00:00:00Z'); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); }
+
+  // ---- mouvements et blessures ----
+  // joueurs actifs avec l'équipe à une date : l'arrivée est avant ou le jour même, le départ après ou le jour même (ou aucun départ)
+  function activeAt(stints, pid, d) { return (stints || []).some(function (x) { return x[0] === pid && x[1] <= d && (x[2] == null || x[2] >= d); }); }
+  // matchs manqués sur blessure : matchs du calendrier strictement après la date de blessure et strictement avant la date de retour
+  // (réglé sur les 362 blessures déjà enregistrées : concordance complète)
+  function missedGames(dates, inj, ret) { if (!dates || !isDate(inj) || !isDate(ret) || ret < inj) return null; return dates.filter(function (d) { return d > inj && d < ret; }).length; }
+  function validateMove(r, ctx) {
+    var out = [];
+    if (!isDate(r.date)) out.push(A('date', 'err', 'val.date_format'));
+    if (!r.pid) out.push(A('pid', 'err', 'val.player_missing'));
+    if (!r.move) out.push(A('move', 'err', 'val.required'));
+    if (r.pid && isDate(r.date) && ctx.stints && !activeAt(ctx.stints, r.pid, r.date)) out.push(A('pid', 'err', 'val.player_not_active'));
+    if (r.move !== 'injury' && r.ret) out.push(A('ret', 'err', 'val.ret_only_injury'));
+    if (r.move !== 'send_down' && (r.claimed === 'yes' || r.claimed === 1 || r.claimed === '1')) out.push(A('claimed', 'err', 'val.claimed_only_send_down'));
+    if (r.move === 'injury') {
+      if (r.ret && !isDate(r.ret)) out.push(A('ret', 'err', 'val.date_format'));
+      else if (r.ret && isDate(r.date) && r.ret < r.date) out.push(A('ret', 'err', 'val.return_before_date'));
+      else if (r.ret && isDate(r.date) && r.ret === r.date) out.push(A('ret', 'warn', 'val.return_same_day'));
+      if (!r.ret) out.push(A('ret', 'warn', 'val.return_missing'));
+      if (ctx.injuriesOf && r.pid && isDate(r.date)) { var end = isDate(r.ret) && r.ret >= r.date ? r.ret : '9999-12-31'; if (ctx.injuriesOf(r.pid, r.id).some(function (o) { return o.date <= end && (o.ret || '9999-12-31') >= r.date; })) out.push(A('date', 'err', 'val.injury_overlap')); }
+      // matchs manqués : calculés d'après le calendrier de la saison
+      if (isDate(r.date) && ctx.scheduleOf) {
+        var sc = ctx.scheduleOf(seasonOf(r.date)), n = ctx.gamesPerSeason || 82;
+        if (!sc || !sc.length) out.push(A('games', 'warn', 'val.schedule_missing'));
+        else if (sc.length < n) out.push(A('games', 'warn', 'val.schedule_incomplete', [sc.length, n]));
+        else if (isDate(r.ret) && r.ret > sc[sc.length - 1]) out.push(A('games', 'warn', 'val.return_after_season'));
+        if (isDate(r.ret) && isDate(r.date) && seasonOf(r.ret) !== seasonOf(r.date)) out.push(A('ret', 'warn', 'val.return_other_season'));
+      }
+    }
+    if (isDate(r.date) && ctx.currentSeason !== undefined && Math.abs(seasonOf(r.date) - ctx.currentSeason) > 1) out.push(A('date', 'warn', 'val.date_far'));
+    return out;
+  }
+
+  // ---- contrats ----
+  function contractDerived(r) {
+    var first = num(r.first), years = num(r.years);
+    if (first === null || years === null || years < 1) return { last: null, end: null };
+    return { last: first + years - 1, end: (first + years) + '-06-30' };
+  }
+  function validateContract(r, ctx) {
+    var out = [], first = num(r.first), years = num(r.years), aav = num(r.aav), terms = NO_TERMS.indexOf(r.event) < 0;
+    if (!isDate(r.date)) out.push(A('date', 'err', 'val.date_format'));
+    if (!r.pid) out.push(A('pid', 'err', 'val.player_missing'));
+    if (!r.event) out.push(A('event', 'err', 'val.required'));
+    // joueur déjà avec l'équipe à la date : prolongations, rachat et libération
+    if (r.pid && isDate(r.date) && ACTIVE_ONLY.indexOf(r.event) >= 0 && ctx.stints && !activeAt(ctx.stints, r.pid, r.date)) out.push(A('pid', 'err', 'val.player_not_active'));
+    if (!terms) {
+      ['ctype', 'years', 'first', 'aav'].forEach(function (c) { if (r[c] !== '' && r[c] != null) out.push(A(c, 'err', 'val.not_applicable')); });
+      return out;
+    }
+    if (!r.ctype) out.push(A('ctype', 'err', 'val.required'));
+    if (years === null || years < 1 || years > 8) out.push(A('years', 'err', 'val.years_range'));
+    else if (r.event === 'entry_level' && years > 3) out.push(A('years', 'warn', 'val.elc_years'));
+    if (first === null) out.push(A('first', 'err', 'val.required'));
+    if (aav === null || aav <= 0) out.push(A('aav', 'err', 'val.aav_missing'));
+    // clauses : seulement pour un contrat à un volet, une par année du contrat (jusqu'à 8)
+    for (var k = 1; k <= 8; k++) { var cl = r['cl' + k]; if (cl === '' || cl == null) continue;
+      if (r.ctype !== 'one_way') out.push(A('cl' + k, 'err', 'val.clause_one_way'));
+      else if (years !== null && k > years) out.push(A('cl' + k, 'err', 'val.clause_beyond_years'));
+      else if (CLAUSES.indexOf(cl) < 0) out.push(A('cl' + k, 'err', 'val.clause_unknown')); }
+    if (first !== null && aav !== null) {
+      var known = ctx.cap[first] ? first : Object.keys(ctx.cap).map(Number).filter(function (y) { return y < first; }).sort(function (a, b) { return b - a; })[0];
+      var c = known !== undefined ? ctx.cap[known] : null, lvl = known === first ? 'err' : 'warn';   // saison à venir : plafond pas encore saisi, on compare au dernier connu
+      if (c && c[2] && aav < c[2]) out.push(A('aav', lvl, 'val.aav_below_min', [c[2]]));
+      if (c && c[3] && aav > c[3]) out.push(A('aav', lvl, 'val.aav_above_max', [c[3]]));
+    }
+    if (first !== null && isDate(r.date)) {
+      var diff = first - seasonOf(r.date), maxd = 1 + (r.event === 'entry_level' ? 1 : 0);
+      if (diff < 0 || diff > maxd) out.push(A('first', 'warn', 'val.first_season_vs_date', [diff]));
+    }
+    if (r.pid && isDate(r.date) && first !== null && ctx.contractsOf) {
+      var others = ctx.contractsOf(r.pid, r.id), start = first + '-07-01';
+      var overlap = others.filter(function (o) { return o.end && o.end >= addDays(start, 1) && o.start && o.start < start; });
+      if (r.event.indexOf('extension') < 0 && r.event && overlap.length && r.event !== 'traded_for' && r.event !== 'acquired') out.push(A('pid', 'warn', 'val.contract_overlap'));
+    }
+    return out;
+  }
+  // offres hostiles : compensation et jusqu'à 4 choix (équipe, année, ronde)
+  function validateOffer(r, ctx) {
+    var out = [];
+    if (!isDate(r.date)) out.push(A('date', 'err', 'val.date_format'));
+    if (!r.pid) out.push(A('pid', 'err', 'val.player_missing'));
+    if (!r.event) out.push(A('event', 'err', 'val.required'));
+    if (r.pid && isDate(r.date) && r.event === 'unmatched' && ctx.stints && !activeAt(ctx.stints, r.pid, r.date)) out.push(A('pid', 'err', 'val.player_not_active'));
+    if (!r.comp) out.push(A('comp', 'err', 'val.required'));
+    var any = false, seen = {};
+    for (var k = 1; k <= 4; k++) {
+      var t = r['p' + k + 't'], y = r['p' + k + 'y'], rd = r['p' + k + 'r'], has = [t, y, rd].some(function (v) { return v !== '' && v != null; });
+      if (!has) continue; any = true;
+      if (r.comp !== 'yes') { out.push(A('p' + k + 't', 'err', 'val.picks_need_comp')); continue; }
+      if (!t) out.push(A('p' + k + 't', 'err', 'val.required')); if (num(y) === null) out.push(A('p' + k + 'y', 'err', 'val.required')); else if (isDate(r.date) && num(y) < seasonOf(r.date)) out.push(A('p' + k + 'y', 'warn', 'val.pick_year_past'));
+      if (num(rd) === null || num(rd) < 1 || num(rd) > 7) out.push(A('p' + k + 'r', 'err', 'val.round_range'));
+      var key = t + '|' + y + '|' + rd; if (t && seen[key]) out.push(A('p' + k + 't', 'warn', 'val.comp_pick_dup')); seen[key] = 1;
+    }
+    if (r.comp === 'yes' && !any) out.push(A('p1t', 'warn', 'val.comp_no_pick'));
+    return out;
+  }
+
+  // ---- transactions : lignes regroupées par (date, partenaire) ----
+  function tradeGroups(rows) {
+    var g = {}, order = [];
+    rows.forEach(function (r, i) { var k = (r.date || '') + '|' + (r.partner || '') + '|' + (r.grp || ''); if (!g[k]) { g[k] = []; order.push(k); } g[k].push(i); });
+    return { g: g, order: order };
+  }
+  function validateTradeRow(r, ctx) {
+    var out = [];
+    if (!isDate(r.date)) out.push(A('date', 'err', 'val.date_format'));
+    if (!r.partner) out.push(A('partner', 'err', 'val.required'));
+    if (!r.dir) out.push(A('dir', 'err', 'val.required'));
+    if (r.type === 'player' && !r.pid) out.push(A('pid', 'err', 'val.player_missing'));
+    if (r.type === 'pick') {
+      var y = num(r.year), rd = num(r.round);
+      if (y === null) out.push(A('year', 'err', 'val.required')); if (rd === null || rd < 1 || rd > 7) out.push(A('round', 'err', 'val.round_range'));
+      if (!r.orig) out.push(A('orig', 'err', 'val.required'));
+    }
+    if (!r.type) out.push(A('type', 'err', 'val.required'));
+    var ret = num(r.ret), ry = num(r.ryears);
+    if (ret !== null && ret < 0) out.push(A('ret', 'err', 'val.negative'));
+    if (ret > 0 && (ry === null || ry < 1)) out.push(A('ryears', 'err', 'val.retention_years'));
+    if (ret > 0 && r.type !== 'player') out.push(A('ret', 'err', 'val.retention_player_only'));
+    if (ret > 0 && ctx && ctx.aavAt && r.pid && isDate(r.date)) { var aav = ctx.aavAt(r.pid, r.date); var full = r.dir === 'in' ? aav + ret : aav; if (aav && ret > full * 0.505) out.push(A('ret', 'warn', 'val.retention_over_half', [Math.round(full * 0.5)])); }
+    return out;
+  }
+  function validateTradeGroup(rows, idxs) {
+    var out = [], o = idxs.filter(function (i) { return rows[i].dir === 'out'; }).length, n = idxs.filter(function (i) { return rows[i].dir === 'in'; }).length;
+    if (!o) out.push(A('dir', 'warn', 'val.trade_no_out')); if (!n) out.push(A('dir', 'warn', 'val.trade_no_in'));
+    if (o > 5 || n > 5) out.push(A('dir', 'err', 'val.trade_max_assets'));
+    return out;
+  }
+
+  // ---- changements de position ----
+  function validatePosChange(r, ctx) {
+    var out = [];
+    if (!isDate(r.date)) out.push(A('date', 'err', 'val.date_format'));
+    if (!r.pid) out.push(A('pid', 'err', 'val.player_missing'));
+    else if (isDate(r.date) && ctx && ctx.stints && !activeAt(ctx.stints, r.pid, r.date)) out.push(A('pid', 'err', 'val.player_not_active'));
+    // position de départ (fp) : case calculée, que l'on ne peut pas remplir → message propre (val.pc_from_missing)
+    ['fp', 'tp'].forEach(function (c) { if (!r[c]) out.push(A(c, 'err', c === 'fp' ? 'val.pc_from_missing' : 'val.required')); else if (POS.indexOf(r[c]) < 0) out.push(A(c, 'err', 'val.position_unknown')); });
+    if (r.fp && r.tp && r.fp === r.tp && (r.fs || '') === (r.ts || '')) out.push(A('tp', 'warn', 'val.position_same'));
+    return out;
+  }
+
+  // ---- nouveau joueur ----
+  function validateNewPlayer(r, ctx) {
+    var out = [];
+    ['first', 'last', 'pos', 'birth', 'date'].forEach(function (c) { if (!r[c]) out.push(A(c, 'err', 'val.required')); });
+    if (r.pos2 && (r.pos2 === r.pos || secondaryOptions(r.pos).indexOf(r.pos2) < 0)) out.push(A('pos2', 'err', 'val.pos2_group'));
+    if (r.ptype && r.pos && PTYPES[GROUP_OF[r.pos]] && PTYPES[GROUP_OF[r.pos]].indexOf(r.ptype) < 0) out.push(A('ptype', 'warn', 'val.ptype_group'));
+    if (r.pos && POS.indexOf(r.pos) < 0) out.push(A('pos', 'err', 'val.position_unknown'));
+    if (r.birth && !isDate(r.birth)) out.push(A('birth', 'err', 'val.date_format'));
+    if (r.date && !isDate(r.date)) out.push(A('date', 'err', 'val.date_format'));
+    if (r.birth && r.date && isDate(r.birth) && isDate(r.date)) { var age = (Date.parse(r.date) - Date.parse(r.birth)) / 31557600000; if (age < 16 || age > 45) out.push(A('birth', 'warn', 'val.age_range', [Math.round(age)])); }
+    var hh = num(r.height); if (r.height !== '' && r.height != null && (hh === null || hh < 60 || hh > 84)) out.push(A('height', 'warn', 'val.height_range'));
+    var w = num(r.weight); if (w !== null && (w < 120 || w > 300)) out.push(A('weight', 'warn', 'val.weight_range'));
+    var dr = num(r.dround), dp = num(r.dpick); if (dr !== null && (dr < 1 || dr > 7)) out.push(A('dround', 'err', 'val.round_range')); if (dp !== null && (dp < 1 || dp > 300)) out.push(A('dpick', 'warn', 'val.pick_range'));
+    // homonyme (même groupe, même nom simplifié, joueurs historiques compris) : réponse obligatoire à « Même joueur ? » (migration 71)
+    if (r.first && r.last && ctx.homoCands && HO) {
+      var hc = ctx.homoCands(r), nm = (r.first + ' ' + r.last).trim(), hs = HO.status(hc, r.homo);
+      if (hs === 'ask') out.push(A('last', 'err', 'val.homonym_unanswered', [nm]));
+      else if (hs === 'no' && r.birth && isDate(r.birth) && HO.sameBirth(hc, r.birth)) out.push(A('birth', 'err', 'val.homonym_same_birth', [nm, r.birth]));
+    }
+    return out;
+  }
+
+  var api = { PTYPES: PTYPES, PTSLUG: PTSLUG, GROUP_OF: GROUP_OF, secondaryOptions: secondaryOptions, viaFrom: viaFrom, validateOffer: validateOffer, CLAUSES: CLAUSES, NO_TERMS: NO_TERMS, ACTIVE_ONLY: ACTIVE_ONLY, activeAt: activeAt, missedGames: missedGames, POS: POS, MOVES: MOVES, EVENTS: EVENTS, isDate: isDate, seasonOf: seasonOf, num: num, addDays: addDays, contractDerived: contractDerived,
+              validateMove: validateMove, validateContract: validateContract, tradeGroups: tradeGroups, validateTradeRow: validateTradeRow, validateTradeGroup: validateTradeGroup,
+              validatePosChange: validatePosChange, validateNewPlayer: validateNewPlayer };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.FTV = api;
+})(typeof window !== 'undefined' ? window : this);
+
+;/* Repêchage (phase 4d) : choix détenus, ordre de sélection, valeur des choix, analyse du repêchage. Sans interface, testable avec Node.
+   Entrée : les données de la page Repêchage (assembleSeason de connect/live_data.js = season/build_season_data.py) :
+     D.franchise { code, first }, D.league { size }, D.standings { saison : [[équipe, rang, PTS, association, division, rang div.]] },
+     D.ranks { saison : { équipe : rang de repêchage } }, D.base.lottery { année : [[rang tiré, rang avant loterie, équipe]] },
+     D.base.picks { année : [ronde, équipe d'origine, rang global, clé, statut, …, id du joueur] }, D.base.top3,
+     D.draft { initial, trades, offers, values, po, board } (voir draftData dans live_data.js).
+   Sources Excel : DraftPicks (Q5:V188, LET « Owned picks » ; GetDraftRank, module VBA DraftRanksFunctions), DraftRanks (AH4:BF227 ;
+   GetTeamByDraftRank ; rangs des séries H229:AF312), DraftBoard (P6:AE213). Référence en cache : season/fixtures/draft_reference.json. */
+(function (root) {
+  var FE = typeof module !== 'undefined' && module.exports ? require('../entry/entry_core.js') : root.FTE;   // goalieDerived (SV%, MBA)
+  var SEASONS = 25, ROUNDS = 7, PLAYOFF_TEAMS = 16;   // durée d'une franchise (ft_private.franchise_seasons, db/78), rondes, équipes aux séries
+
+  // Années de repêchage de la franchise : première saison + 1 à + 25 (DraftPicks!B5 ; ft_private.draft_years).
+  function draftYears(first) { var a = []; for (var y = first + 1; y <= first + SEASONS; y++) a.push(y); return a; }
+
+  // Barème par défaut (décision du 2026-11-19, docs/maquettes/pick_value_fit.py) : 0,713 + 99,287 · p^−0,297 · e^(−0,0398 (p − 1)),
+  // arrondi au centième. Même formule : ft_private.pick_value_default (db/78), import_xlsm.py pick_value_default.
+  function pickValueDefault(p) {
+    var x = Number((0.713 + 99.287 * Math.pow(p, -0.297) * Math.exp(-0.0398 * (p - 1))).toPrecision(15));
+    return Math.round(x * 100 + 1e-9) / 100;
+  }
+  // Barème de la franchise (draft_pick_value) ; rang absent : valeur par défaut.
+  function valueOf(values) { var m = {}; (values || []).forEach(function (v) { if (v[1] != null) m[v[0]] = +v[1]; }); return function (p) { return p == null ? null : m[p] != null ? m[p] : pickValueDefault(p); }; }
+
+  function key(y, r, t) { return y + '|' + r + '|' + t; }
+
+  // ---- Ordre (DraftRanks) ----
+  // Rang des 16 équipes des séries (DraftRanks!C297:C312) : 1 = champion, 2 = finaliste, 3-4 = perdants des finales d'association
+  // (le mieux classé en saison d'abord), 5-16 = éliminés aux rondes 1 et 2 : champions de division d'abord (rang div. 1), puis les
+  // autres, chacun dans l'ordre du classement (H285:H296). Série gagnée = 4 victoires. null si les séries ne sont pas finies.
+  function playoffRanks(series, standing) {
+    if (!series || !standing) return null;
+    var st = {}; standing.forEach(function (s) { st[s[0]] = { rank: s[1], divWinner: s[5] === 1 }; });
+    var out = {}, losers = { 1: [], 2: [], 3: [] }, champ = null, done = true;
+    series.forEach(function (x) {
+      var a = x[3], b = x[4], w = x[5] >= 4 ? a : x[6] >= 4 ? b : null, l = w === a ? b : w === b ? a : null;
+      if (!w || !l) { done = false; return; }
+      if (x[0] === 4) { champ = w; out[w] = 1; out[l] = 2; } else losers[x[0]].push(l);
+    });
+    if (!done || !champ || series.length !== 15) return null;
+    var byRank = function (a, b) { return (st[a] ? st[a].rank : 99) - (st[b] ? st[b].rank : 99); };
+    losers[3].sort(byRank).forEach(function (t, i) { out[t] = 3 + i; });
+    var early = losers[1].concat(losers[2]);
+    early.filter(function (t) { return st[t] && st[t].divWinner; }).sort(byRank).concat(early.filter(function (t) { return !(st[t] && st[t].divWinner); }).sort(byRank))
+      .forEach(function (t, i) { out[t] = 5 + i; });
+    return out;
+  }
+  // Ordre de sélection d'une année (équipe d'origine de chaque rang global), comme GetTeamByDraftRank :
+  //   rang r dans la ronde ≤ nombre d'équipes hors séries (taille − 16) : 1re ronde = résultat de la loterie (rang tiré r) ;
+  //   rondes suivantes = rang avant la loterie r (sinon rang de repêchage du classement) ;
+  //   r > taille − 16 : équipe des séries de rang taille + 1 − r (le champion choisit en dernier).
+  // Classement et séries de la saison année − 1. Retour : { year, size, status : 'final' | 'partial' | 'none', picks : [{ overall, round, rank, team }] }.
+  function draftOrder(D, year) {
+    var n = (D.league && D.league.size) || 32, np = n - PLAYOFF_TEAMS, season = String(year - 1);
+    // comme DraftRanks!AH4 : ordre inconnu avant le repêchage (20 juin) à la date du jeu
+    if (D.franchise && D.franchise.date && String(D.franchise.date) < year + '-06-20') return { year: year, size: n, status: 'none', picks: emptyOrder(n) };
+    var lot = (D.base && D.base.lottery && D.base.lottery[String(year)]) || [], byPick = {}, byPre = {};
+    lot.forEach(function (l) { if (l[2]) { byPick[l[0]] = l[2]; if (l[1] != null) byPre[l[1]] = l[2]; } });
+    var dr = {}, rk = (D.ranks && D.ranks[season]) || {}; Object.keys(rk).forEach(function (t) { if (rk[t] != null) dr[rk[t]] = t; });
+    var pr = playoffRanks(D.draft && D.draft.po && D.draft.po[season], D.standings && D.standings[season]), poBy = {};
+    if (pr) Object.keys(pr).forEach(function (t) { poBy[pr[t]] = t; });
+    var picks = [], known = 0;
+    for (var round = 1; round <= ROUNDS; round++) for (var r = 1; r <= n; r++) {
+      var t = r <= np ? (round === 1 ? byPick[r] : byPre[r] || dr[r]) || null : poBy[n + 1 - r] || null;
+      if (t) known++;
+      picks.push({ overall: (round - 1) * n + r, round: round, rank: r, team: t });
+    }
+    return { year: year, size: n, status: known === picks.length ? 'final' : known ? 'partial' : 'none', picks: picks };
+  }
+  function emptyOrder(n) { var a = []; for (var round = 1; round <= ROUNDS; round++) for (var r = 1; r <= n; r++) a.push({ overall: (round - 1) * n + r, round: round, rank: r, team: null }); return a; }
+  // Rang global du choix (année, ronde, équipe d'origine) dans l'ordre (GetDraftRank) ; null si inconnu.
+  function overallOf(order, round, team) { for (var i = 0; i < order.picks.length; i++) { var p = order.picks[i]; if (p.round === round && p.team === team) return p.overall; } return null; }
+
+  // ---- Choix détenus (DraftPicks « Owned picks ») ----
+  // Registre chronologique : choix de départ (draft_pick_initial), règle par défaut (chaque équipe détient ses propres choix : les
+  // nôtres, de la 1re année de repêchage jusqu'à la dernière citée, même au-delà des 25 années des choix de départ), échanges
+  // (trade_asset de type choix), compensations des offres hostiles (offre signée : nous cédons les choix ; non alignée : nous les
+  // recevons). Écart voulu avec l'Excel : un choix cédé puis récupéré n'est compté qu'une fois (l'Excel l'additionne).
+  // Anomalies (signalées, jamais corrigées) : choix cédé sans être détenu, choix reçu déjà détenu, statut « traded » avec un rang.
+  function ledger(D) {
+    var dd = D.draft || {}, code = D.franchise.code, first = D.franchise.first, held = {}, lost = {}, issues = [], last = first + SEASONS, hist = {}, init = {};
+    (dd.trades || []).forEach(function (t) { if (t[3] > last) last = t[3]; }); (dd.offers || []).forEach(function (o) { if (o[2] > last) last = o[2]; });
+    var mk = function (y, r, t, o) { return Object.assign({ year: y, round: r, team: t }, o); };
+    (dd.initial || []).forEach(function (x) { var k = key(x[0], x[1], x[2]); if (x[3]) init[k] = 1; if (x[3]) held[k] = mk(x[0], x[1], x[2], { via: 'initial', on: null, from: null }); else lost[k] = mk(x[0], x[1], x[2], { via: 'initial', on: null, to: null }); });
+    for (var y = first + 1; y <= last; y++) for (var r = 1; r <= ROUNDS; r++) { var k0 = key(y, r, code); if (!held[k0] && !lost[k0]) { held[k0] = mk(y, r, code, { via: 'default', on: null, from: null }); init[k0] = 1; } }
+    var ev = [];
+    (dd.trades || []).forEach(function (t, i) { ev.push({ on: t[0], i: i, dir: t[2], y: t[3], r: t[4], t: t[5], via: 'trade', who: t[1] }); });
+    (dd.offers || []).forEach(function (o, i) { ev.push({ on: o[0], i: 10000 + i, dir: o[1] === 'unmatched' ? 'in' : 'out', y: o[2], r: o[3], t: o[4], via: 'offer_sheet', who: null }); });
+    ev.sort(function (a, b) { return a.on < b.on ? -1 : a.on > b.on ? 1 : a.i - b.i; });
+    ev.forEach(function (e) {
+      var k = key(e.y, e.r, e.t);
+      (hist[k] = hist[k] || []).push({ dir: e.dir, who: e.who, on: e.on, via: e.via });
+      if (e.dir === 'in') {
+        if (held[k]) issues.push({ kind: 'in_already_held', year: e.y, round: e.r, team: e.t, on: e.on, via: e.via });
+        held[k] = mk(e.y, e.r, e.t, { via: e.via, on: e.on, from: e.who }); delete lost[k];
+      } else {
+        if (!held[k]) issues.push({ kind: 'out_not_held', year: e.y, round: e.r, team: e.t, on: e.on, via: e.via });
+        delete held[k]; lost[k] = mk(e.y, e.r, e.t, { via: e.via, on: e.on, to: e.who });
+      }
+    });
+    var sortP = function (a, b) { return a.year - b.year || a.round - b.round || (a.team < b.team ? -1 : a.team > b.team ? 1 : 0); };
+    return { held: Object.keys(held).map(function (k) { return held[k]; }).sort(sortP), lost: Object.keys(lost).map(function (k) { return lost[k]; }).sort(sortP), issues: issues, hist: hist, init: init };
+  }
+  // Détenteur d'un choix pour l'onglet Ordre : nous ; l'équipe à qui nous l'avons cédé ; null si cédé sans destinataire connu (offre
+  // hostile) ; sinon l'équipe d'origine (seuls les échanges de notre franchise sont saisis : ceux des autres équipes sont inconnus).
+  function holderFn(D, L) {
+    var h = {}, l = {}; L.held.forEach(function (p) { h[key(p.year, p.round, p.team)] = 1; }); L.lost.forEach(function (p) { l[key(p.year, p.round, p.team)] = p; });
+    return function (y, r, t) { var k = key(y, r, t); if (h[k]) return { team: D.franchise.code, mine: true }; if (l[k]) return { team: l[k].to || null, mine: false }; return { team: t, mine: false }; };
+  }
+  // Rang projeté d'un choix dont l'ordre est inconnu : ordre inverse du dernier classement connu (taille + 1 − rang au classement) ;
+  // sans classement : milieu de la ronde (taille / 2, arrondi vers le bas). basis : 'exact' | 'projected' | 'middle'.
+  function projectFn(D) {
+    var seasons = Object.keys(D.standings || {}).map(Number).sort(function (a, b) { return b - a; }), lastSt = seasons.length ? D.standings[String(seasons[0])] : [], rk = {};
+    lastSt.forEach(function (s) { if (s[1] != null) rk[s[0]] = s[1]; });
+    var n = (D.league && D.league.size) || 32;
+    return function (round, team) { var r = rk[team] != null ? n + 1 - rk[team] : null; return r != null ? { overall: (round - 1) * n + r, basis: 'projected' } : { overall: (round - 1) * n + Math.floor(n / 2), basis: 'middle' }; };
+  }
+
+  // ---- Analyse (DraftBoard) ----
+  // Choix de l'équipe (joueurs repêchés par elle, draft_team) et carrière en saison régulière avec l'équipe : P = B + A ; gardiens :
+  // SV% et MBA par entry_core.goalieDerived (null sans tirs ou sans minutes ; l'Excel affiche 0, IFERROR).
+  function boardPicks(D) {
+    return ((D.draft && D.draft.board) || []).map(function (b) {
+      var g = b[4] === 'G', o = { player_id: b[0], year: b[1], round: b[2], pick: b[3], pos: b[4], first: b[5], last: b[6], gp: b[7], pos2: b[16] || null, gp_hist: b[17] || 0 };
+      if (g) { var d = FE.goalieDerived({ sv: b[13], sa: b[14], min: b[15] }); o.w = b[11]; o.so = b[12]; o.sv_pct = d.svPct; o.gaa = d.gaa; }
+      else { o.g = b[8]; o.a = b[9]; o.pts = (b[8] || 0) + (b[9] || 0); o.pm = b[10]; }
+      return o;
+    });
+  }
+
+  // ---- Analyse : réussite des joueurs repêchés (Gabriel, 2026-11-23) ----
+  // Parmi les choix de l'équipe (boardPicks), nombre et proportion de joueurs avec au moins 1 match et au moins 100 matchs de
+  // saison régulière AVEC L'ÉQUIPE (gp de boardPicks : même source que la colonne MJ de l'Analyse). Filtres facultatifs :
+  // pos = groupe F / D / G ou poste exact (C, LW, RW, LD, RD, G) ; year ; round. Proportion en % (0 à 100, non arrondie),
+  // null quand aucun joueur ne correspond au filtre (jamais 0). Un MJ vide compte comme 0 match.
+  var GROUP = { C: 'F', LW: 'F', RW: 'F', F: 'F', LD: 'D', RD: 'D', D: 'D', G: 'G' };
+  // Options (Gabriel, 2026-11-23) : recent = false retire les deux années de repêchage les plus récentes de la liste (joueurs
+  // pas encore eu le temps de jouer) ; hist = false ne compte pas les MJ avec l'équipe d'avant la franchise (gp_hist).
+  function boardSummary(picks, f) {
+    f = f || {};
+    var ys = []; (picks || []).forEach(function (p) { if (ys.indexOf(p.year) < 0) ys.push(p.year); }); ys.sort(function (a, b) { return b - a; });
+    var recent = f.recent === false ? ys.slice(0, 2) : [];
+    var rows = (picks || []).filter(function (p) {
+      if (recent.indexOf(p.year) >= 0) return false;
+      if (f.year != null && f.year !== '' && p.year !== +f.year) return false;
+      if (f.round != null && f.round !== '' && p.round !== +f.round) return false;
+      if (f.pos) { if (f.pos === 'F' || f.pos === 'D' || f.pos === 'G') { if (GROUP[p.pos] !== f.pos) return false; } else if (p.pos !== f.pos) return false; }
+      return true;
+    });
+    var n = rows.length, gp1 = 0, gp100 = 0;
+    rows.forEach(function (p) { var g = (p.gp || 0) - (f.hist === false ? p.gp_hist || 0 : 0); if (g >= 1) gp1++; if (g >= 100) gp100++; });
+    var pct = function (k) { return n ? 100 * k / n : null; };
+    return { n: n, gp1: gp1, gp1_pct: pct(gp1), gp100: gp100, gp100_pct: pct(gp100), years_out: recent };
+  }
+
+  // ---- Choix de départ : validation avant l'envoi (mêmes règles que ft_private.initial_pick_error et
+  // ft_private.initial_empty_rounds, migration 78) ----
+  // picks : [{ year, round, team, owned }] (format de assemble().initial). own : code de l'équipe ; years : années de repêchage ;
+  // teams : codes des équipes de la ligue de la franchise (actives ; comme ft_private.in_league, pas toutes les équipes connues). Erreurs : ronde, année, équipe hors ligue, choix d'une autre équipe à « non », doublon.
+  // Avertissement (permis, jamais bloquant ; Gabriel, 2026-11-23) : ton choix à « non » et aucun choix détenu dans la même
+  // ronde et la même année → val.pick0_none_round.
+  function validateInitial(picks, own, years, teams) {
+    var errors = [], warnings = [], seen = {}, held = {}, inLeague = {};
+    (teams || []).forEach(function (t) { inLeague[t] = 1; });
+    var y0 = Math.min.apply(null, years), y1 = Math.max.apply(null, years);
+    // Comme ft_save_initial_picks : code en majuscules, « owned » absent = détenu, ronde et année entières (json_int).
+    var rows = (picks || []).map(function (p) { return { year: +p.year, round: +p.round, team: String(p.team == null ? '' : p.team).trim().toUpperCase(), owned: p.owned == null ? true : !!p.owned }; });
+    rows.forEach(function (p, i) {
+      var e = null;
+      if (!(Math.floor(p.round) === p.round && p.round >= 1 && p.round <= ROUNDS)) e = 'val.pick0_round';
+      else if (!(Math.floor(p.year) === p.year && p.year >= y0 && p.year <= y1)) e = 'val.pick0_year';
+      else if (!p.team || !inLeague[p.team]) e = 'val.pick0_team';
+      else if (p.team !== own && !p.owned) e = 'val.pick0_not_own';
+      else if (seen[key(p.year, p.round, p.team)]) e = 'val.pick0_dup';
+      if (e) errors.push({ i: i, key: e, year: p.year, round: p.round, team: p.team });
+      seen[key(p.year, p.round, p.team)] = 1;
+      if (p.owned && !e) held[p.year + '|' + p.round] = 1;   // une ligne en erreur ne compte pas comme choix détenu
+    });
+    var warned = {};
+    rows.forEach(function (p) {
+      var k = p.year + '|' + p.round;
+      if (p.team === own && !p.owned && !held[k] && !warned[k]) { warned[k] = 1; warnings.push({ key: 'val.pick0_none_round', year: p.year, round: p.round, team: own }); }
+    });
+    warnings.sort(function (a, b) { return a.year - b.year || a.round - b.round; });
+    return { errors: errors, warnings: warnings };
+  }
+
+  // ---- Choix détenus (onglet de consultation) : chaque choix passé par l'équipe et son parcours ----
+  // Un choix par (année, ronde, équipe d'origine) : détenu au départ (init), mouvements datés (hist : in = acquis de, out = cédé à),
+  // détenu aujourd'hui (held), exercé (overall et joueur, depuis draft_pick ; poste secondaire depuis l'Analyse).
+  function pickTimeline(D, A) {
+    var L = ledger(D), pl = {}, pos2 = {}, out = [], code = D.franchise.code;
+    (A || assemble(D)).board.picks.forEach(function (b) { pos2[b.player_id] = b.pos2; });
+    Object.keys((D.base && D.base.picks) || {}).forEach(function (y) { D.base.picks[y].forEach(function (p) { pl[key(+y, p[0], p[1])] = p; }); });
+    var heldK = {}; L.held.forEach(function (p) { heldK[key(p.year, p.round, p.team)] = 1; });
+    var all = {}; L.held.concat(L.lost).forEach(function (p) { all[key(p.year, p.round, p.team)] = p; });
+    Object.keys(all).forEach(function (k) {
+      var p = all[k], x = pl[k], used = x && x[4] === 'selected' && x[2] != null;
+      out.push({ year: p.year, round: p.round, team: p.team, mine: p.team === code, init: !!L.init[k], hist: (L.hist[k] || []).slice(), held: !!heldK[k] && !used, used: !!(heldK[k] && used),
+        overall: used ? x[2] : null, player: used ? ((x[5] || '') + ' ' + (x[6] || '')).trim() : null, pos: used ? x[7] || null : null, player_id: used ? x[x.length - 1] : null, pos2: used ? pos2[x[x.length - 1]] || null : null });
+    });
+    out.sort(function (a, b) { return a.year - b.year || a.round - b.round || (a.mine ? -1 : b.mine ? 1 : a.team < b.team ? -1 : 1); });
+    return out;
+  }
+
+  // ---- Assemblage pour la page Repêchage (onglets Choix détenus, Ordre, Analyse) et Point de départ (Choix de départ) ----
+  function assemble(D) {
+    var L = ledger(D), val = valueOf(D.draft && D.draft.values), holder = holderFn(D, L), project = projectFn(D), orders = {}, years = {};
+    var n = (D.league && D.league.size) || 32;
+    draftYears(D.franchise.first).forEach(function (y) { years[y] = 1; }); L.held.concat(L.lost).forEach(function (p) { years[p.year] = 1; });
+    Object.keys(years).forEach(function (y) { orders[y] = draftOrder(D, +y); });
+    var exercised = {}; Object.keys((D.base && D.base.picks) || {}).forEach(function (y) { D.base.picks[y].forEach(function (p) { exercised[key(+y, p[0], p[1])] = p; }); });
+    var issues = L.issues.slice();
+    Object.keys(exercised).forEach(function (k) { var p = exercised[k]; if (p[4] === 'traded' && p[2] != null) issues.push({ kind: 'traded_with_pick', year: +k.split('|')[0], round: p[0], team: p[1], overall: p[2] }); });
+    // rang global : celui du choix exercé (draft_pick.overall_pick, rang réel du jeu) s'il existe ; sinon l'ordre calculé ; sinon le rang
+    // projeté. Rang calculé ≠ rang enregistré : anomalie order_vs_recorded (séries en base à vérifier).
+    var owned = L.held.map(function (p) {
+      var o = orders[p.year], ov = o ? overallOf(o, p.round, p.team) : null, x = exercised[key(p.year, p.round, p.team)], rec = x && x[2] != null ? x[2] : null;
+      if (rec != null && ov != null && rec !== ov) issues.push({ kind: 'order_vs_recorded', year: p.year, round: p.round, team: p.team, overall: rec, computed: ov });
+      var pr = rec == null && ov == null ? project(p.round, p.team) : null, use = rec != null ? rec : ov != null ? ov : pr.overall;
+      return Object.assign({}, p, { overall: use, basis: rec != null ? 'recorded' : ov != null ? 'exact' : pr.basis, computed_overall: ov, value: val(use),
+        status: x ? x[4] : null, player_id: x ? x[x.length - 1] : null });
+    });
+    var ordersOut = {}; Object.keys(orders).forEach(function (y) { var o = orders[y]; ordersOut[y] = { status: o.status, picks: o.picks.map(function (p) { var h = p.team ? holder(+y, p.round, p.team) : { team: null, mine: false }; return { overall: p.overall, round: p.round, rank: p.rank, team: p.team, holder: h.team, mine: h.mine, value: val(p.overall) }; }) }; });
+    var values = []; for (var p = 1; p <= ROUNDS * n; p++) values.push({ overall: p, value: val(p), standard: pickValueDefault(p) });
+    return { years: draftYears(D.franchise.first), initial: ((D.draft && D.draft.initial) || []).map(function (x) { return { year: x[0], round: x[1], team: x[2], owned: !!x[3] }; }),
+             owned: owned, lost: L.lost, issues: issues, orders: ordersOut, values: values, board: { top3: (D.base && D.base.top3) || {}, picks: boardPicks(D) } };
+  }
+
+  var api = { SEASONS: SEASONS, ROUNDS: ROUNDS, draftYears: draftYears, pickValueDefault: pickValueDefault, valueOf: valueOf, playoffRanks: playoffRanks, draftOrder: draftOrder, overallOf: overallOf, ledger: ledger, boardPicks: boardPicks, boardSummary: boardSummary, validateInitial: validateInitial, pickTimeline: pickTimeline, assemble: assemble };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.FTDRAFT = api;
+})(typeof window !== 'undefined' ? window : this);
+
+;/* Repêchage : onglets de consultation (phase 4d, maquettes approuvées le 2026-11-23 : docs/maquettes/4d_*.html).
+   Choix détenus (owned), Ordre (ranks), Analyse (board). Calculs : season/draft_core.js (FTDRAFT) ; rien n'est recalculé ici.
+   Chaque onglet suit le contrat des onglets « view » de season/grid_engine.js : render(ctx), act(vs, dataset, ctx), set(vs, nom, valeur, ctx). */
+(function (root) {
+  var DR = root.FTDRAFT || (typeof require !== 'undefined' ? require('./draft_core.js') : null);
+  var ROUNDS = 7;
+  var IC = {
+    in: '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 2l7 7M9 4v5H4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    out: '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6h8M7 3l3 3-3 3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    mine: '<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M5 .8 9.2 5 5 9.2.8 5z" fill="currentColor"/></svg>',
+    up: '<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M5 1.5 9 8H1z" fill="currentColor"/></svg>',
+    down: '<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M5 8.5 1 2h8z" fill="currentColor"/></svg>',
+    chev: '<svg viewBox="0 0 10 10" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" d="M1.5 3.5 5 7l3.5-3.5"/></svg>',
+    info: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 7v4.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="8" cy="4.9" r="1" fill="currentColor"/></svg>',
+    clock: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 7v5l3 2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>'
+  };
+
+  // ---- données dérivées, mises en cache par objet DATA (la page recharge DATA après une synchronisation) ----
+  var CACHE = { D: null };
+  function derived(D) {
+    if (CACHE.D === D) return CACHE;
+    var A = DR.assemble(D);
+    CACHE = { D: D, A: A, T: DR.pickTimeline(D, A), teams: {}, next: D.franchise.current + 1, first: D.franchise.first + 1 };
+    (D.teams || []).forEach(function (x) { CACHE.teams[x.code] = x; });
+    return CACHE;
+  }
+
+  // ---- petites aides d'affichage ----
+  function nf(x, d, lang) { return x == null || isNaN(x) ? '—' : new Intl.NumberFormat(lang === 'en' ? 'en-CA' : 'fr-CA', { minimumFractionDigits: d || 0, maximumFractionDigits: d || 0 }).format(x); }
+  function ordL(c, n) { var k = c.lang === 'en' ? (n % 100 >= 11 && n % 100 <= 13 ? 'n' : n % 10 === 1 ? 1 : n % 10 === 2 ? 2 : n % 10 === 3 ? 3 : 'n') : (n === 1 ? 1 : 'n'); return c.fmt('ui.ord_' + k, [n]); }
+  function roundShort(c, r) { return c.t('dft.round_n', true).replace('{0}', r); }
+  function dateL(c, d) { if (!d) return ''; var p = String(d).split('-'); return new Intl.DateTimeFormat(c.lang === 'en' ? 'en-CA' : 'fr-CA', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(Date.UTC(+p[0], +p[1] - 1, +p[2])); }
+  function tname(c, code) { var x = derived(c.DATA).teams[code]; return x ? (c.lang === 'en' ? x.en : x.fr || x.en) : code; }
+  function teamChip(c, code) { var x = derived(c.DATA).teams[code] || {}; return '<span class="ft-team" title="' + c.esc(tname(c, code)) + '"><span class="tl" style="--o1:' + c.esc(x.c1 || '') + ';--o2:' + c.esc(x.c2 || '') + '"></span>' + c.esc(code) + '</span>'; }
+  // nom court de la grille repliée : « J. Milson », « J.-P. Roy » ; un prénom déjà réduit à une initiale reste tel quel
+  function shortName(n) { var w = String(n || '').trim().split(/\s+/); if (w.length < 2 || /\.$/.test(w[0])) return w.join(' '); return w[0].split('-').map(function (x) { return x.charAt(0) + '.'; }).join('-') + ' ' + w.slice(1).join(' '); }
+  function posL(c, p) { return p.pos ? c.t('pc.' + p.pos, true) + (p.pos2 && p.pos !== 'G' ? '/' + c.t('pc.' + p.pos2, true) : '') : ''; }
+  function lastOut(p) { var o = p.hist.filter(function (h) { return h.dir === 'out'; }).pop(); return o ? o.who : null; }
+
+  // =====================================================================================
+  // 1. Choix détenus
+  // =====================================================================================
+  function isHeld(p) { return p.held || p.used; }
+  // mode 'short' : année repliée (sans équipe d'origine sur un choix exercé, nom court) ; 'det' : année ouverte (poste + nom complet)
+  function chip(c, p, mode) {
+    var det = mode === 'det', me = p.mine;
+    if (p.used) {
+      var nm = det ? (posL(c, p) ? '<span class="ps">' + c.esc(posL(c, p)) + '</span> ' : '') + c.esc(p.player || '')
+        : '<span aria-hidden="true">' + c.esc(shortName(p.player)) + '</span><span class="vh">' + c.esc(p.player || '') + '</span>';
+      return '<span class="dpk" data-st="used"' + (det ? ' data-m="det"' : '') + ' title="' + c.esc(c.fmt('dft.own_chip_used', [ordL(c, p.overall), p.player || ''])) + '"><span class="n">' + p.overall + '</span>' + (me || !det ? '' : '<span class="o">' + c.esc(p.team) + '</span>') + '<span class="nm">' + nm + '</span></span>';
+    }
+    if (p.held) return me ? '<span class="dpk" data-st="own" title="' + c.esc(c.fmt('dft.own_chip_own', [p.round])) + '"><span class="c">' + c.esc(p.team) + '</span></span>'
+      : '<span class="dpk" data-st="acq" title="' + c.esc(c.fmt('dft.own_chip_acq', [p.team])) + '">' + IC.in + '<span class="c">' + c.esc(p.team) + '</span></span>';
+    var to = lastOut(p);
+    return '<span class="dpk" data-st="out" title="' + c.esc(c.fmt('dft.own_chip_out', [to || '?'])) + '"><span class="c">' + c.esc(p.team) + '</span>' + IC.out + '<span class="c">' + c.esc(to || '?') + '</span></span>';
+  }
+  function legendChip(c, st, team, extra) { return chip(c, Object.assign({ team: team, mine: team === c.DATA.franchise.code, hist: [], round: 1 }, st, extra || {}), 'short'); }
+  function ownedView(c) {
+    var X = derived(c.DATA), vs = c.vs, view = vs.view || 'held', moves = view === 'moves', open = vs.open || {}, code = c.DATA.franchise.code;
+    var by = {}; X.T.forEach(function (p) { (by[p.year] = by[p.year] || []).push(p); });
+    var years = Object.keys(by).map(Number).sort(function (a, b) { return b - a; });
+    var noInitial = !((c.DATA.draft && c.DATA.draft.initial) || []).length;
+    var vbtn = function (v, k) { return '<button type="button" data-vact="view" data-v="' + v + '" aria-pressed="' + (view === v) + '">' + c.esc(c.t(k)) + '</button>'; };
+    var h = '<section class="card wide"><div class="ft-cardhead"><p class="sub lead">' + c.esc(c.fmt('dft.own_sub', [X.first, years[0] || X.first])) + '</p>' +
+      '<div class="acts"><div class="ft-seg" role="group" aria-label="' + c.esc(c.t('dft.own_view')) + '">' + vbtn('held', 'dft.own_view_held') + vbtn('moves', 'dft.own_view_moves') + '</div>' +
+      '<a class="btn" href="start.html#picks0">' + c.esc(c.t('dft.own_go_start')) + '</a></div></div>';
+    if (noInitial) h += '<div class="ft-msg" role="note">' + IC.info + '<span><b>' + c.esc(c.t('dft.own_empty_lead')) + '</b> ' + c.esc(c.t('dft.own_empty_body')) + '</span><span></span></div>';
+    var lg = [['dft.own_lg_own', { held: true }, code], ['dft.own_lg_acq', { held: true }, 'CHI'], ['dft.own_lg_used', { used: true, overall: 47, player: 'Jean Tremblay' }, code]];
+    if (moves) lg.push(['dft.own_lg_out', { hist: [{ dir: 'out', who: 'CBJ' }] }, code]);
+    h += '<div class="ft-legend" role="note">' + lg.map(function (x) { return '<span>' + legendChip(c, x[1], x[2]) + c.esc(c.t(x[0])) + '</span>'; }).join('') + '</div>';
+    h += '<div class="ft-ledger-wrap"><table class="ft-ledger" data-view="' + view + '" aria-label="' + c.esc(c.t('nav.t.draft.owned')) + '"><colgroup><col class="y">' + '<col>'.repeat(ROUNDS) + '<col class="t"></colgroup><thead><tr><th scope="col">' + c.esc(c.t('picks.col_year')) + '</th>';
+    for (var r = 1; r <= ROUNDS; r++) h += '<th scope="col"><abbr title="' + c.esc(c.fmt('dft.round_n', [r])) + '">' + c.esc(roundShort(c, r)) + '</abbr></th>';
+    h += '<th scope="col" class="num"><abbr title="' + c.esc(c.t('dft.own_count')) + '">' + c.esc(c.t('dft.own_count', true)) + '</abbr></th></tr></thead><tbody>';
+    var sepPast = false;
+    years.forEach(function (y, yi) {
+      if (yi === 0 && y >= X.next) h += '<tr class="sep"><th colspan="9" scope="rowgroup">' + c.esc(c.t('dft.own_future')) + '</th></tr>';
+      if (y < X.next && !sepPast) { h += '<tr class="sep"><th colspan="9" scope="rowgroup">' + c.esc(c.t('dft.own_past')) + '</th></tr>'; sepPast = true; }
+      var list = by[y], held = list.filter(isHeld).length, op = !!open[y];
+      var tg = '<button type="button" class="yr-tg" data-vact="year" data-year="' + y + '" aria-expanded="' + op + '" aria-controls="pk-det-' + y + '" aria-label="' + c.esc(c.fmt(op ? 'dft.own_det_hide' : 'dft.own_det_show', [y])) + '">' + IC.chev + '<span>' + c.esc(c.t(op ? 'dft.own_det_hide' : 'dft.own_det_show', true)) + '</span></button>';
+      h += '<tr data-year="' + y + '" class="' + (y === X.next ? 'cur' : '') + (op ? ' open' : '') + '"><th scope="row"><span class="yv">' + y + '</span>' + (y === X.next ? '<span class="ys">' + c.esc(c.t('dft.own_next')) + '</span>' : '') + tg + '</th>';
+      for (var r = 1; r <= ROUNDS; r++) {
+        var cell = list.filter(function (p) { return p.round === r; });
+        // « détenus seulement » : choix détenus ou exercés ; « mouvements » : plus ton choix cédé, et le compte des choix de passage
+        var shown = cell.filter(function (p) { return isHeld(p) || (moves && p.mine); }).sort(function (a, b) { return (isHeld(b) ? 1 : 0) - (isHeld(a) ? 1 : 0) || (a.mine ? -1 : 1); });
+        var tr = moves ? cell.filter(function (p) { return !isHeld(p) && !p.mine; }).length : 0;
+        h += '<td data-round="' + r + '"' + (shown.length || tr ? '' : ' class="empty"') + '>' + shown.map(function (p) { return chip(c, p, op ? 'det' : 'short'); }).join('') +
+          (tr ? '<span class="dpk" data-st="transit" title="' + c.esc(c.fmt('dft.own_transit', [tr])) + '"><span class="o">' + c.esc(c.t('dft.own_transit', true).replace('{0}', tr)) + '</span></span>' : '') + '</td>';
+      }
+      var dlt = held - ROUNDS;
+      h += '<td class="num">' + held + (dlt ? '<span class="d">' + (dlt > 0 ? '+' : '−') + Math.abs(dlt) + '</span>' : '') + '</td></tr>';
+      if (op) h += detailRow(c, y, list, moves);
+    });
+    return h + '</tbody></table></div><p class="ft-keys">' + c.esc(c.t('dft.own_keys')) + '</p></section>';
+  }
+  function detailRow(c, y, list, moves) {
+    var src = moves ? list : list.filter(isHeld);
+    var items = src.slice().sort(function (a, b) { return a.round - b.round || (a.mine ? -1 : 1); }).map(function (p) {
+      var steps = [];
+      if (p.init) steps.push(c.esc(c.t('dft.own_det_start')));
+      p.hist.forEach(function (x) { if (moves || x.dir === 'in') steps.push(c.esc(c.fmt(x.dir === 'in' ? 'dft.own_det_in' : 'dft.own_det_out', [x.who || '?', dateL(c, x.on)]))); });
+      if (p.used) steps.push(c.esc(c.fmt('dft.own_det_used', [ordL(c, p.overall), p.player || ''])));
+      else if (p.held) steps.push(c.esc(c.t('dft.own_det_held')));
+      return '<li class="' + (isHeld(p) ? 'hi' : '') + '"><span class="h"><span class="r">' + c.esc(roundShort(c, p.round)) + '</span>' + chip(c, p, 'det') + '<span>' + c.esc(c.fmt('dft.own_det_pick', [tname(c, p.team)])) + '</span></span><ol>' + steps.map(function (s) { return '<li>' + s + '</li>'; }).join('') + '</ol></li>';
+    });
+    return '<tr class="pk-detail" data-year="' + y + '" id="pk-det-' + y + '"><td colspan="9"><h4 class="help-sh">' + c.esc(c.fmt(moves ? 'dft.own_det_title' : 'dft.own_det_title_held', [y])) + '</h4>' +
+      (items.length ? '<ul class="pk-det">' + items.join('') + '</ul>' : '<p class="muted">' + c.esc(c.t('dft.own_det_none')) + '</p>') + '</td></tr>';
+  }
+  var owned = {
+    k: 'owned', lbl: 'nav.t.draft.owned', mode: 'view', schema: [], fixed: function () { return []; }, validate: function () { return []; }, seasons: function () { return []; },
+    render: ownedView,
+    act: function (vs, ds) {
+      if (ds.vact === 'view') { vs.view = ds.v === 'moves' ? 'moves' : 'held'; return true; }
+      if (ds.vact === 'year') { vs.open = vs.open || {}; vs.open[ds.year] = !vs.open[ds.year]; return true; }
+      return false;
+    }
+  };
+
+  // =====================================================================================
+  // 2. Ordre
+  // =====================================================================================
+  function ranksView(c) {
+    var X = derived(c.DATA), D = c.DATA, code = D.franchise.code, vs = c.vs;
+    var known = Object.keys(X.A.orders).map(Number).filter(function (y) { return X.A.orders[y].status !== 'none'; }).sort(function (a, b) { return b - a; });
+    var Y = vs.year != null ? +vs.year : known.length ? known[0] : X.first;
+    var opts = (known.indexOf(Y) < 0 ? [Y] : []).concat(known);
+    var sel = '<section class="pick"><label>' + c.esc(c.t('dft.ord_year')) + '<select data-vf="year">' + opts.map(function (y) { return '<option value="' + y + '"' + (y === Y ? ' selected' : '') + '>' + y + '</option>'; }).join('') + '</select></label></section>';
+    var O = X.A.orders[Y];
+    if (!O || O.status === 'none') return sel + '<div class="ft-empty" role="status">' + IC.clock + '<h2>' + c.esc(c.fmt('dft.ord_empty_lead', [Y])) + '</h2><p>' + c.esc(c.fmt('dft.ord_empty_body', [(Y - 1) + '-' + String(Y % 100).padStart(2, '0')])) + '</p></div>';
+    var n = (D.league && D.league.size) || 32, picks = O.picks, lot = {}; ((D.base.lottery || {})[String(Y)] || []).forEach(function (l) { lot[l[0]] = { pick: l[0], pre: l[1], team: l[2] }; });
+    var mine = {}, gone = {}; X.T.filter(function (p) { return p.year === Y; }).forEach(function (p) { var k = p.round + '|' + p.team; if (isHeld(p)) mine[k] = p; else if (p.mine) gone[k] = lastOut(p) || '?'; });
+    var top = {}; ((D.base.top3 || {})[String(Y)] || []).forEach(function (x) { top[x[0]] = { name: x[2], pos: x[3] }; });
+    var best = null; Object.keys(lot).forEach(function (k) { var x = lot[k]; if (x.pre == null) return; var j = x.pre - x.pick; if (!best || j > best.j) best = { j: j, x: x }; });
+    var bt = best ? picks[best.x.pick - 1].team : null, bm = best && mine['1|' + bt];
+    var title = best && best.j > 0 ? c.fmt(bm ? 'dft.ord_title_lot_mine' : 'dft.ord_title_lot', [Y, bt, ordL(c, best.x.pre), ordL(c, best.x.pick)]) : c.t('nav.t.draft.ranks');
+    var h = sel + '<section class="card wide"><div class="ft-cardhead"><div><h3>' + c.esc(title) + '</h3><p class="sub">' + c.esc(c.t('dft.ord_sub')) + '</p></div></div>';
+    h += '<div class="ft-legend" role="note"><span class="mk-mine">' + IC.mine + c.esc(code) + '</span><span>' + c.esc(c.t('dft.ord_mine_lg')) + '</span><span class="ft-hold">' + c.esc(code) + ' ' + IC.out + ' …</span><span>' + c.esc(c.t('dft.ord_gone_lg')) + '</span><span>' + c.esc(c.t('ui.dash_hint')) + '</span></div>';
+    var TH = function (k, cls) { return '<th' + (cls ? ' class="' + cls + '"' : '') + '><abbr title="' + c.esc(c.t(k)) + '">' + c.esc(c.t(k, true)) + '</abbr></th>'; };
+    h += '<div class="ft-stack"><div><h4 class="help-sh">' + c.esc(c.t('dft.ord_r1')) + '</h4><div class="ft-scroll" style="max-height:none"><table class="ft-stats" data-ord="r1"><thead><tr>' +
+      TH('picks.col_overall') + TH('dft.ord_col_pre', 'num') + TH('dft.ord_col_move', 'num') + TH('dft.ord_col_orig', 'tl') + TH('lot.col_owner', 'tl') + TH('dft.ord_col_player', 'tl') + '</tr></thead><tbody>';
+    for (var k = 1; k <= n; k++) {
+      var o = picks[k - 1].team, lx = lot[k], m = mine['1|' + o], g = o === code ? gone['1|' + code] : null, j = lx && lx.pre != null ? lx.pre - lx.pick : null;
+      var mv = j == null ? '<span class="muted">—</span>' : j > 0 ? '<span class="mv up" title="' + c.esc(c.fmt('dft.ord_up', [j])) + '">' + IC.up + '+' + j + '<span class="vh">' + c.esc(c.fmt('dft.ord_up', [j])) + '</span></span>' : j < 0 ? '<span class="mv down" title="' + c.esc(c.fmt('dft.ord_down', [-j])) + '">' + IC.down + '−' + (-j) + '<span class="vh">' + c.esc(c.fmt('dft.ord_down', [-j])) + '</span></span>' : '<span class="muted">0</span>';
+      var holder = m ? '<span class="mk-mine">' + IC.mine + c.esc(code) + '<span class="vh">' + c.esc(c.t('dft.ord_mine')) + '</span></span>' : g ? '<span class="ft-hold"><b>' + c.esc(g) + '</b></span>' : '<span class="muted">—</span>';
+      var pl = m && m.used ? c.esc(m.player) + ' <span class="muted">' + c.esc(posL(c, m)) + '</span>' : top[k] ? c.esc(top[k].name) + (top[k].pos ? ' <span class="muted">' + c.esc(c.t('pc.' + top[k].pos, true)) + '</span>' : '') : '<span class="muted">—</span>';
+      h += '<tr data-pick="' + k + '"' + (m ? ' class="mine"' : '') + '><td>' + k + '</td><td class="num">' + (lx && lx.pre != null ? lx.pre : '<span class="muted">—</span>') + '</td><td class="num">' + mv + '</td><td class="tl">' + (o ? teamChip(c, o) : '<span class="muted">—</span>') + '</td><td class="tl">' + holder + '</td><td class="tl">' + pl + '</td></tr>';
+    }
+    h += '</tbody></table></div></div>';
+    h += '<div><h4 class="help-sh">' + c.esc(c.t('dft.ord_r27')) + '</h4><div class="ft-scroll" style="max-height:none"><table class="ft-order" data-ord="r27"><colgroup><col class="rk">' + '<col>'.repeat(ROUNDS - 1) + '</colgroup><thead><tr><th class="rk"><abbr title="' + c.esc(c.t('dft.ord_col_rank')) + '">' + c.esc(c.t('dft.ord_col_rank', true)) + '</abbr></th>';
+    for (var r = 2; r <= ROUNDS; r++) h += '<th><abbr title="' + c.esc(c.fmt('dft.round_n', [r])) + '">' + c.esc(roundShort(c, r)) + '</abbr></th>';
+    h += '</tr></thead><tbody>';
+    for (var q = 1; q <= n; q++) {
+      h += '<tr><th scope="row">' + q + '</th>';
+      for (var r2 = 2; r2 <= ROUNDS; r2++) {
+        var nn = (r2 - 1) * n + q, o2 = (picks[nn - 1] || {}).team, m2 = mine[r2 + '|' + o2], g2 = o2 === code ? gone[r2 + '|' + code] : null;
+        h += '<td data-pick="' + nn + '"' + (m2 ? ' class="mine" title="' + c.esc(c.t('dft.ord_mine')) + '"' : g2 ? ' class="gone"' : '') + '><span class="n">' + nn + '</span>' + c.esc(o2 || '—') + (m2 && o2 !== code ? ' ' + IC.mine : '') + (g2 ? ' ' + IC.out + ' <b>' + c.esc(g2) + '</b>' : '') + (m2 ? '<span class="vh">, ' + c.esc(c.t('dft.ord_mine')) + '</span>' : '') + '</td>';
+      }
+      h += '</tr>';
+    }
+    return h + '</tbody></table></div></div></div></section>';
+  }
+  var ranks = {
+    k: 'ranks', lbl: 'nav.t.draft.ranks', mode: 'view', schema: [], fixed: function () { return []; }, validate: function () { return []; }, seasons: function () { return []; },
+    render: ranksView, set: function (vs, name, v) { if (name === 'year') vs.year = +v; }
+  };
+
+  // =====================================================================================
+  // 3. Analyse
+  // =====================================================================================
+  // valeur par année : choix exercés au barème de leur rang ; choix détenus à venir au rang exact ou projeté (assemble().owned)
+  function yearValues(X) {
+    var out = {}, used = {}; X.T.forEach(function (p) { if (p.used) used[p.year + '|' + p.round + '|' + p.team] = 1; });
+    X.A.owned.forEach(function (p) {
+      var o = out[p.year] = out[p.year] || { u: 0, p: 0 };
+      if (used[p.year + '|' + p.round + '|' + p.team]) o.u += p.value || 0; else if (p.year >= X.next) o.p += p.value || 0;
+    });
+    Object.keys(out).forEach(function (y) { if (!out[y].u && !out[y].p) delete out[y]; });
+    return out;
+  }
+  function barsSVG(c, X, yv) {
+    var ys = Object.keys(yv).map(Number).sort(function (a, b) { return a - b; }), W = 840, H = 230, l = 44, b = 34, tp = 12, mx = 0;
+    if (!ys.length) return '';
+    ys.forEach(function (y) { mx = Math.max(mx, yv[y].u + yv[y].p); }); mx = Math.ceil(mx / 50) * 50 || 50;
+    var bw = (W - l - 8) / ys.length, s = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + c.esc(c.t('dft.brd_axis_value')) + '"><defs><pattern id="hatch-c1" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" style="fill:var(--panel)"/><rect width="2.6" height="6" style="fill:var(--c1)"/></pattern></defs>';
+    for (var g = 0; g <= mx; g += 50) { var yy = H - b - (H - b - tp) * g / mx; s += '<line class="grid" x1="' + l + '" x2="' + W + '" y1="' + yy + '" y2="' + yy + '"/><text class="axl" x="' + (l - 6) + '" y="' + (yy + 4) + '" text-anchor="end">' + g + '</text>'; }
+    var avg = 0, nu = 0; ys.forEach(function (y) { if (yv[y].u) { avg += yv[y].u; nu++; } }); avg = nu ? avg / nu : 0;
+    ys.forEach(function (y, i) {
+      var x = l + i * bw + 3, w = Math.max(bw - 6, 2), v = yv[y].u + yv[y].p, hh = (H - b - tp) * v / mx, proj = !!yv[y].p && !yv[y].u;
+      s += '<rect class="' + (proj ? 'bar-p' : 'bar-g') + '" x="' + x + '" y="' + (H - b - hh) + '" width="' + w + '" height="' + hh + '" rx="2"><title>' + y + ' : ' + nf(v, 1, c.lang) + '</title></rect>';
+      if (i % 2 === 0 || y >= X.next) s += '<text class="axl" x="' + (x + w / 2) + '" y="' + (H - b + 14) + '" text-anchor="middle">' + y + '</text>';
+    });
+    var ya = H - b - (H - b - tp) * avg / mx; if (nu) s += '<line class="line-def" x1="' + l + '" x2="' + W + '" y1="' + ya + '" y2="' + ya + '"/><text class="axl" x="' + (l + 4) + '" y="' + (ya - 5) + '" text-anchor="start">' + c.esc(c.t('dft.brd_s_avg')) + ' ' + nf(avg, 0, c.lang) + '</text>';
+    return s + '<text class="axl" x="' + l + '" y="' + (H - 2) + '">' + c.esc(c.t('dft.brd_axis_year')) + '</text></svg>';
+  }
+  function curveSVG(c, X) {
+    var V = X.A.values, N = V.length, W = 840, H = 220, l = 44, b = 34, tp = 10, n = (c.DATA.league && c.DATA.league.size) || 32;
+    var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + c.esc(c.t('dft.brd_scale')) + '">';
+    var Xp = function (p) { return l + (W - l - 10) * (p - 1) / (N - 1); }, Yv = function (v) { return H - b - (H - b - tp) * v / 100; };
+    for (var g = 0; g <= 100; g += 25) s += '<line class="grid" x1="' + l + '" x2="' + W + '" y1="' + Yv(g) + '" y2="' + Yv(g) + '"/><text class="axl" x="' + (l - 6) + '" y="' + (Yv(g) + 4) + '" text-anchor="end">' + g + '</text>';
+    for (var r = 1; r <= ROUNDS; r++) s += '<text class="axl" x="' + Xp((r - 1) * n + 1) + '" y="' + (H - b + 14) + '">' + ((r - 1) * n + 1) + '</text>';
+    var pd = '', pc = '', mod = '';
+    V.forEach(function (v, i) { pd += (i ? 'L' : 'M') + Xp(v.overall).toFixed(1) + ' ' + Yv(v.standard).toFixed(1); pc += (i ? 'L' : 'M') + Xp(v.overall).toFixed(1) + ' ' + Yv(v.value).toFixed(1); if (v.value !== v.standard) mod += '<circle class="dot-mod" cx="' + Xp(v.overall) + '" cy="' + Yv(v.value) + '" r="4"><title>' + v.overall + ' : ' + nf(v.value, 1, c.lang) + '</title></circle>'; });
+    return s + '<path class="line-def" d="' + pd + '"/><path class="line-cur" d="' + pc + '"/>' + mod + '<text class="axl" x="' + l + '" y="' + (H - 2) + '">' + c.esc(c.t('dft.brd_axis_rank')) + '</text></svg>';
+  }
+  function pctCell(c, k, n) { var pc = n ? 100 * k / n : null; return '<td class="pct"><span class="pw"><span class="ft-pbar" aria-hidden="true"><span style="width:' + (pc || 0).toFixed(1) + '%"></span></span><span class="v">' + (pc == null ? '—' : nf(pc, 0, c.lang) + ' %') + '</span></span></td>'; }
+  function successHTML(c, X) {
+    var vs = c.vs, picks = X.A.board.picks, f = { pos: vs.pos || '', year: vs.syear || '', round: vs.round || '', recent: vs.recent ? false : undefined, hist: vs.hist ? false : undefined };
+    var S = DR.boardSummary(picks, f), firstSeason = c.DATA.franchise.first + '-' + String((c.DATA.franchise.first + 1) % 100).padStart(2, '0');
+    var years = []; picks.forEach(function (p) { if (years.indexOf(p.year) < 0) years.push(p.year); }); years.sort(function (a, b) { return b - a; });
+    var o = function (v, l, cur) { return '<option value="' + v + '"' + (String(cur) === String(v) ? ' selected' : '') + '>' + c.esc(l) + '</option>'; };
+    var fPos = '<label>' + c.esc(c.t('col.position')) + '<select data-vf="pos">' + o('', c.t('pl.all_pos'), f.pos) +
+      '<optgroup label="' + c.esc(c.t('pre.grp_F')) + '">' + o('F', c.t('pre.grp_F'), f.pos) + ['C', 'LW', 'RW'].map(function (x) { return o(x, c.t('pc.' + x, true), f.pos); }).join('') + '</optgroup>' +
+      '<optgroup label="' + c.esc(c.t('pre.grp_D')) + '">' + o('D', c.t('pre.grp_D'), f.pos) + ['LD', 'RD'].map(function (x) { return o(x, c.t('pc.' + x, true), f.pos); }).join('') + '</optgroup>' + o('G', c.t('pre.grp_G'), f.pos) + '</select></label>';
+    var fYear = '<label>' + c.esc(c.t('picks.col_year')) + '<select data-vf="syear">' + o('', c.t('dft.suc_all_years'), f.year) + years.map(function (y) { return o(y, y, f.year); }).join('') + '</select></label>';
+    var fRound = '<label>' + c.esc(c.t('picks.col_round')) + '<select data-vf="round">' + o('', c.t('dft.suc_all_rounds'), f.round) + [1, 2, 3, 4, 5, 6, 7].map(function (r) { return o(r, c.fmt('dft.round_n', [r]), f.round); }).join('') + '</select></label>';
+    var ry = years.slice(0, 2);
+    var opt = '<label class="chk"><input type="checkbox" data-vf="recent"' + (vs.recent ? ' checked' : '') + (ry.length < 2 ? ' disabled' : '') + '> ' + c.esc(c.fmt('dft.suc_recent', [ry[0] || '', ry[1] || ''])) + '</label>' +
+      '<label class="chk"><input type="checkbox" data-vf="hist"' + (vs.hist ? ' checked' : '') + '> ' + c.esc(c.fmt('dft.suc_hist', [firstSeason])) + '</label>';
+    var h = '<div class="ft-cardhead"><div><h3>' + c.esc(c.t('dft.suc_heading')) + '</h3><p class="suc-lead">' + c.esc(S.n ? c.fmt('dft.suc_title', [S.gp1, S.n, S.gp100]) : c.t('dft.suc_title_none')) + '</p><p class="sub">' + c.esc(c.t('dft.suc_sub')) + '</p></div></div>';
+    h += '<div class="ft-filters" role="group" aria-label="' + c.esc(c.t('dft.suc_filters')) + '">' + fPos + fYear + fRound + '</div><div class="ft-filters opts">' + opt + '</div>';
+    if (vs.recent && S.years_out.length) h += '<p class="note muted">' + c.esc(c.fmt('dft.suc_recent_note', [S.years_out[0], S.years_out[1] || ''])) + '</p>';
+    if (!picks.length) return h + '<p class="muted">' + c.esc(c.t('dft.suc_empty')) + '</p>';
+    var TH = function (k, cls, extra) { return '<th class="' + (cls || '') + '"' + (extra || ' scope="col"') + '><abbr title="' + c.esc(c.t(k)) + '">' + c.esc(c.t(k, true)) + '</abbr></th>'; };
+    h += '<div class="ft-scroll" style="max-height:none"><table class="ft-stats suc" data-brd="success"><thead><tr><th rowspan="2" scope="col">' + c.esc(c.t('dft.suc_by_round')) + '</th>' + TH('dft.suc_drafted', '', ' rowspan="2" scope="col"') + TH('dft.suc_gp1', 'grp', ' colspan="2" scope="colgroup"') + TH('dft.suc_gp100', 'grp', ' colspan="2" scope="colgroup"') + '</tr><tr>' +
+      TH('dft.suc_n') + TH('dft.suc_pct', 'pct') + TH('dft.suc_n') + TH('dft.suc_pct', 'pct') + '</tr></thead><tbody>';
+    for (var r = 1; r <= ROUNDS; r++) {
+      if (f.round && r !== +f.round) continue;
+      var R = DR.boardSummary(picks, Object.assign({}, f, { round: r }));
+      h += '<tr data-round="' + r + '"><td>' + c.esc(c.fmt('dft.round_n', [r])) + '</td><td>' + R.n + '</td><td>' + R.gp1 + '</td>' + pctCell(c, R.gp1, R.n) + '<td>' + R.gp100 + '</td>' + pctCell(c, R.gp100, R.n) + '</tr>';
+    }
+    return h + '</tbody><tfoot><tr><td>' + c.esc(c.t('dft.brd_total')) + '</td><td>' + S.n + '</td><td>' + S.gp1 + '</td>' + pctCell(c, S.gp1, S.n) + '<td>' + S.gp100 + '</td>' + pctCell(c, S.gp100, S.n) + '</tr></tfoot></table></div>';
+  }
+  function boardView(c) {
+    var X = derived(c.DATA), yv = yearValues(X), ys = Object.keys(yv).map(Number), best = ys.filter(function (y) { return y < X.next && yv[y].u; }).sort(function (a, b) { return yv[b].u - yv[a].u; })[0];
+    var last = ys.length ? Math.max.apply(null, ys) : X.first;
+    var h = '<section class="card wide"><div class="ft-cardhead"><div><h3>' + c.esc(best ? c.fmt('dft.brd_chart_title', [best, nf(yv[best].u, 1, c.lang)]) : c.fmt('dft.brd_chart_proj', [X.first, last])) + '</h3><p class="sub">' + c.esc(c.t('dft.brd_chart_sub')) + '</p></div>' +
+      '<div class="ft-legend" style="margin:0"><span><svg width="14" height="12" aria-hidden="true"><rect width="14" height="12" rx="2" style="fill:var(--c1);stroke:var(--ink1)"/></svg>' + c.esc(c.t('dft.brd_s_used')) + '</span><span><svg width="14" height="12" aria-hidden="true"><rect width="14" height="12" rx="2" style="fill:var(--panel);stroke:var(--ink1);stroke-dasharray:3 2"/><path d="M0 12 12 0M4 12 14 2" style="stroke:var(--c1);stroke-width:2.4"/></svg>' + c.esc(c.t('dft.brd_s_proj')) + '</span><span><svg width="18" height="4" aria-hidden="true"><path d="M0 2h18" style="stroke:var(--muted);stroke-width:2;stroke-dasharray:5 4"/></svg>' + c.esc(c.t('dft.brd_s_avg')) + '</span></div></div>' +
+      '<div class="ft-chart">' + barsSVG(c, X, yv) + '</div></section>';
+    h += '<section class="card wide" id="success">' + successHTML(c, X) + '</section>';
+    var rows = X.A.board.picks.slice().sort(function (a, b) { return b.year - a.year || a.pick - b.pick; }), val = DR.valueOf(c.DATA.draft && c.DATA.draft.values);
+    var bestP = 0; rows.forEach(function (p) { if (p.pos !== 'G') bestP = Math.max(bestP, p.pts || 0); });
+    var TH = function (k, cls) { return '<th class="' + (cls || '') + '"><abbr title="' + c.esc(c.t(k)) + '">' + c.esc(c.t(k, true)) + '</abbr></th>'; };
+    h += '<section class="card wide"><div class="ft-cardhead"><div><h3>' + c.esc(c.t('dft.brd_picks')) + '</h3><p class="sub">' + c.esc(c.t('dft.brd_picks_sub')) + '</p></div></div>';
+    if (!rows.length) h += '<div class="ft-empty" role="status">' + IC.clock + '<p class="lead">' + c.esc(c.t('dft.brd_empty_lead')) + '</p><p>' + c.esc(c.t('dft.brd_empty_body')) + '</p></div>';
+    else {
+      h += '<div class="ft-scroll" style="max-height:460px"><table class="ft-stats" data-brd="picks"><thead><tr>' + TH('col.player') + TH('picks.col_year') + TH('picks.col_round') + TH('picks.col_overall') + TH('col.position') + TH('col.value', 'ro') +
+        TH('stat.gp') + TH('stat.g') + TH('stat.a') + TH('stat.pts', 'ro') + TH('stat.plus_minus') + TH('stat.w') + TH('stat.so') + TH('stat.sv_pct', 'ro') + TH('stat.gaa', 'ro') + '</tr></thead><tbody>';
+      var tot = { v: 0, gp: 0, g: 0, a: 0 }, na = '<td class="na" aria-hidden="true"></td>';
+      rows.forEach(function (p) {
+        var gk = p.pos === 'G', v = p.pick != null ? val(p.pick) : null; tot.v += v || 0; tot.gp += p.gp || 0;
+        var cells = '<td>' + (p.gp || 0) + '</td>';
+        if (gk) cells += na + na + na + na + '<td>' + (p.w || 0) + '</td><td>' + (p.so || 0) + '</td><td>' + (p.sv_pct != null ? nf(p.sv_pct, 3, c.lang).replace(/^0/, '') : '—') + '</td><td>' + (p.gaa != null ? nf(p.gaa, 2, c.lang) : '—') + '</td>';
+        else { cells += '<td>' + (p.g || 0) + '</td><td>' + (p.a || 0) + '</td><td' + (p.pts && p.pts === bestP ? ' class="best"' : '') + '>' + (p.pts || 0) + '</td><td>' + (p.pm > 0 ? '+' : '') + (p.pm || 0) + '</td>' + na + na + na + na; tot.g += p.g || 0; tot.a += p.a || 0; }
+        h += '<tr data-pick="' + p.year + '-' + p.pick + '"><td>' + c.esc((p.first + ' ' + p.last).trim()) + '</td><td>' + p.year + '</td><td>' + (p.round || '—') + '</td><td>' + (p.pick || '—') + '</td><td>' + c.esc(posL(c, p) || '—') + '</td><td>' + nf(v, 1, c.lang) + '</td>' + cells + '</tr>';
+      });
+      h += '</tbody><tfoot><tr><td>' + c.esc(c.t('dft.brd_total')) + '</td><td></td><td></td><td>' + rows.length + '</td><td></td><td>' + nf(tot.v, 1, c.lang) + '</td><td>' + tot.gp + '</td><td>' + tot.g + '</td><td>' + tot.a + '</td><td>' + (tot.g + tot.a) + '</td><td></td><td></td><td></td><td></td><td></td></tr></tfoot></table></div>';
+    }
+    h += '</section>';
+    var V = X.A.values, v1 = V[0] ? V[0].value : null, n = (c.DATA.league && c.DATA.league.size) || 32, v32 = V[n - 1], v64 = V[2 * n - 1];
+    h += '<section class="card wide"><div class="ft-cardhead"><div><h3>' + c.esc(v32 && v64 && v32.value && v64.value ? c.fmt('dft.brd_curve_title', [nf(v1 / v32.value, 0, c.lang), nf(v1 / v64.value, 0, c.lang)]) : c.t('dft.brd_scale')) + '</h3><p class="sub">' + c.esc(c.t('dft.brd_curve_sub')) + '</p></div>' +
+      '<div class="ft-legend" style="margin:0"><span><svg width="18" height="4" aria-hidden="true"><path d="M0 2h18" style="stroke:var(--muted);stroke-width:2;stroke-dasharray:5 4"/></svg>' + c.esc(c.t('dft.brd_curve_def')) + '</span><span><svg width="18" height="4" aria-hidden="true"><path d="M0 2h18" style="stroke:var(--c1);stroke-width:2.5"/></svg>' + c.esc(c.t('dft.brd_curve_cur')) + '</span></div></div><div class="ft-chart">' + curveSVG(c, X) + '</div>' + scaleEditor(c, X) + '</section>';
+    return h;
+  }
+  // barème modifiable (draft_pick_value, RPC ft_save_pick_values, migration 78) : rang dans la ronde en ligne, ronde en colonne
+  function scaleVal(txt) { var x = String(txt == null ? '' : txt).trim().replace(/\s/g, '').replace(',', '.'); if (!/^\d{1,3}(\.\d)?$/.test(x)) return null; var v = +x; return v >= 0 && v <= 100 ? v : null; }
+  function scaleEditor(c, X) {
+    var vs = c.vs, row = c.row(), ed = row.v || {}, n = (c.DATA.league && c.DATA.league.size) || 32, nEd = Object.keys(ed).length + (row.reset ? 1 : 0), cur = {};
+    X.A.values.forEach(function (v) { cur[v.overall] = row.reset ? v.standard : v.value; });
+    var h = '<p style="margin:12px 0 8px"><button type="button" class="btn ft-disc" data-vact="scale" aria-expanded="' + !!vs.scale + '" aria-controls="scale-ed">' + IC.chev + c.esc(c.t(vs.scale ? 'dft.brd_scale_hide' : 'dft.brd_scale_edit')) + '</button></p>';
+    if (!vs.scale) return h;
+    h += '<div id="scale-ed"><p class="ft-hint">' + IC.info + c.esc(c.t('dft.brd_scale_hint')) + '</p><div class="scroll"><table class="grid ev scale" aria-label="' + c.esc(c.t('dft.brd_scale')) + '"><thead><tr><th><abbr title="' + c.esc(c.t('dft.ord_col_rank')) + '">' + c.esc(c.t('dft.ord_col_rank', true)) + '</abbr></th>';
+    for (var r = 1; r <= ROUNDS; r++) h += '<th><abbr title="' + c.esc(c.fmt('dft.round_n', [r])) + '">' + c.esc(roundShort(c, r)) + '</abbr></th>';
+    h += '</tr></thead><tbody>';
+    for (var q = 1; q <= n; q++) {
+      h += '<tr><th scope="row">' + q + '</th>';
+      for (var r3 = 1; r3 <= ROUNDS; r3++) {
+        var k = (r3 - 1) * n + q, has = ed[k] != null, bad = has && scaleVal(ed[k]) == null, shown = has ? ed[k] : nf(cur[k], 1, c.lang);
+        h += '<td class="ci' + (has && !bad ? ' ed' : '') + (bad ? ' rej' : '') + '"><input class="cell num" data-vf="sv" data-y="0" data-r="' + k + '" value="' + c.esc(shown) + '" autocomplete="off" inputmode="decimal" aria-label="' + c.esc(c.fmt('dft.brd_scale_cell', [ordL(c, k)])) + '"' + (bad ? ' aria-invalid="true"' : '') + '>' +
+          (bad ? '<span class="gi-tip up" role="tooltip">' + c.esc(c.t('val.pick_value')) + '</span>' : '') + '</td>';
+      }
+      h += '</tr>';
+    }
+    return h + '</tbody></table></div><div class="scale-status" role="status">' + (nEd ? '<span class="ed">' + c.esc(c.fmt('dft.brd_scale_mod', [Object.keys(ed).length])) + '</span>' : '<span class="muted">' + c.esc(c.t('entry.pending_none')) + '</span>') +
+      '<button type="button" class="btn" data-vact="scale-reset">' + c.esc(c.t('dft.brd_scale_reset')) + '</button></div></div>';
+  }
+  // Analyse : consultation, plus le barème modifiable (une seule ligne fixe : v = { rang: texte saisi }, reset = barème par défaut)
+  var board = {
+    k: 'board', lbl: 'nav.t.draft.board', mode: 'fixed', exportAll: true, noReset: true, schema: [['v', 'dft.brd_scale', 'ro']], seasons: function () { return []; }, defaultSeason: function () { return 0; },
+    fixed: function () { return [{ v: {}, reset: false }]; },
+    validate: function (rows) { return rows.map(function (r) { var a = []; Object.keys(r.v || {}).forEach(function (k) { if (scaleVal(r.v[k]) == null) a.push({ c: 'v', level: 'err', k: 'val.pick_value', p: [] }); }); return a; }); },
+    render: boardView,
+    act: function (vs, ds, c) {
+      if (ds.vact === 'scale') { vs.scale = !vs.scale; return true; }
+      if (ds.vact === 'scale-reset') { c.put('v', {}); c.put('reset', true); return true; }
+      return false;
+    },
+    set: function (vs, name, v, c, ds) {
+      if (name === 'recent' || name === 'hist') vs[name] = !!v; else if (['pos', 'syear', 'round'].indexOf(name) >= 0) vs[name] = v;
+      else if (name === 'sv') { var e = Object.assign({}, c.row().v || {}), cur = {}; derived(c.DATA).A.values.forEach(function (x) { cur[x.overall] = c.row().reset ? x.standard : x.value; });
+        var val = scaleVal(v); if (val != null && val === cur[+ds.r]) delete e[ds.r]; else e[ds.r] = String(v).trim(); c.put('v', e); }
+    },
+    plan: function (rows, _s, ctx) {
+      var r = rows[0] || {}, vals = Object.keys(r.v || {}).map(function (k) { return { overall_pick: +k, value: scaleVal(r.v[k]) }; });
+      return [{ op: 'custom', run: async function (client) {
+        if (r.reset) await client.rpc('ft_save_pick_values', { p_franchise_id: ctx.fid, p_values: [], p_reset: true });
+        if (vals.length) await client.rpc('ft_save_pick_values', { p_franchise_id: ctx.fid, p_values: vals });
+      } }];
+    },
+    pull: async function (cl, _s, ctx) { var r = await cl.select('draft_pick_value', 'select=overall_pick,value&order=overall_pick'); ctx.DATA.draft = ctx.DATA.draft || {}; ctx.DATA.draft.values = r.map(function (x) { return [x.overall_pick, x.value == null ? null : +x.value]; }); CACHE = { D: null }; return r.length; },
+    csv: function (rows) { var r = rows[0] || {}; return 'franchise_id,overall_pick,value\n' + Object.keys(r.v || {}).map(function (k) { return [1, k, scaleVal(r.v[k])].join(','); }).join('\n') + '\n'; }
+  };
+
+  // =====================================================================================
+  // 4. Point de départ › Choix de départ (saisie ; draft_pick_initial, RPC ft_save_initial_picks, migration 78)
+  // =====================================================================================
+  // État : { own: { 'année|ronde': bool }, oth: { 'année|ronde': [codes] } } ; une seule ligne fixe (colonne p) dans les saisies en attente.
+  // Par défaut (aucun choix de départ en base) : tous tes choix cochés, aucun choix d'une autre équipe (Gabriel, 2026-11-23).
+  var IC2 = {
+    warn: '<svg class="tip-ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.9 14.7 13.8H1.3Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M8 6.2v3.7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="8" cy="11.8" r="1" fill="currentColor"/></svg>',
+    err: '<svg class="tip-ic" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M5.6 5.6l4.8 4.8M10.4 5.6l-4.8 4.8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>'
+  };
+  var P0D = null;   // données de la page (fixed() la reçoit ; validate() et csv() ne la reçoivent pas)
+  function p0years(D) { return DR.draftYears(D.franchise.first); }
+  function p0base(D) {
+    var code = D.franchise.code, own = {}, oth = {}, init = (D.draft && D.draft.initial) || [];
+    p0years(D).forEach(function (y) { for (var r = 1; r <= ROUNDS; r++) own[y + '|' + r] = true; });
+    init.forEach(function (x) { var k = x[0] + '|' + x[1]; if (x[2] === code) own[k] = !!x[3]; else if (x[3]) (oth[k] = oth[k] || []).push(x[2]); });
+    return { own: own, oth: oth };
+  }
+  function p0clone(st) { return { own: Object.assign({}, st.own), oth: JSON.parse(JSON.stringify(st.oth)) }; }
+  function p0teams(D) { return ((D.league && D.league.teams) || []).map(function (x) { return x[0]; }).filter(function (c) { return c !== D.franchise.code; }).sort(); }
+  // liste envoyée à ft_save_initial_picks et vérifiée par validateInitial ; ref : case d'origine de chaque ligne (pour placer les alertes)
+  function p0list(D, st) {
+    var code = D.franchise.code, out = [], ref = [];
+    p0years(D).forEach(function (y) { for (var r = 1; r <= ROUNDS; r++) {
+      var k = y + '|' + r; out.push({ year: y, round: r, team: code, owned: !!st.own[k] }); ref.push({ y: y, r: r, i: -1 });
+      (st.oth[k] || []).forEach(function (c, i) { if (c) { out.push({ year: y, round: r, team: c, owned: true }); ref.push({ y: y, r: r, i: i }); } });
+    } });
+    return { picks: out, ref: ref };
+  }
+  function p0check(D, st) {
+    var L = p0list(D, st), v = DR.validateInitial(L.picks, D.franchise.code, p0years(D), ((D.league && D.league.teams) || []).map(function (x) { return x[0]; }));
+    var cells = {};
+    v.errors.forEach(function (e) { var f = L.ref[e.i]; (cells[f.y + '|' + f.r] = cells[f.y + '|' + f.r] || []).push({ level: 'err', i: f.i, k: e.key, p: e.key === 'val.pick0_dup' ? [e.team, e.year] : e.key === 'val.pick0_team' ? [e.team, e.round, e.year] : e.key === 'val.pick0_not_own' ? [e.team, e.year, e.round] : e.key === 'val.pick0_year' ? [e.year] : [e.round] }); });
+    v.warnings.forEach(function (w) { (cells[w.year + '|' + w.round] = cells[w.year + '|' + w.round] || []).push({ level: 'warn', i: -1, k: 'val.pick0_none_round', p: [w.round, w.year, D.franchise.code] }); });
+    return { cells: cells, list: L.picks, errors: v.errors.length, warnings: v.warnings.length };
+  }
+  function picks0View(c) {
+    var D = c.DATA, st = c.row().p || p0base(D), code = D.franchise.code, ys = p0years(D), y0 = ys[0], y1 = ys[ys.length - 1], codes = p0teams(D), chk = p0check(D, st);
+    var h = '<section class="card wide"><div class="ft-cardhead"><div><h3>' + c.esc(c.t('nav.t.start.picks0')) + '</h3><p class="sub">' + c.esc(c.fmt('start.picks_default', [y0, y1])) + '</p></div><div class="acts"><button type="button" class="btn" data-vact="p0-reset">' + c.esc(c.t('start.picks_reset')) + '</button></div></div>';
+    h += '<div class="ft-msg" role="note">' + IC.info + '<span><b>' + c.esc(c.fmt('start.picks_new_lead', [y0, y1])) + '</b> ' + c.esc(c.t('start.picks_new_body')) + '</span><span></span></div>';
+    h += '<p class="ft-hint">' + IC.info + c.esc(c.t('start.picks_hint')) + '</p>';
+    h += '<div class="scroll"><table class="grid ev p0" aria-label="' + c.esc(c.t('nav.t.start.picks0')) + '"><colgroup><col class="y">' + '<col>'.repeat(ROUNDS) + '<col class="t"></colgroup><thead><tr><th>' + c.esc(c.t('picks.col_year')) + '</th>';
+    for (var r1 = 1; r1 <= ROUNDS; r1++) h += '<th title="' + c.esc(c.fmt('dft.round_n', [r1])) + '">' + c.esc(roundShort(c, r1)) + '</th>';
+    h += '<th class="d ro" title="' + c.esc(c.t('dft.own_count')) + '">' + c.esc(c.t('dft.own_count', true)) + '</th></tr></thead><tbody>';
+    ys.forEach(function (y) {
+      var lines = 1, n = 0;
+      for (var rr = 1; rr <= ROUNDS; rr++) { var ot0 = st.oth[y + '|' + rr] || []; lines = Math.max(lines, ot0.length); n += (st.own[y + '|' + rr] ? 1 : 0) + ot0.filter(function (x, i, a) { return x && a.indexOf(x) === i; }).length; }
+      for (var li = 0; li < lines; li++) {
+        h += '<tr data-year="' + y + '" data-line="' + li + '"' + (li ? ' class="p0-more"' : '') + '>' + (li ? '' : '<th scope="row" rowspan="' + lines + '">' + y + '</th>');
+        for (var r = 1; r <= ROUNDS; r++) {
+          var k = y + '|' + r, ot = st.oth[k] || [], al = chk.cells[k] || [], cls = 'ci', tip = '', inner = '';
+          if (li === 0) inner += '<label class="p0-own" title="' + c.esc(c.fmt('start.picks_own', [r, y])) + '"><input type="checkbox" class="cell" data-vf="own" data-y="' + y + '" data-r="' + r + '"' + (st.own[k] ? ' checked' : '') + ' aria-label="' + c.esc(c.fmt('start.picks_own', [r, y])) + '">' + c.esc(code) + '</label>';
+          var add = '<button type="button" class="p0-add" data-vact="p0-add" data-y="' + y + '" data-r="' + r + '" aria-label="' + c.esc(c.fmt('start.picks_add', [r, y])) + '" title="' + c.esc(c.fmt('start.picks_add', [r, y])) + '">' + c.esc(c.t('start.picks_other_ph')) + '</button>';
+          if (li < ot.length) {
+            var bad = al.filter(function (a) { return a.level === 'err' && a.i === li; })[0];
+            inner += '<span class="p0-oth' + (bad ? ' rej' : '') + '"><select class="cell oth" data-vf="oth" data-y="' + y + '" data-r="' + r + '" data-i="' + li + '" aria-label="' + c.esc(c.fmt('start.picks_other', [r, y])) + '"' + (bad ? ' aria-invalid="true"' : '') + '><option value=""></option>' + codes.map(function (x) { return '<option' + (x === ot[li] ? ' selected' : '') + '>' + c.esc(x) + '</option>'; }).join('') + '</select></span>';
+            if (bad) { cls += ' rej'; tip = '<span class="gi-tip" role="tooltip">' + IC2.err + c.esc(c.fmt(bad.k, bad.p)) + '</span>'; }
+            if (li === ot.length - 1) inner += add;
+          } else if (li === 0) inner += add;
+          var w = li === 0 && al.filter(function (a) { return a.level === 'warn' || (a.level === 'err' && a.i === -1); })[0];
+          if (w) { cls += w.level === 'err' ? ' rej' : ' wrn'; tip = '<span class="gi-tip' + (w.level === 'err' ? '' : ' wn') + '" role="tooltip">' + (w.level === 'err' ? IC2.err : IC2.warn) + c.esc(c.fmt(w.k, w.p)) + '</span>'; }
+          h += '<td class="' + cls + (inner ? '' : ' gap') + '">' + inner + tip + '</td>';
+        }
+        h += li ? '' : '<td class="ro calc" rowspan="' + lines + '">' + n + '</td>';
+        h += '</tr>';
+      }
+    });
+    return h + '</tbody></table></div></section>';
+  }
+  var picks0 = {
+    k: 'picks0', lbl: 'nav.t.start.picks0', mode: 'fixed', exportAll: true, noReset: true, render: picks0View,
+    schema: [['p', 'nav.t.start.picks0', 'ro']], seasons: function () { return []; }, defaultSeason: function () { return 0; },
+    fixed: function (_s, _h, D) { P0D = D; return [{ p: p0base(D) }]; },
+    // alertes de la ligne unique : erreurs (bloquent l'envoi) et avertissements (ronde sans choix ; n'empêchent rien)
+    validate: function (rows, _h) { var D = P0D; return rows.map(function (r) { if (!r.p || !D) return []; var x = p0check(D, r.p), a = []; Object.keys(x.cells).forEach(function (k) { x.cells[k].forEach(function (z) { a.push({ c: 'p', level: z.level, k: z.k, p: z.p }); }); }); return a; }); },
+    set: function (vs, name, v, c, ds) {
+      var st = p0clone(c.row().p || p0base(c.DATA)), k = ds.y + '|' + ds.r;
+      if (name === 'own') st.own[k] = !!v;
+      else if (name === 'oth') { var l = st.oth[k] = st.oth[k] || []; l[+ds.i] = v; while (l.length && !l[l.length - 1]) l.pop(); if (!l.length) delete st.oth[k]; }
+      c.put('p', st);
+    },
+    act: function (vs, ds, c) {
+      if (ds.vact === 'p0-reset') { c.drop(); return true; }
+      if (ds.vact === 'p0-add') { var st = p0clone(c.row().p || p0base(c.DATA)), k = ds.y + '|' + ds.r, l = st.oth[k] = st.oth[k] || []; l.push(''); c.put('p', st); return '[data-vf="oth"][data-y="' + ds.y + '"][data-r="' + ds.r + '"][data-i="' + (l.length - 1) + '"]'; }
+      return false;
+    },
+    plan: function (rows, _s, ctx) {
+      var st = rows[0] && rows[0].p; if (!st) return [];
+      var list = p0list(ctx.DATA, st).picks.map(function (p) { return { draft_year: p.year, round: p.round, original_team_code: p.team, owned: p.owned }; });
+      return [{ op: 'custom', run: async function (client) { await client.rpc('ft_save_initial_picks', { p_franchise_id: ctx.fid, p_picks: list }); } }];
+    },
+    pull: async function (cl, _s, ctx) { var r = await cl.select('draft_pick_initial', 'select=draft_year,round,original_team_code,owned&order=draft_year,round,original_team_code'); ctx.DATA.draft = ctx.DATA.draft || {}; ctx.DATA.draft.initial = r.map(function (x) { return [x.draft_year, x.round, x.original_team_code, x.owned ? 1 : 0]; }); CACHE = { D: null }; return r.length; },
+    csv: function (rows, _s, _h) { var st = rows[0] && rows[0].p; if (!st || !P0D) return 'franchise_id,draft_year,round,original_team_code,owned\n'; return 'franchise_id,draft_year,round,original_team_code,owned\n' + p0list(P0D, st).picks.map(function (p) { return [1, p.year, p.round, p.team, p.owned].join(','); }).join('\n') + '\n'; }
+  };
+
+  var api = { owned: owned, ranks: ranks, board: board, picks0: picks0, shortName: shortName, derived: derived };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.FTDV = api;
+})(typeof window !== 'undefined' ? window : this);
+
 ;/* Importation d'un calendrier depuis un fichier CSV ou Excel (.xlsx) : lecture des fichiers, reconnaissance des colonnes, des dates et des équipes.
    Sans dépendance : le .xlsx est lu avec DecompressionStream (navigateurs récents et Node 18+). */
 (function (root) {
@@ -1225,15 +2169,35 @@
         common: h.common === false ? [] : (C.common || [])
       });
     }
+    function headerHTML() {
+      var nav = CFG.nav.map(function (n) { return '<a class="navlink" href="' + n[0] + '">' + esc(t(n[1])) + '</a>'; }).join('');
+      return '<header class="top"><div class="brand"><span class="crest"></span><div><div class="fr">' + esc(tn(DATA.franchise.name)) + '</div><div class="sub">' + esc(t(CFG.titleKey)) + '</div></div></div>' +
+        '<div class="ctl">' + nav + '<div class="seg" role="group"><button data-lang="fr" aria-pressed="' + (state.lang === 'fr') + '">FR</button><button data-lang="en" aria-pressed="' + (state.lang === 'en') + '">EN</button></div></div></header>';
+    }
+    // ---- onglets de consultation (mode 'view', phase 4d : Repêchage › Choix détenus, Ordre, Analyse) ----
+    // L'onglet fournit render(ctx) → HTML et, s'il le faut, act(vs, dataset, ctx) (boutons data-vact) et set(vs, name, value, ctx)
+    // (champs data-vf). vs : état d'affichage de l'onglet (années ouvertes, filtres), gardé tant que la page est ouverte.
+    state.vw = {};
+    function vctx(tb) {
+      var vs = state.vw[tb.k] = state.vw[tb.k] || {}, sk = String(seasonOf(tb));
+      // onglet de saisie dessiné par render (Choix de départ) : une seule ligne fixe ; put() enregistre une colonne de cette ligne
+      // dans les saisies en attente (même stockage, même envoi, même barre d'état que les grilles) ; drop() les annule
+      return { DATA: DATA, t: t, fmt: fmt, esc: esc, tn: tn, lang: state.lang, vs: vs, logo: logoHTML, go: function (k) { state.tab = k; }, alerts: function () { return alertsOf(tb)[0] || []; },
+        row: function () { return tb.fixed ? rows(tb)[0] || {} : {}; },
+        put: function (c, v) { var o = entries[tb.k][sk] = entries[tb.k][sk] || {}; var x = Object.assign({}, o[0] || {}); x[c] = v; o[0] = x; persist(); },
+        drop: function () { delete entries[tb.k][sk]; persist(); } };
+    }
+    function viewAct(ds) { var tb = tab(); if (tb.render && tb.act) { var c = vctx(tb); return tb.act(c.vs, ds, c); } return false; }
+    function viewSet(name, value, ds) { var tb = tab(); if (tb.render && tb.set) { var c = vctx(tb); tb.set(c.vs, name, value, c, ds || {}); return true; } return false; }
     function view() {
+      if (tab().render) return headerHTML() + '<main class="entry view" data-view="' + esc(state.tab) + '">' + FTP.panel(t, esc, sync) + (typeof window !== 'undefined' && window.FT_PAGE ? '' : '<section class="pick"><div class="seg tabs" role="group">' + CFG.tabs.map(function (x) { return '<button data-tab="' + x.k + '" aria-pressed="' + (state.tab === x.k) + '">' + esc(t(x.lbl)) + '</button>'; }).join('') + '</div></section>') + tab().render(vctx(tab())) + '</main>';
       var tb = tab(), g = gridHTML(tb), sv = seasonOf(tb), list = tb.seasons ? tb.seasons(DATA) : [];
       var opts = list.map(function (y) { return '<option value="' + y + '"' + (y === sv ? ' selected' : '') + '>' + esc(tb.seasonKind === 'year' ? y : sl(y)) + '</option>'; }).join('');
       var plist = DATA.players.map(function (p) { return '<option value="' + esc(plLabel(p)) + '"></option>'; }).join(''), klist = DATA.players.map(function (p) { return '<option value="' + esc(p.key) + '"></option>'; }).join('');
       var tabs = CFG.tabs.map(function (x) { return '<button data-tab="' + x.k + '" aria-pressed="' + (state.tab === x.k) + '">' + esc(t(x.lbl)) + '</button>'; }).join('');
       var nav = CFG.nav.map(function (n) { return '<a class="navlink" href="' + n[0] + '">' + esc(t(n[1])) + '</a>'; }).join('');
       var nAuto = tb.mode === 'fixed' ? rows(tb).filter(function (r) { return r.auto; }).length : 0;
-      return '<header class="top"><div class="brand"><span class="crest"></span><div><div class="fr">' + esc(tn(DATA.franchise.name)) + '</div><div class="sub">' + esc(t(CFG.titleKey)) + '</div></div></div>' +
-        '<div class="ctl">' + nav + '<div class="seg" role="group"><button data-lang="fr" aria-pressed="' + (state.lang === 'fr') + '">FR</button><button data-lang="en" aria-pressed="' + (state.lang === 'en') + '">EN</button></div></div></header>' +
+      return headerHTML() +
         '<main class="entry">' + FTP.panel(t, esc, sync) + '<section class="pick">' + (typeof window !== 'undefined' && window.FT_PAGE ? '' : '<div class="seg tabs" role="group">' + tabs + '</div>') + (list.length ? '<label>' + esc(t(tb.seasonKind === 'year' ? 'col.draft_year' : 'ui.season')) + '<select id="sn">' + opts + '</select></label>' : '') +
         '<div class="acts"><button class="btn" data-act="csv">' + esc(t('entry.export_csv')) + '</button>' + (tb.import ? '<button class="btn" data-act="import">' + esc(t('imp.button')) + '</button><input type="file" id="impfile" accept=".csv,.txt,.xlsx" hidden>' : '') +
         '<button class="btn" data-act="json">' + esc(t('entry.export_json')) + '</button><button class="btn ghost" data-act="reset">' + esc(t('entry.reset')) + '</button></div><datalist id="plist">' + plist + '</datalist><datalist id="klist">' + klist + '</datalist>' + listsHTML(tb) + '</section>' +
@@ -1312,7 +2276,7 @@
       else { entries[tb.k][sk] = entries[tb.k][sk] || {}; entries[tb.k][sk][ri] = Object.assign(entries[tb.k][sk][ri] || {}, { homo: v }); }
       persist(); return true;
     }
-    return { homoAnswer: homoAnswer, setStep: setStep, getStep: function () { return state.step; }, stageImport: stageImport, stageImportError: stageImportError, applyImport: applyImport, cancelImport: cancelImport, importState: function () { return state.imp; }, setFilter: setFilter, visibleIdx: function () { return visibleIdx(tab()); }, lists: function () { var tb = tab(); return tb.lists ? tb.lists(H(), DATA, state.lang) : {}; }, sync: sync, doLogin: doLogin, doLogout: doLogout, doPull: doPull, doPush: doPush, state: state, view: view, t: t, tab: tab, rows: function () { return rows(tab()); }, setCell: setCell, removeRow: removeRow, reset: reset, applyPaste: applyPaste, alerts: function () { return alertsOf(tab()); },
+    return { viewAct: viewAct, viewSet: viewSet, homoAnswer: homoAnswer, setStep: setStep, getStep: function () { return state.step; }, stageImport: stageImport, stageImportError: stageImportError, applyImport: applyImport, cancelImport: cancelImport, importState: function () { return state.imp; }, setFilter: setFilter, visibleIdx: function () { return visibleIdx(tab()); }, lists: function () { var tb = tab(); return tb.lists ? tb.lists(H(), DATA, state.lang) : {}; }, sync: sync, doLogin: doLogin, doLogout: doLogout, doPull: doPull, doPush: doPush, state: state, view: view, t: t, tab: tab, rows: function () { return rows(tab()); }, setCell: setCell, removeRow: removeRow, reset: reset, applyPaste: applyPaste, alerts: function () { return alertsOf(tab()); },
              csvRows: csvRows, jsonExport: jsonExport, countEntries: countEntries, isNA: isNA, refusal: refusal, rowLabel: rowLabel, colLabel: colLabel, alertCount: alertCount, storageOk: function () { return !storeErr; }, ctx: function () { return state.tab + '|' + seasonOf(tab()); }, snapshot: snapshot, restore: restore, pasteCols: pasteCols, derived: function (i) { var tb = tab(), rs = rows(tb); return tb.derived ? tb.derived(rs[i], i, rs, H(), t) : []; }, alertsText: alertsText, seasonOf: function () { return seasonOf(tab()); }, entries: function () { return entries; } };
   }
 
@@ -1359,6 +2323,7 @@
     }
     rootEl.addEventListener('change', function (e) {
       var el = e.target;
+      if (el.dataset && el.dataset.vf) { app.viewSet(el.dataset.vf, el.type === 'checkbox' ? el.checked : el.value, el.dataset); host.draw('[data-vf="' + el.dataset.vf + '"]' + (el.dataset.y ? '[data-y="' + el.dataset.y + '"][data-r="' + el.dataset.r + '"]' + (el.dataset.i ? '[data-i="' + el.dataset.i + '"]' : '') : '')); return; }
       if (el.id === 'sn') { app.state.season[app.state.tab] = +el.value; draw(); }
       else if (el.id === 'flt-q') { app.setFilter('q', el.value); draw(); }
       else if (el.id === 'step') { app.setStep(el.value); draw(); }
@@ -1387,6 +2352,7 @@
         var hri = +String(b.dataset.ref).replace(/^\D+-/, ''), hk = b.dataset.homo; gi.edit(function () { app.homoAnswer(hri, hk, +b.dataset.id); });
         host.draw(hk === 'no' ? '.cell[data-r="' + hri + '"][data-c="birth"]' : '#homo-' + b.dataset.ref + ' button'); return;
       }
+      if (b.dataset.vact) { var vr = app.viewAct(b.dataset); if (vr !== false) host.draw(typeof vr === 'string' ? vr : null); return; }   // onglets de consultation
       if (b.dataset.act === 'pcb-accept') { gi.edit(function () { app.setCell(+b.dataset.r, b.dataset.c, b.dataset.name); }); draw([+b.dataset.r, b.dataset.c]); return; }   // « Lier à … »
       if (b.dataset.lang) app.state.lang = b.dataset.lang; else if (b.dataset.tab) app.state.tab = b.dataset.tab; else if (b.dataset.rm) { gi.edit(function () { app.removeRow(+b.dataset.rm); }); }
       else if (b.dataset.act === 'csv') { download(CFG.storeKey + '_' + app.state.tab + '.csv', app.csvRows(), 'text/csv'); return; }
@@ -1408,6 +2374,7 @@
 (function (root) {
   var S = root.FTS || (typeof require !== 'undefined' ? require('./season_core.js') : null);
   var FTC = root.FTC || (typeof require !== 'undefined' ? require('./countries.js') : null);
+  var DV = root.FTDV || (typeof require !== 'undefined' ? require('./draft_views.js') : null);   // onglets de consultation du repêchage (phase 4d)
   var HO = root.FTHOMO || (typeof require !== 'undefined' ? require('../connect/homonym_ui.js') : null);   // joueurs homonymes (migration 71)
   var FTLOGOS = root.FTLOGOS || (function () { try { return typeof require !== 'undefined' ? require('./logos.js') : null; } catch (e) { return null; } })() || { div: {}, conf: {}, po: {} };
   var FTTROPHY = root.FTTROPHY || (function () { try { return typeof require !== 'undefined' ? require('./trophy_images.js') : {}; } catch (e) { return {}; } })();
@@ -1663,7 +2630,7 @@
   function inchesFrom(str) { var m = /^(\d+)\s*'\s*(\d{1,2})/.exec(String(str == null ? '' : str).trim()); return m ? +m[1] * 12 + +m[2] : null; }
   var picks = {
     k: 'picks', lbl: 'off.tab_picks', help: { note: 'off.help_picks_note', noteParams: function (DATA) { var n = (DATA.league && DATA.league.size) || 32; return [n, 7 * n]; }, where: ['off.help_picks_where_1', 'off.help_picks_where_2'], order: ['off.help_picks_order_1', 'off.help_picks_order_2', 'off.help_picks_order_3', 'off.help_picks_order_4'], errors: ['off.help_picks_err_1', 'off.help_picks_err_2', 'off.help_picks_err_3'], alerts: ['off.help_picks_al_year', 'off.help_picks_al_round', 'off.help_picks_al_req', 'off.help_picks_al_dup', 'off.help_picks_al_pick', 'off.help_picks_al_age', 'off.help_picks_al_odd', 'off.help_picks_al_ptype', 'off.help_picks_al_birth', 'off.help_al_homonym', 'off.help_picks_al_birth_req'] }, hintKey: 'picks.hint', tableClass: 'picks', mode: 'fixed', multi: true, seasons: function () { return []; }, defaultSeason: function () { return 0; },
-    schema: [['year', 'picks.col_year', 'int'], ['round', 'picks.col_round', 'int'], ['overall', 'picks.col_overall', 'int'], ['first', 'col.first_name', 'text'], ['last', 'col.last_name', 'text'], ['pos', 'col.position', 'sel', POSOPT], ['height', 'picks.col_height', 'text'], ['weight', 'picks.col_weight', 'int'], ['birth', 'picks.col_birth', 'date'], ['hand', 'picks.col_hand', 'sel', HANDOPT], ['country', 'picks.col_country', 'sel', []], ['ptype', 'picks.col_ptype', 'sel', []]],
+    schema: [['year', 'picks.col_year', 'int'], ['round', 'picks.col_round', 'int'], ['overall', 'picks.col_overall', 'int'], ['first', 'col.first_name', 'text'], ['last', 'col.last_name', 'text'], ['pos', 'col.position', 'sel', POSOPT], ['pos2', 'col.position2', 'sel', []], ['height', 'picks.col_height', 'text'], ['weight', 'picks.col_weight', 'int'], ['birth', 'picks.col_birth', 'date'], ['hand', 'picks.col_hand', 'sel', HANDOPT], ['country', 'picks.col_country', 'sel', []], ['ptype', 'picks.col_ptype', 'sel', []]],
     placeholder: function (def, r, i, H) { var fr = H && H.lang === 'fr'; return def[0] === 'height' ? (fr ? '188' : "6'2") : def[0] === 'weight' ? (fr ? '86' : '190') : def[0] === 'year' ? '2025' : ''; },
     // taille et poids sont gardés en pouces et en livres ; l'écran les saisit et les affiche en cm et en kg en français
     parseCell: function (def, v, lang) {
@@ -1678,15 +2645,16 @@
       return v;
     },
     selOptions: function (def, r, t, lang) {
+      if (def[0] === 'pos2') { var EVC = root.FTV || (typeof require !== 'undefined' ? require('../events/events_core.js') : null); return r.pos === 'G' ? [] : EVC.secondaryOptions(r.pos).filter(function (x) { return x !== r.pos; }).map(function (x) { return [x, 'pc.' + x]; }); }   // poste secondaire (migration 79)
       if (def[0] === 'country') return FTC.options(lang);
       if (def[0] === 'ptype') { var g = POSGRP[r.pos], list = g ? S.PTYPES[g] : ['F', 'D', 'G'].reduce(function (a, k) { S.PTYPES[k].forEach(function (x) { if (a.indexOf(x) < 0) a.push(x); }); return a; }, []); return list.map(function (x) { return [x, 'ptype.' + PTSLUG[x]]; }); }
       return null;
     },
     cellAfter: function (def, r) { var u = def[0] === 'country' && r.country ? FTC.flagURL(r.country) : ''; return u ? ' <img class="flag" src="' + u + '" alt="" onerror="this.style.display=\'none\'">' : ''; },
     fixed: function (_s, H, DATA) {
-      var rows = [], years = Object.keys(DATA.base.picks).sort();
-      years.forEach(function (y) { DATA.base.picks[y].filter(function (x) { return x[4] === 'selected' && x[3]; })   /* doublons exacts : fusionnés par la migration 57, contrainte draft_pick_uniq */.forEach(function (x) { var hi = inchesFrom(x[8]); rows.push({ year: +y, round: x[0], overall: x[2] == null ? '' : x[2], first: x[5] || '', last: x[6] || '', pos: x[7] || '', height: hi == null ? '' : hi, weight: x[9] === '' ? '' : x[9], birth: x[10] || '', hand: x[11] || '', country: x[12] || '', ptype: x[13] || '', key: x[3], pid: x[14] == null ? null : x[14], orig: x[1] || '' }); }); });
-      for (var i = 0; i < PICK_BLANK; i++) rows.push({ year: '', round: '', overall: '', first: '', last: '', pos: '', height: '', weight: '', birth: '', hand: '', country: '', ptype: '' });
+      var rows = [], years = Object.keys(DATA.base.picks).sort(), p2 = {}; ((DATA.draft && DATA.draft.board) || []).forEach(function (b) { if (b[16]) p2[b[0]] = b[16]; });
+      years.forEach(function (y) { DATA.base.picks[y].filter(function (x) { return x[4] === 'selected' && x[3]; })   /* doublons exacts : fusionnés par la migration 57, contrainte draft_pick_uniq */.forEach(function (x) { var hi = inchesFrom(x[8]); rows.push({ year: +y, round: x[0], overall: x[2] == null ? '' : x[2], first: x[5] || '', last: x[6] || '', pos: x[7] || '', pos2: x[14] != null && p2[x[14]] || '', height: hi == null ? '' : hi, weight: x[9] === '' ? '' : x[9], birth: x[10] || '', hand: x[11] || '', country: x[12] || '', ptype: x[13] || '', key: x[3], pid: x[14] == null ? null : x[14], orig: x[1] || '' }); }); });
+      for (var i = 0; i < PICK_BLANK; i++) rows.push({ year: '', round: '', overall: '', first: '', last: '', pos: '', pos2: '', height: '', weight: '', birth: '', hand: '', country: '', ptype: '' });
       return rows;
     },
     // joueur repêché homonyme d'un joueur connu (même groupe, historiques compris) : question « Même joueur ? » sous la ligne (maquette docs/maquettes/homonymes.html)
@@ -2024,7 +2992,7 @@
           var existing = {}; (await client.select('player', 'select=id,legacy_key&origin=eq.franchise')).forEach(function (p) { existing[p.legacy_key] = p.id; });
           var fields = function (r, key) {
             var o = { first_name: r.first, last_name: r.last, full_name: (r.first + ' ' + r.last).trim(), legacy_key: key, birth_date: nn(r.birth), height_in: filled(r.height) ? Math.round(+r.height) : null, weight_lb: filled(r.weight) ? Math.round(+r.weight) : null, handedness: HANDDB[r.hand] || null, player_type: nn(r.ptype), country: nn(r.country), draft_year: +r.year, draft_round: filled(r.round) ? +r.round : null, draft_pick: filled(r.overall) ? +r.overall : null, draft_team: myTeam };
-            if (r.pos) { o.position_original = r.pos; o.position_current = r.pos; } return o;
+            if (r.pos) { o.position_original = r.pos; o.position_current = r.pos; } if (r.pos2 && r.pos !== 'G') o.position_secondary_original = r.pos2; return o;   // statut Recrue et 0 match : posés par la base (79)
           };
           var keyOf = function (r) { var prefix = r.key ? r.key.slice(0, 4) : (POSGRP[r.pos] || 'F') + ' - '; return prefix + (r.first + ' ' + r.last).trim(); };
           // joueurs (création ou mise à jour des seules valeurs remplies) puis choix de chaque année, en un seul appel transactionnel
@@ -2114,7 +3082,114 @@
   function part(key, titleKey, screen, prefix, tabs) { var o = Object.assign({}, CFGS.off, { storeKey: key, titleKey: titleKey, tabs: tabs }); o.help = Object.assign({}, CFGS.off.help, { screen: screen, prefix: prefix }); return o; }
   CFGS.results = part('ft_results_v1', 'nav.g.results', 'results', 'res.', [standings, series, cup]);
   CFGS.honors = part('ft_honors_v1', 'nav.g.honors', 'honors', 'hon.', [awards, allstar, retire]);
-  CFGS.draft = part('ft_draft_v1', 'nav.g.draft', 'draft', 'dft.', [lottery, top3, picks]);
+  // ---- Point de départ › Effectif de départ (phase 4d, maquette docs/maquettes/4d_effectif_depart.html ; RPC ft_save_start_roster, 78-79) ----
+  // Une ligne par joueur de départ (draft.start) + 12 lignes vides. Profil d'un joueur existant : ft_update_player ; statut, matchs de
+  // recrue et contrat de départ : ft_save_start_roster (nouveau joueur : new_player, arrivée « Start »). Seule une recrue peut être sans contrat.
+  var EV = root.FTV || (typeof require !== 'undefined' ? require('../events/events_core.js') : null);
+  var START_BLANK = 12, STEVOPT = [['acquired', 'ev.acquired'], ['entry_level', 'ev.entry_level'], ['none', 'start.no_contract']];
+  var STATOPT = [['Rookie', 'pl.st_rookie'], ['Veteran', 'pl.st_veteran']], CTOPT = [['one_way', 'ctype.one_way'], ['two_way', 'ctype.two_way']];
+  var YEARSOPT = [1, 2, 3, 4, 5, 6, 7, 8].map(function (y) { return [y, String(y)]; });
+  var HANDFROM = { Left: 'L', Right: 'R' };
+  function startFirst(DATA) { return DATA.franchise.first; }
+  var roster0 = {
+    k: 'roster0', lbl: 'nav.t.start.roster0', hintKey: 'start.roster_hint', tableClass: 'r0', mode: 'fixed', seasons: function () { return []; }, defaultSeason: function () { return 0; },
+    schema: [['first', 'col.first_name', 'text'], ['last', 'col.last_name', 'text'], ['pos', 'col.position', 'sel', POSOPT], ['pos2', 'col.position2', 'sel', []], ['no', 'col.number', 'int'],
+      ['height', 'picks.col_height', 'text'], ['weight', 'picks.col_weight', 'int'], ['birth', 'picks.col_birth', 'date'], ['hand', 'picks.col_hand', 'sel', HANDOPT], ['ptype', 'picks.col_ptype', 'sel', []],
+      ['dyear', 'col.draft_year', 'int'], ['dround', 'col.draft_round', 'int'], ['dpick', 'col.draft_pick', 'int'], ['dteam', 'col.draft_team', 'sel', []], ['country', 'col.country', 'sel', []],
+      ['status', 'pl.col_status', 'sel', STATOPT], ['gp1', 'col.gp_prior1', 'int'], ['gp2', 'col.gp_prior2', 'int'],
+      ['ev', 'start.col_contract', 'sel', STEVOPT], ['ctype', 'col.contract_type', 'sel', CTOPT], ['years', 'col.years', 'sel', YEARSOPT], ['cfirst', 'col.first_season', 'sel', []], ['aav', 'col.aav', 'money'],
+      ['cl1', 'ct.col_clause1', 'sel', []], ['cl2', 'ct.col_clause2', 'sel', []], ['cl3', 'ct.col_clause3', 'sel', []], ['cl4', 'ct.col_clause4', 'sel', []], ['cl5', 'ct.col_clause5', 'sel', []], ['cl6', 'ct.col_clause6', 'sel', []], ['cl7', 'ct.col_clause7', 'sel', []], ['cl8', 'ct.col_clause8', 'sel', []],
+      ['clast', 'col.last_season', 'text']],
+    shortHeads: true,
+    placeholder: function (def, r, i, H) { return picks.placeholder(def, r, i, H); },
+    parseCell: function (def, v, lang) { return picks.parseCell(def, v, lang); },
+    fmtCell: function (def, v, lang) { return picks.fmtCell(def, v, lang); },
+    cellAfter: function (def, r) { return picks.cellAfter(def, r); },
+    selOptions: function (def, r, t, lang) {
+      var c = def[0], first = startFirst(CUR_DATA || { franchise: { first: 2024 } });
+      if (c === 'country' || c === 'ptype') return picks.selOptions(def, r, t, lang);
+      if (c === 'pos2') return EV.secondaryOptions(r.pos).filter(function (x) { return x !== r.pos; }).map(function (x) { return [x, 'pc.' + x]; });
+      if (c === 'dteam') return ((CUR_DATA && CUR_DATA.teams) || []).filter(function (x) { return x.code !== 'NHL'; }).map(function (x) { return [x.code, x.code]; });
+      if (c === 'cfirst') return [first - 1, first].map(function (y) { return [y, y + '-' + String((y + 1) % 100).padStart(2, '0')]; });
+      if (c === 'ev') return STEVOPT.filter(function (o) { return o[0] !== 'none' || r.status === 'Rookie'; });
+      if (/^cl\d$/.test(c)) return EV.CLAUSES.map(function (x) { return [x, x]; });
+      return null;
+    },
+    // cases sans objet (hachurées) : poste secondaire d'un gardien, matchs de recrue d'un vétéran, contrat absent, clauses au-delà des années ou d'un contrat à deux volets
+    cellRO: function (def, r) {
+      var c = def[0], none = r.ev === 'none';
+      if (c === 'clast') return { text: r.cfirst && r.years && !none ? (+r.cfirst + +r.years - 1) + '-' + String((+r.cfirst + +r.years) % 100).padStart(2, '0') : '—', cls: 'calc' };
+      if (c === 'pos2' && r.pos === 'G') return { html: '', cls: 'na' };
+      if ((c === 'gp1' || c === 'gp2') && r.status === 'Veteran') return { html: '', cls: 'na' };
+      if (['ctype', 'years', 'cfirst', 'aav'].indexOf(c) >= 0 && none) return { html: '', cls: 'na' };
+      if (/^cl\d$/.test(c) && (none || r.ctype === 'two_way' || (r.years && +c.slice(2) > +r.years))) return { html: '', cls: 'na' };
+      return null;
+    },
+    fixed: function (_s, H, DATA) {
+      CUR_DATA = DATA;
+      var rows = ((DATA.draft && DATA.draft.start) || []).map(function (x) {
+        var ct = x[21], o = { pid: x[0], first: x[1] || '', last: x[2] || '', pos: x[3] || '', pos2: x[4] || '', no: x[5] == null ? '' : x[5], height: x[6] == null ? '' : x[6], weight: x[7] == null ? '' : x[7], birth: x[8] || '', hand: HANDFROM[x[9]] || '', ptype: x[10] || '',
+          dyear: x[11] == null ? '' : x[11], dround: x[12] == null ? '' : x[12], dpick: x[13] == null ? '' : x[13], dteam: teamCodeOf(DATA, x[14]), country: x[15] || '', status: x[16] || '', gp1: x[17] == null ? '' : x[17], gp2: x[18] == null ? '' : x[18], via: x[19], on: x[20],
+          ev: ct ? ct[2] : 'none', ctype: ct && ct[3] || '', years: ct && ct[5] || '', cfirst: ct && ct[4] || '', aav: ct && ct[6] != null ? ct[6] : '', cid: ct ? ct[0] : null, signed: ct ? ct[1] : null };
+        for (var k = 1; k <= 8; k++) o['cl' + k] = ct && ct[7] && ct[7][k - 1] || '';
+        return o;
+      });
+      for (var i = 0; i < START_BLANK; i++) { var b = { pid: null, ev: '' }; roster0.schema.forEach(function (d) { if (!(d[0] in b)) b[d[0]] = ''; }); rows.push(b); }
+      return rows;
+    },
+    validate: function (rows) {
+      var first = startFirst(CUR_DATA || { franchise: { first: 2024 } }), on = first + '-09-14';
+      return rows.map(function (r) {
+        var has = r.pid || r.first || r.last || r.pos; if (!has) return [];
+        var a = r.pid ? [] : EV.validateNewPlayer(Object.assign({}, r, { date: on }), {}).filter(function (x) { return x.c !== 'birth' || x.k !== 'val.required'; });
+        if (r.pid) { if (!r.first) a.push({ c: 'first', level: 'err', k: 'val.required', p: [] }); if (!r.last) a.push({ c: 'last', level: 'err', k: 'val.required', p: [] }); }
+        if (r.pos2 && r.pos2 === r.pos) a.push({ c: 'pos2', level: 'err', k: 'val.pos2_same', p: [] });
+        if (!r.status) a.push({ c: 'status', level: 'err', k: 'val.required', p: [] });
+        if (r.status === 'Rookie') ['gp1', 'gp2'].forEach(function (c) { if (r[c] === '' || r[c] == null) a.push({ c: c, level: 'err', k: 'val.required', p: [] }); else if (!(+r[c] >= 0 && +r[c] <= 84 && Math.floor(+r[c]) === +r[c])) a.push({ c: c, level: 'err', k: 'val.np_gp_prior', p: [] }); });
+        if (r.status === 'Veteran' && ((r.gp1 !== '' && r.gp1 != null) || (r.gp2 !== '' && r.gp2 != null)) && !r.pid) a.push({ c: 'gp1', level: 'err', k: 'val.np_gp_vet', p: [] });
+        if (!r.ev || (r.ev === 'none' && r.status !== 'Rookie')) a.push({ c: 'ev', level: 'err', k: r.status === 'Veteran' && (r.ev === 'none' || !r.ev) ? 'val.start_contract' : 'val.required', p: [] });
+        if (r.ev && r.ev !== 'none') ['ctype', 'years', 'cfirst', 'aav'].forEach(function (c) { if (r[c] === '' || r[c] == null) a.push({ c: c, level: 'err', k: 'val.required', p: [] }); });
+        return a;
+      });
+    },
+    plan: function (rows, _s, c) {
+      var first = startFirst(c.DATA), nn = function (v) { return v === '' || v == null ? null : v; }, ni = function (v) { return v === '' || v == null ? null : Math.round(+v); };
+      var used = rows.filter(function (r) { return r.pid || r.first || r.last; });
+      var prof = function (r) { return { first_name: r.first, last_name: r.last, birth_date: nn(r.birth), height_in: ni(r.height), weight_lb: ni(r.weight), handedness: HANDDB[r.hand] || null, country: nn(r.country), player_type: nn(r.ptype),
+        draft_year: ni(r.dyear), draft_round: ni(r.dround), draft_pick: ni(r.dpick), draft_team: r.dteam ? teamNameOf(c.DATA, r.dteam) : null, position_secondary_original: nn(r.pos2) }; };
+      var contract = function (r) {
+        if (!r.ev || r.ev === 'none') return null;
+        var f = +r.cfirst, y = +r.years, signed = r.signed || (first + '-07-01'), o = { signed_on: signed, event_type: r.ev, contract_type: r.ctype, first_season: f, years: y, aav: +r.aav, start_on: signed > f + '-07-01' ? signed : f + '-07-01', end_on: (f + y) + '-06-30',
+          contract_years: [] };
+        for (var k = 0; k < y; k++) o.contract_years.push({ season: f + k, cap_hit: +r.aav, clause: r.ctype === 'one_way' ? nn(r['cl' + (k + 1)]) : null });
+        if (r.cid) o.id = r.cid; return o;
+      };
+      return [{ op: 'custom', run: async function (client) {
+        for (var i = 0; i < used.length; i++) { var r = used[i]; if (r.pid) await client.rpc('ft_update_player', { p_franchise_id: c.fid, p_player: Object.assign({ id: r.pid, jersey_number: ni(r.no) }, prof(r)) }); }
+        await client.rpc('ft_save_start_roster', { p_franchise_id: c.fid, p_rows: used.map(function (r) {
+          var o = { status_at_acquisition: r.status, contract: contract(r) };
+          if (r.status === 'Rookie') { o.rookie_gp_current = ni(r.gp1); o.rookie_gp_previous = ni(r.gp2); }
+          if (r.pid) { o.player_id = r.pid; o.acquired_via = r.via || 'Start'; if (r.on) o.acquired_on = r.on; }
+          else { var np = Object.assign({ position_original: r.pos, full_name: (r.first + ' ' + r.last).trim(), jersey_number: ni(r.no) }, prof(r)); Object.keys(np).forEach(function (k) { if (np[k] === null) delete np[k]; }); o.new_player = np; o.acquired_via = 'Start'; if (!o.contract) o.acquired_on = first + '-09-14'; }   // sans contrat : arrivée au 14 septembre de la première saison (PlayersList!W)
+          return o;
+        }) });
+      } }];
+    },
+    pull: async function (cl, _s, c) {
+      var A = root.FTLIVE || (typeof require !== 'undefined' ? require('../connect/live_data.js') : null), R = {};
+      var T = { player: 'select=id,full_name,first_name,last_name,position_original,position_secondary_original,height_in,weight_lb,birth_date,handedness,player_type,draft_year,draft_round,draft_pick,draft_team,country&origin=eq.franchise',
+        player_stint: 'select=player_id,acquired_on,acquired_via,status_at_acquisition,rookie_gp_current,rookie_gp_previous,jersey_number,departed_on', contract: 'select=id,signed_on,player_id,event_type,contract_type,years,aav,first_season', contract_year: 'select=contract_id,season,clause' };
+      var ks = Object.keys(T); for (var i = 0; i < ks.length; i++) R[ks[i]] = await cl.select(ks[i], T[ks[i]]);
+      R.franchise = [{ first_season_start_year: c.DATA.franchise.first, name: c.DATA.franchise.name, abbreviation: c.DATA.franchise.code }];
+      c.DATA.draft = c.DATA.draft || {}; c.DATA.draft.start = A.startRoster(R); return c.DATA.draft.start.length;
+    },
+    csv: function (rows) { return csv('franchise_id,player_id,first_name,last_name,position,status,contract', rows.filter(function (r) { return r.pid || r.first || r.last; }).map(function (r) { return [1, r.pid || '', r.first, r.last, r.pos, r.status, r.ev]; })); }
+  };
+  var CUR_DATA = null;
+  function teamCodeOf(DATA, name) { if (!name) return ''; var t = (DATA.teams || []).filter(function (x) { return x.code === name || x.en === name || x.fr === name; })[0]; return t ? t.code : ''; }
+  function teamNameOf(DATA, code) { var t = (DATA.teams || []).filter(function (x) { return x.code === code; })[0]; return t ? t.en : code; }
+  CFGS.start = part('ft_start_v1', 'nav.g.start', 'start', 'start.', [roster0, DV.picks0]);
+  CFGS.draft = part('ft_draft_v1', 'nav.g.draft', 'draft', 'dft.', [DV.owned, lottery, DV.ranks, top3, picks, DV.board]);
   var api = { CFGS: CFGS, helpers: helpers };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.FTCFG = api;
 })(typeof window !== 'undefined' ? window : this);

@@ -105,7 +105,7 @@
   // Tables propres à une franchise : chaque lecture et chaque modification est filtrée sur la franchise active (franchise_id).
   var SCOPED = ['player', 'player_stint', 'skater_season_stats', 'goalie_season_stats', 'team_season_stats', 'standing', 'playoff_series', 'award_win', 'all_star_selection',
     'stanley_cup_result', 'stanley_cup_member', 'salary_cap_season', 'contract', 'offer_sheet', 'offer_sheet_pick', 'data_issue', 'trade', 'roster_move',
-    'player_rating', 'schedule_game', 'position_change', 'role_assignment', 'draft_pick_initial', 'draft_pick', 'draft_lottery', 'draft_top3', 'retirement', 'franchise_league_team',
+    'player_rating', 'schedule_game', 'position_change', 'role_assignment', 'draft_pick_initial', 'draft_pick_value', 'draft_pick', 'draft_lottery', 'draft_top3', 'retirement', 'franchise_league_team',
     'historical_award_counts', 'projected_level', 'v_contract_year_level', 'v_skater_career_totals', 'v_skater_career_records', 'v_skater_season_records', 'hr_job', 'v_player_career'];
   // Tables enfants sans franchise_id : filtrées par leur parent (embarqué vide de PostgREST, « parent!inner() »)
   var CHILD = { contract_year: 'contract', trade_asset: 'trade' };
@@ -316,7 +316,7 @@
   var TABLES = [
     ['franchise', 'select=id,name,abbreviation,color_primary,color_secondary,color_tertiary,first_season_start_year,current_season_start_year,ui_locale,games_per_season,current_game_date&order=id'],
     ['team', 'select=id,code,name_en,name_fr,is_active,conference,division,color_1,color_2,color_3,franchise_code,logo&order=id'],
-    ['player', 'select=id,legacy_key,full_name,position_group,first_name,last_name,origin,birth_date,height_in,weight_lb,handedness,country,draft_year,draft_round,draft_pick,draft_team,position_original,position_current,player_type,nhl_id,hr_id&order=id', 1],
+    ['player', 'select=id,legacy_key,full_name,position_group,first_name,last_name,origin,birth_date,height_in,weight_lb,handedness,country,draft_year,draft_round,draft_pick,draft_team,position_original,position_secondary_original,position_current,player_type,nhl_id,hr_id&order=id', 1],
     ['skater_season_stats', 'select=id,player_id,season,game_type,origin,manual,position,age,gp,g,a,pts,plus_minus,pim,shots,gwg,ppg,shg,ppp,shp,toi_minutes,fow,fot,hits,blocks,giveaways,takeaways,oa_end&order=id', 1],
     ['goalie_season_stats', 'select=id,player_id,season,game_type,origin,manual,gp,w,l,otl,so,saves,shots_against,goals_against,minutes,pim,g,a,oa_end&order=id', 1],
     ['team_season_stats', 'select=season,game_type,gp,w,l,otl,points,gf,ga,result,rw,row_,ppg,pp_opportunities,shga,ppga,times_shorthanded,shgf,home_w,home_l,home_otl,away_w,away_l,away_otl&order=id'],
@@ -325,7 +325,7 @@
     ['award_win', 'select=season,award_id,place,player_id,player_key,team_code,stat_value&order=id'],
     ['all_star_selection', 'select=season,team_level,position,player_id,player_key,team_code&order=id'],
     ['roster_move', 'select=id,season,moved_on,player_id,move,injury_return_on,games_missed,waiver_claimed&order=id', 1],
-    ['player_stint', 'select=player_id,acquired_on,acquired_via,status_at_acquisition,jersey_number,departed_on,departed_via&order=player_id,acquired_on', 1],
+    ['player_stint', 'select=player_id,acquired_on,acquired_via,status_at_acquisition,rookie_gp_current,rookie_gp_previous,jersey_number,departed_on,departed_via&order=player_id,acquired_on', 1],
     ['contract', 'select=id,signed_on,player_id,event_type,contract_type,years,aav,first_season,start_on,end_on&order=id', 1],
     ['contract_year', 'select=contract_id,season,clause&order=contract_id,season', 1],
     ['position_change', 'select=id,changed_on,player_id,from_primary,from_secondary,to_primary,to_secondary&order=id'],
@@ -336,6 +336,7 @@
     ['draft_top3', 'select=draft_year,pick,team_id,player_name,position,potential&order=draft_year,pick'],
     ['draft_lottery', 'select=draft_year,pick,pre_lottery_rank,team_code&order=draft_year,pick'],
     ['draft_pick', 'select=draft_year,round,original_team_code,overall_pick,selected_player_id,selected_player_key,status&order=id'],
+    ['draft_pick_initial', 'select=draft_year,round,original_team_code,owned&order=draft_year,round,original_team_code'],   // choix de départ (Point de départ, Repêchage)
     ['v_contract_year_level', 'select=contract_id,player_id,season,cap_hit,contract_type,level,basis&order=contract_id,season', 1],
     ['role_assignment', 'select=season,slot,player_id&order=id'],
     ['player_rating', 'select=player_id,season,oa&order=player_id,season', 1],
@@ -346,7 +347,8 @@
 
   var OPTIONAL = [['franchise_league_team', 'select=team_code,conference,division,active_from,active_to&order=id'], ['stanley_cup_member', 'select=season,position_group,player_key&order=season,position_group,sort_order,id', 1], ['historical_award_counts', 'select=award_code,counts'],
     ['offer_sheet', 'select=id,signed_on,player_id,event_type,compensation&order=signed_on,id'], ['offer_sheet_pick', 'select=offer_sheet_id,slot,team_code,pick_year,pick_round&order=offer_sheet_id,slot'],
-    ['v_player_career', 'select=player_id,first_season,last_season&order=player_id']];   // migration 71 : années de carrière (étiquettes d'homonymes)
+    ['v_player_career', 'select=player_id,first_season,last_season&order=player_id'],   // migration 71 : années de carrière (étiquettes d'homonymes)
+    ['draft_pick_value', 'select=overall_pick,value&order=overall_pick']];   // migration 78 : barème de valeur des choix (Repêchage › Analyse)
   var FTSBX = (function () { var S = typeof FTSB !== 'undefined' ? FTSB : (typeof require === 'function' ? require('./sb.js') : null); if (!S) return null; var set = {}; S.SCOPED.concat(Object.keys(S.CHILD), ['team']).forEach(function (t) { set[t] = 1; }); set.team = 0; return { isScoped: function (t) { return !!set[t]; } }; })();
   function pspan(n) { var P = typeof FTPERF !== 'undefined' ? FTPERF : root.FTPERF; return P ? P.span(n) : function () {}; }
   // lecture d'une table filtrée sur la franchise active (sb.js ajoute franchise_id) ; la table franchise : seulement la franchise active
@@ -360,7 +362,9 @@
   PAGE_TABLES.preseason = PAGE_TABLES.offseason = ['award', 'player', 'v_player_career', 'standing', 'role_assignment', 'player_rating', 'stanley_cup_result', 'skater_season_stats', 'team_season_stats', 'playoff_series', 'historical_award_counts', 'salary_cap_season', 'goalie_season_stats', 'schedule_game', 'draft_lottery', 'draft_top3', 'draft_pick', 'award_win', 'all_star_selection', 'retirement', 'stanley_cup_member', 'contract'];
   // pages de groupe (phase 4b, connect/ft_nav.js) : mêmes tables que les anciennes pages qui les servent
   PAGE_TABLES.franchise = PAGE_TABLES.setup.concat(PAGE_TABLES.history_edit); PAGE_TABLES.stats = PAGE_TABLES.entry; PAGE_TABLES.roster = PAGE_TABLES.events;
-  PAGE_TABLES.results = PAGE_TABLES.honors = PAGE_TABLES.draft = PAGE_TABLES.preseason; PAGE_TABLES.cards = PAGE_TABLES.analysis = PAGE_TABLES.player_card;
+  PAGE_TABLES.results = PAGE_TABLES.honors = PAGE_TABLES.preseason;
+  // Repêchage (phase 4d) : choix de départ, échanges de choix, compensations, barème
+  PAGE_TABLES.draft = PAGE_TABLES.preseason.concat(['draft_pick_initial', 'draft_pick_value', 'trade', 'trade_asset', 'offer_sheet', 'offer_sheet_pick']); PAGE_TABLES.start = PAGE_TABLES.draft; PAGE_TABLES.cards = PAGE_TABLES.analysis = PAGE_TABLES.player_card;
   var COMMON = ['franchise', 'team', 'label', 'franchise_league_team'];
   function tableDefs() { return TABLES.map(function (t) { return { name: t[0], query: t[1], big: !!t[2], optional: false }; }).concat(OPTIONAL.map(function (t) { return { name: t[0], query: t[1], big: !!t[2], optional: true }; })); }
   // ordre de lecture : tables communes, tables de la page, puis le reste
@@ -521,7 +525,7 @@
         var sb = {}, pb = {}; R.player_stint.slice().sort(function (a, b) { return String(a.acquired_on).localeCompare(String(b.acquired_on)); }).forEach(function (s) { (sb[s.player_id] = sb[s.player_id] || []).push(s); });
         R.position_change.slice().sort(function (a, b) { return String(a.changed_on).localeCompare(String(b.changed_on)) || a.id - b.id; }).forEach(function (c) { (pb[c.player_id] = pb[c.player_id] || []).push(c); });
         return sortBy(R.player.filter(function (p) { return p.origin === 'franchise'; }), function (p) { return [p.full_name]; }).map(function (p) { var ss = sb[p.id] || [], pc = pb[p.id] || [], f = ss[0] || {}, la = ss[ss.length - 1] || {};
-          return [p.id, p.legacy_key, la.jersey_number == null ? null : la.jersey_number, p.position_original, p.position_current, pc.length ? pc[0].from_secondary : null, pc.length ? pc[pc.length - 1].to_secondary : null, p.birth_date, p.height_in, p.weight_lb, p.handedness, p.player_type, p.draft_year, p.draft_round, p.draft_pick, p.draft_team, p.country, f.status_at_acquisition || null, f.acquired_on || null, f.acquired_via || null, la.departed_on || null, la.departed_via || null, p.first_name, p.last_name]; }); })(),
+          return [p.id, p.legacy_key, la.jersey_number == null ? null : la.jersey_number, p.position_original, p.position_current, p.position_secondary_original || (pc.length ? pc[0].from_secondary : null), pc.length ? pc[pc.length - 1].to_secondary : null, p.birth_date, p.height_in, p.weight_lb, p.handedness, p.player_type, p.draft_year, p.draft_round, p.draft_pick, p.draft_team, p.country, f.status_at_acquisition || null, f.acquired_on || null, f.acquired_via || null, la.departed_on || null, la.departed_via || null, p.first_name, p.last_name, f.rookie_gp_current == null ? null : f.rookie_gp_current, f.rookie_gp_previous == null ? null : f.rookie_gp_previous]; }); })(),
       hist: sortBy(R.player.filter(function (p) { return p.origin === 'historical'; }), function (p) { return [p.full_name, p.id]; }).map(function (p) { return [p.id, p.full_name, p.position_group]; }),   // proposés côté « reçus » d'un échange
       stints: R.player_stint.filter(function (s) { return s.acquired_on != null; }).map(function (s) { return [s.player_id, s.acquired_on, s.departed_on]; }),
       schedule: (function () { var o = {}; R.schedule_game.slice().sort(function (a, b) { return a.season - b.season || a.game_no - b.game_no; }).forEach(function (g) { (o[String(g.season)] = o[String(g.season)] || []).push(g.game_date); }); return o; })(),
@@ -532,6 +536,52 @@
         tr: sortBy(R.trade, function (t) { return [t.traded_on]; }).filter(function (t) { return assetsBy[t.id]; }).map(function (t) { return { id: t.id, date: t.traded_on, partner: t.partner_team_code, assets: assetsBy[t.id].map(function (a) { return [a.direction, a.asset_type, a.player_id, a.pick_year, a.pick_round, tc[a.pick_original_team_id] || null, a.retained_salary, a.retained_years]; }) }; }),
         pc: sortBy(R.position_change, function (p) { return [p.changed_on]; }).map(function (p) { return [p.changed_on, p.player_id, p.from_primary, p.from_secondary, p.to_primary, p.to_secondary]; })
       }, labels: labels(R) };
+  }
+
+  // ---------- repêchage (phase 4d) : données brutes des onglets Choix de départ, Choix détenus, Ordre et Analyse ----------
+  // Même structure que season/build_season_data.py (clé « draft ») ; les calculs sont dans season/draft_core.js (FTDRAFT.assemble).
+  //   initial : [[année, ronde, équipe d'origine, détenu 1/0]] (draft_pick_initial) ;
+  //   trades  : [[date, partenaire, 'in' | 'out', année, ronde, équipe d'origine]] (choix des échanges, dans l'ordre de saisie) ;
+  //   offers  : [[date, 'signed' | 'unmatched', année, ronde, équipe d'origine]] (choix de compensation des offres hostiles) ;
+  //   values  : [[rang global, valeur]] (draft_pick_value, migration 78 ; vide avant) ;
+  //   po      : { saison : [[ronde, conférence, rang, équipe A, équipe B, victoires A, victoires B]] } (playoff_series) ;
+  //   board   : [[id, année, ronde, rang, poste, prénom, nom, PJ, B, A, +/-, V, BL, arrêts, tirs, minutes]] : joueurs repêchés
+  //             par l'équipe (player.draft_team = nom anglais de l'équipe), carrière en saison régulière avec l'équipe (toutes origines).
+  // Point de départ › Effectif de départ (phase 4d) : même structure que season/build_season_data.py (draft.start)
+  function startRoster(R) {
+    var f = franchise(R), f1 = f.first_season_start_year + '-07-01', f2 = (f.first_season_start_year + 1) + '-06-30', P = {}, cl = {}, ct = {};
+    R.player.forEach(function (p) { P[p.id] = p; });
+    sortBy(R.contract_year || [], function (y) { return [y.contract_id, y.season]; }).forEach(function (y) { (cl[y.contract_id] = cl[y.contract_id] || []).push(y.clause || ''); });
+    sortBy(R.contract.filter(function (c) { return (c.event_type === 'acquired' || c.event_type === 'entry_level') && c.signed_on <= f2; }), function (c) { return [c.signed_on, c.id]; }).forEach(function (c) { if (!ct[c.player_id]) ct[c.player_id] = c; });
+    var st = R.player_stint.filter(function (s) { return P[s.player_id] && (s.acquired_via === 'Start' || (s.acquired_via === 'Draft' && s.acquired_on < f1 && (s.departed_on == null || s.departed_on >= f1))); });
+    return sortBy(st, function (s) { return [P[s.player_id].full_name, s.player_id]; }).map(function (s) { var p = P[s.player_id], c = ct[p.id], nv = function (v) { return v == null ? null : v; };
+      return [p.id, nv(p.first_name), nv(p.last_name), nv(p.position_original), nv(p.position_secondary_original), nv(s.jersey_number), nv(p.height_in), nv(p.weight_lb), nv(p.birth_date), nv(p.handedness),
+        nv(p.player_type), nv(p.draft_year), nv(p.draft_round), nv(p.draft_pick), nv(p.draft_team), nv(p.country), nv(s.status_at_acquisition), nv(s.rookie_gp_current), nv(s.rookie_gp_previous), s.acquired_via, s.acquired_on,
+        c ? [c.id, c.signed_on, c.event_type, nv(c.contract_type), nv(c.first_season), nv(c.years), c.aav == null ? null : +c.aav, cl[c.id] || []] : null]; });
+  }
+  function draftData(R) {
+    var f = franchise(R), tc = teamCode(R), trById = {}; R.trade.forEach(function (t) { trById[t.id] = t; });
+    var mine = R.team.filter(function (t) { return t.code === f.abbreviation; }).sort(function (a, b) { return (a.owner_franchise_id == null ? 1 : 0) - (b.owner_franchise_id == null ? 1 : 0); })[0];
+    var names = {}; [f.name, f.abbreviation, mine && mine.name_en].forEach(function (n) { if (n) names[n] = 1; });
+    var sk = {}, gk = {}, add = function (o, id, vals) { var a = o[id] = o[id] || vals.map(function () { return 0; }); vals.forEach(function (v, i) { a[i] += v || 0; }); };
+    R.skater_season_stats.forEach(function (s) { if (s.game_type === 'RS') add(sk, s.player_id, [s.gp, s.g, s.a, s.plus_minus]); });
+    R.goalie_season_stats.forEach(function (s) { if (s.game_type === 'RS') add(gk, s.player_id, [s.gp, s.w, s.so, s.saves, s.shots_against, s.minutes]); });
+    // MJ avec l'équipe avant le début de la franchise (origin = historical) : option « exclure » de la carte Réussite (Gabriel, 2026-11-23)
+    var hgp = {}; R.skater_season_stats.concat(R.goalie_season_stats).forEach(function (s) { if (s.game_type === 'RS' && s.origin === 'historical') hgp[s.player_id] = (hgp[s.player_id] || 0) + (s.gp || 0); });
+    var po = {}; sortBy(R.playoff_series, function (x) { return [x.season, x.round, x.conference, x.slot]; }).forEach(function (x) { (po[String(x.season)] = po[String(x.season)] || []).push([x.round, x.conference, x.slot, x.team_a_code, x.team_b_code, x.wins_a, x.wins_b]); });
+    var osById = {}; (R.offer_sheet || []).forEach(function (o) { osById[o.id] = o; });
+    return {
+      initial: sortBy(R.draft_pick_initial || [], function (d) { return [d.draft_year, d.round, d.original_team_code]; }).map(function (d) { return [d.draft_year, d.round, d.original_team_code, b01(d.owned)]; }),
+      trades: sortBy(R.trade_asset.filter(function (a) { return a.asset_type === 'pick' && trById[a.trade_id]; }), function (a) { return [trById[a.trade_id].traded_on, a.trade_id]; })
+        .map(function (a) { var t = trById[a.trade_id]; return [t.traded_on, t.partner_team_code || null, a.direction, a.pick_year, a.pick_round, tc[a.pick_original_team_id] || null]; }),
+      offers: sortBy((R.offer_sheet_pick || []).filter(function (x) { var o = osById[x.offer_sheet_id]; return o && (o.compensation === true || o.compensation === 1); }), function (x) { return [osById[x.offer_sheet_id].signed_on, x.offer_sheet_id, x.slot]; })
+        .map(function (x) { var o = osById[x.offer_sheet_id]; return [o.signed_on, o.event_type, x.pick_year, x.pick_round, x.team_code]; }),
+      values: sortBy(R.draft_pick_value || [], function (v) { return [v.overall_pick]; }).map(function (v) { return [v.overall_pick, v.value == null ? null : +v.value]; }),
+      po: po,
+      board: sortBy(R.player.filter(function (p) { return p.draft_team && names[p.draft_team] && p.draft_year != null; }), function (p) { return [p.draft_year, p.draft_round == null ? 99 : p.draft_round, p.draft_pick == null ? 9999 : p.draft_pick, p.id]; })
+        .map(function (p) { var g = p.position_group === 'G', a = g ? gk[p.id] || [0, 0, 0, 0, 0, 0] : sk[p.id] || [0, 0, 0, 0];
+          return [p.id, p.draft_year, p.draft_round, p.draft_pick, p.position_original || p.position_group, p.first_name || '', p.last_name || ''].concat(g ? [a[0], null, null, null, a[1], a[2], a[3], a[4], r2(a[5])] : [a[0], a[1], a[2], a[3], null, null, null, null, null], [p.position_secondary_original || null, hgp[p.id] || 0]); })
+    };
   }
 
   // ---------- début de saison et saison morte ----------
@@ -572,7 +622,7 @@
         standing: standing
       },
       hist: sortBy(R.player.filter(function (p) { return p.origin === 'historical'; }), function (p) { return [p.full_name, p.id]; }).map(function (p) { return [p.id, p.full_name, p.position_group]; }),   // joueurs historiques proposés dans les écrans de choix d'un joueur
-      contracts: R.contract.map(function (c) { return [c.player_id, c.start_on, c.end_on]; }), stats: stats, po: po, standings: standings, po_stats: poStats, team_rs: teamRs, labels: labels(R) };
+      contracts: R.contract.map(function (c) { return [c.player_id, c.start_on, c.end_on]; }), stats: stats, po: po, standings: standings, po_stats: poStats, team_rs: teamRs, draft: Object.assign({ start: startRoster(R) }, draftData(R)), labels: labels(R) };
   }
 
 
@@ -595,7 +645,7 @@
       })(), labels: labels(R) };
   }
 
-  var api = { loadVersions: loadVersions, VERSION_DEPS: VERSION_DEPS, activeFranchise: activeFranchise, readTable: readTable, tableDefs: tableDefs, OPTIONAL: OPTIONAL, PAGE_TABLES: PAGE_TABLES, leagueInfo: leagueInfo, leagueTeams: leagueTeams, assembleSetup: assembleSetup, assembleHistory: assembleHistory, HSK: HSK, HGK: HGK, TABLES: TABLES, loadAll: loadAll, assemblePlayerCard: assemblePlayerCard, assembleEntry: assembleEntry, assembleEvents: assembleEvents, assembleSeason: assembleSeason };
+  var api = { startRoster: startRoster, loadVersions: loadVersions, VERSION_DEPS: VERSION_DEPS, activeFranchise: activeFranchise, readTable: readTable, tableDefs: tableDefs, OPTIONAL: OPTIONAL, PAGE_TABLES: PAGE_TABLES, leagueInfo: leagueInfo, leagueTeams: leagueTeams, draftData: draftData, assembleSetup: assembleSetup, assembleHistory: assembleHistory, HSK: HSK, HGK: HGK, TABLES: TABLES, loadAll: loadAll, assemblePlayerCard: assemblePlayerCard, assembleEntry: assembleEntry, assembleEvents: assembleEvents, assembleSeason: assembleSeason };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.FTLIVE = api;
 })(typeof window !== 'undefined' ? window : this);
 
@@ -631,13 +681,13 @@
   // kind : saisie (enter) ou consultation (view) ; store : clé des saisies en attente de la page (suffixe _f<franchise>, connect/live_mount.js)
   var GROUPS = [
     { id: 'franchise', sec: 'enter', store: null, tabs: [{ id: 'franchise', pane: 'setup' }, { id: 'history_fix', pane: 'hist' }] },
-    { id: 'start', sec: 'enter', tabs: [{ id: 'roster0', soon: 1 }, { id: 'picks0', soon: 1 }] },
+    { id: 'start', sec: 'enter', tabs: [{ id: 'roster0', app: 'roster0' }, { id: 'picks0', app: 'picks0' }] },
     { id: 'preseason', sec: 'enter', store: 'ft_pre_v1', tabs: [{ id: 'cap', app: 'cap' }, { id: 'lineup', app: 'roles' }, { id: 'ratings', app: 'ratings' }, { id: 'schedule', app: 'schedule' }] },
     { id: 'stats', sec: 'enter', store: 'ft_entries_v1', tabs: [{ id: 'skaters', app: 'sk' }, { id: 'goalies', app: 'gk' }, { id: 'team', app: 'tm' }] },
     { id: 'roster', sec: 'enter', store: 'ft_events_v1', tabs: [{ id: 'injuries', app: 'inj' }, { id: 'moves', app: 'mv' }, { id: 'trades', app: 'tr' }, { id: 'contracts', app: 'ct' }, { id: 'offers', app: 'os' }, { id: 'positions', app: 'pc' }, { id: 'players', app: 'pl' }] },
     { id: 'results', sec: 'enter', store: 'ft_results_v1', tabs: [{ id: 'standings', app: 'standings' }, { id: 'series', app: 'series' }, { id: 'cup', app: 'cup' }] },
     { id: 'honors', sec: 'enter', store: 'ft_honors_v1', tabs: [{ id: 'awards', app: 'awards' }, { id: 'allstar', app: 'allstar' }, { id: 'retire', app: 'retire' }] },
-    { id: 'draft', sec: 'enter', store: 'ft_draft_v1', tabs: [{ id: 'owned', soon: 1, kind: 'view' }, { id: 'lottery', app: 'lottery' }, { id: 'ranks', soon: 1, kind: 'view' }, { id: 'top3', app: 'top3' }, { id: 'picks', app: 'picks' }, { id: 'board', soon: 1, kind: 'view' }] },
+    { id: 'draft', sec: 'enter', store: 'ft_draft_v1', tabs: [{ id: 'owned', app: 'owned', kind: 'view' }, { id: 'lottery', app: 'lottery' }, { id: 'ranks', app: 'ranks', kind: 'view' }, { id: 'top3', app: 'top3' }, { id: 'picks', app: 'picks' }, { id: 'board', app: 'board', kind: 'view' }] },
     { id: 'cards', sec: 'view', tabs: [{ id: 'player', app: 'player' }, { id: 'goalie', soon: 1 }, { id: 'team', app: 'team' }] },
     { id: 'team_records', sec: 'view', tabs: [{ id: 'skaters', soon: 1 }, { id: 'goalies', soon: 1 }, { id: 'team', soon: 1 }] },
     { id: 'league_records', sec: 'view', tabs: [{ id: 'players', soon: 1 }, { id: 'teams', soon: 1 }, { id: 'hof', soon: 1 }] },
