@@ -106,7 +106,9 @@
   var SCOPED = ['player', 'player_stint', 'skater_season_stats', 'goalie_season_stats', 'team_season_stats', 'standing', 'playoff_series', 'award_win', 'all_star_selection',
     'stanley_cup_result', 'stanley_cup_member', 'salary_cap_season', 'contract', 'offer_sheet', 'offer_sheet_pick', 'data_issue', 'trade', 'roster_move',
     'player_rating', 'schedule_game', 'position_change', 'role_assignment', 'draft_pick_initial', 'draft_pick_value', 'draft_pick', 'draft_lottery', 'draft_top3', 'retirement', 'franchise_league_team',
-    'historical_award_counts', 'projected_level', 'v_contract_year_level', 'v_skater_career_totals', 'v_skater_career_records', 'v_skater_season_records', 'hr_job', 'v_player_career'];
+    'historical_award_counts', 'projected_level', 'v_contract_year_level', 'hr_job', 'v_player_career',
+    'nhl_career_record', 'record_threshold', 'team_rating_param', 'team_rating_weight', 'v_skater_season', 'v_goalie_season', 'v_team_season', 'v_skater_career',
+    'v_goalie_career', 'v_team_career', 'v_radar_goalie', 'v_radar_thresholds_goalie'];   // migration 84 ; nhl_career_record_ref est globale (sans franchise_id)
   // Tables enfants sans franchise_id : filtrées par leur parent (embarqué vide de PostgREST, « parent!inner() »)
   var CHILD = { contract_year: 'contract', trade_asset: 'trade' };
   var SCOPED_SET = {}; SCOPED.forEach(function (t) { SCOPED_SET[t] = 1; });
@@ -319,7 +321,7 @@
     ['player', 'select=id,legacy_key,full_name,position_group,first_name,last_name,origin,birth_date,height_in,weight_lb,handedness,country,draft_year,draft_round,draft_pick,draft_team,position_original,position_secondary_original,position_current,player_type,nhl_id,hr_id&order=id', 1],
     ['skater_season_stats', 'select=id,player_id,season,game_type,origin,manual,position,age,gp,g,a,pts,plus_minus,pim,shots,gwg,ppg,shg,ppp,shp,toi_minutes,fow,fot,hits,blocks,giveaways,takeaways,oa_end&order=id', 1],
     ['goalie_season_stats', 'select=id,player_id,season,game_type,origin,manual,gp,w,l,otl,so,saves,shots_against,goals_against,minutes,pim,g,a,oa_end&order=id', 1],
-    ['team_season_stats', 'select=season,game_type,gp,w,l,otl,points,gf,ga,result,rw,row_,ppg,pp_opportunities,shga,ppga,times_shorthanded,shgf,home_w,home_l,home_otl,away_w,away_l,away_otl&order=id'],
+    ['team_season_stats', 'select=season,game_type,origin,gp,w,l,t,otl,points,gf,ga,result,rw,row_,ppg,pp_opportunities,shga,ppga,times_shorthanded,shgf,home_w,home_l,home_otl,away_w,away_l,away_otl&order=id'],
     ['label', 'select=key,locale,text,short_text&order=key,locale', 1],
     ['award', 'select=id,code&order=id'],
     ['award_win', 'select=season,award_id,place,player_id,player_key,team_code,stat_value&order=id'],
@@ -345,10 +347,14 @@
     ['retirement', 'select=id,retired_season,team_code,position,player_key,hof_nominee,hof_year,gp,g,a,plus_minus,w,so,sv_pct,gaa,ms_g05,ms_a075,ms_p1,ms_20g,ms_30g,ms_50g,ms_50p,ms_75p,ms_100p,ms_20w,ms_30w,ms_c30w,ms_40w,ms_wins&order=id'],
     ['playoff_series', 'select=season,round,conference,slot,wins_a,wins_b,team_a_code,team_b_code&order=season,round,conference,slot']];
 
-  var OPTIONAL = [['franchise_league_team', 'select=team_code,conference,division,active_from,active_to&order=id'], ['stanley_cup_member', 'select=season,position_group,player_key&order=season,position_group,sort_order,id', 1], ['historical_award_counts', 'select=award_code,counts'],
+  // records réels de la LNH, minimums des records et poids de la note d'équipe (migrations 82 à 84 ; lus par les vues de la phase 4e)
+  var OPTIONAL_4E = [['nhl_career_record', 'select=position_group,category,rank,player_name,value,status,player_id,manual&order=position_group,category,rank'],
+    ['record_threshold', 'select=code,season,playoffs,career_season,career_playoffs,career_season_short,career_playoffs_short&order=code'],
+    ['team_rating_param', 'select=grp,substractor,multiplier,addition,global_weight&order=grp'], ['team_rating_weight', 'select=grp,slot,internal_weight&order=grp,slot']];
+  var OPTIONAL = OPTIONAL_4E.concat([['franchise_league_team', 'select=team_code,conference,division,active_from,active_to&order=id'], ['stanley_cup_member', 'select=season,position_group,player_key&order=season,position_group,sort_order,id', 1], ['historical_award_counts', 'select=award_code,counts'],
     ['offer_sheet', 'select=id,signed_on,player_id,event_type,compensation&order=signed_on,id'], ['offer_sheet_pick', 'select=offer_sheet_id,slot,team_code,pick_year,pick_round&order=offer_sheet_id,slot'],
     ['v_player_career', 'select=player_id,first_season,last_season&order=player_id'],   // migration 71 : années de carrière (étiquettes d'homonymes)
-    ['draft_pick_value', 'select=overall_pick,value&order=overall_pick']];   // migration 78 : barème de valeur des choix (Repêchage › Analyse)
+    ['draft_pick_value', 'select=overall_pick,value&order=overall_pick']]);   // migration 78 : barème de valeur des choix (Repêchage › Analyse)
   var FTSBX = (function () { var S = typeof FTSB !== 'undefined' ? FTSB : (typeof require === 'function' ? require('./sb.js') : null); if (!S) return null; var set = {}; S.SCOPED.concat(Object.keys(S.CHILD), ['team']).forEach(function (t) { set[t] = 1; }); set.team = 0; return { isScoped: function (t) { return !!set[t]; } }; })();
   function pspan(n) { var P = typeof FTPERF !== 'undefined' ? FTPERF : root.FTPERF; return P ? P.span(n) : function () {}; }
   // lecture d'une table filtrée sur la franchise active (sb.js ajoute franchise_id) ; la table franchise : seulement la franchise active
@@ -417,6 +423,12 @@
       else R[d.name] = await readTable(client, d, fid);
       sp(R[d.name].length + ' lignes'); done++; if (progress) progress(done, defs.length, d.name);
     }));
+    // Saisons réelles de l'équipe (origin = 'historical', migration 81) : mises à part, pour que les pages existantes ne lisent
+    // que les saisons du mode franchise ; les vues de records les liront dans team_season_stats_hist. Avant 81 : pas d'origin, tout reste.
+    if (R.team_season_stats) {
+      R.team_season_stats_hist = R.team_season_stats.filter(function (t) { return t.origin === 'historical'; });
+      R.team_season_stats = R.team_season_stats.filter(function (t) { return t.origin !== 'historical'; });
+    }
     all(defs.length + ' tables');
     return R;
   }

@@ -118,7 +118,43 @@
   // groupes affichés dans un mode : ceux de groupes(toutes les lignes) qui ont au moins une ligne dans ce mode
   function groupsIn(allRows, rows, pos) { return groups(allRows, pos).filter(function (g) { return rowsOfGroup(rows, g, pos).length; }); }
 
-  var api = { C: C, sum: sum, profile: profile, thresholds: thresholds, score: score, radar: radar, records: records, KEYS: KEYS, MIN_GP_PROFILE: MIN_GP_PROFILE, grpOf: grpOf, groups: groups, rowsOfGroup: rowsOfGroup, groupsIn: groupsIn };
+  // ---- note d'équipe du Match d'ouverture (OpeningNightRoster!P3:P37, poids de Parameters!D21:H31 ; fiche ft-formules) ----
+  // Valeurs par défaut de l'Excel ; la base les garde par franchise (migration 84). Un groupe : poids internes des unités
+  // (lignes, paires, partant / substitut), soustracteur, multiplicateur, addition et poids global.
+  var TEAM_RATING_DEFAULT = {
+    F: { weights: [13.3, 10, 6.6, 3.3], size: 3, substractor: 80, multiplier: 2, addition: 80, global: 0.35 },
+    D: { weights: [25, 17.5, 7.5], size: 2, substractor: 80, multiplier: 2, addition: 80, global: 0.35 },
+    G: { weights: [75, 25], size: 1, substractor: 80, multiplier: 2, addition: 78, global: 0.30 } };
+  function isNum(v) { return typeof v === 'number' && isFinite(v); }
+  // Moyenne des cotes d'une unité, comme MOYENNE : cotes absentes ignorées ; aucune cote -> 0 (SIERREUR).
+  function unitAvg(ratings) { var v = (ratings || []).filter(isNum); return v.length ? v.reduce(function (a, b) { return a + b; }, 0) / v.length : 0; }
+  // Note d'un groupe (0-100). units : une liste de cotes par unité, dans l'ordre (ligne 1, 2…).
+  // Gardiens (une cote par unité) : un gardien sans cote est ignoré et le poids des autres est ramené à 100
+  // (décision du 2026-11-23 ; l'Excel donnait 0 au groupe) ; aucun gardien coté -> 0.
+  function groupRating(units, g) {
+    var t = 0, wsum = 0;
+    for (var i = 0; i < g.weights.length; i++) {
+      var u = (units || [])[i] || [];
+      if (g.size === 1) { if (isNum(u[0])) { t += u[0] * g.weights[i]; wsum += g.weights[i]; } }
+      else t += unitAvg(u) * g.size * g.weights[i];
+    }
+    if (g.size === 1) { if (!wsum) return 0; t = t * 100 / wsum; }
+    return Math.max(Math.min((t / 100 - g.substractor) * g.multiplier + g.addition, 100), 0);
+  }
+  // roster = { F: [[LW, C, RW] × 4 lignes], D: [[LD, RD] × 3 paires], G: [[partant], [substitut]] } (cotes de la saison).
+  // Une case vide (undefined) n'a pas de joueur ; null = joueur aligné sans cote pour la saison : il est ignoré
+  // (décision du 2026-11-23) et listé dans out.missing ({ grp, unit, slot }, indices à partir de 0) pour l'avertissement.
+  function teamRating(roster, params) {
+    var P = params || TEAM_RATING_DEFAULT, r = roster || {}, missing = [];
+    ['F', 'D', 'G'].forEach(function (grp) {
+      (r[grp] || []).forEach(function (u, i) { (u || []).forEach(function (v, j) { if (v === null) missing.push({ grp: grp, unit: i, slot: j }); }); });
+    });
+    var out = { F: groupRating(r.F, P.F), D: groupRating(r.D, P.D), G: groupRating(r.G, P.G), missing: missing };
+    out.team = P.F.global * out.F + P.D.global * out.D + P.G.global * out.G;
+    return out;
+  }
+
+  var api = { C: C, sum: sum, profile: profile, thresholds: thresholds, score: score, radar: radar, records: records, KEYS: KEYS, MIN_GP_PROFILE: MIN_GP_PROFILE, grpOf: grpOf, groups: groups, rowsOfGroup: rowsOfGroup, groupsIn: groupsIn, teamRating: teamRating, TEAM_RATING_DEFAULT: TEAM_RATING_DEFAULT };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.FT = api;
 })(typeof window !== 'undefined' ? window : this);
 
