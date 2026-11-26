@@ -151,11 +151,19 @@
     for (var i = 0; i < ids.length; i++) { var r = P[ids[i]].filter(function (x) { return x.kind === kind && x.game_type === gt && x.stat === stat && x.min_value != null; })[0]; if (r) return r.min_value; }
     return null;
   }
+  // minimum de matchs à un poste sous lequel le profil est un « petit échantillon » : aucune vue ne le donne encore (question posée au coordinateur) ;
+  // tant qu'il manque, la mention n'est pas affichée (aucun nombre écrit en dur). Lu ici dès qu'une vue le fournit (record_threshold, code 'profile_gp').
+  // seuil du « petit échantillon » du profil par poste : v_skater_career.profile_min_gp (record_threshold 'profile_gp'), le même sur toutes les lignes d'un type de match
+  function smallSampleMin(M, gt) {
+    var P = M.P.v_skater_career || {}, ids = Object.keys(P);
+    for (var i = 0; i < ids.length; i++) { var r = P[ids[i]].filter(function (x) { return x.game_type === gt && x.profile_min_gp != null; })[0]; if (r) return r.profile_min_gp; }
+    return null;
+  }
   function radarMinGp(M, gt) { var r = M.thrG.filter(function (x) { return x.game_type === gt; })[0]; return r ? r.min_gp : null; }
   function best(list, f) { var b = null; list.forEach(function (r) { var v = f(r); if (v != null && (b == null || v > f(b))) b = r; }); return b; }
 
   var api = { table: table, index: index, rows: rows, one: one, defaultPlayer: defaultPlayer, skaterSeasons: skaterSeasons, goalieSeasons: goalieSeasons, skaterCareer: skaterCareer, goalieCareer: goalieCareer,
-    record: record, peaks: peaks, peakMin: peakMin, radarMinGp: radarMinGp, skaterRadars: skaterRadars, goalieRadar: goalieRadar, showcase: showcase, team: team, histOf: histOf, histSeries: histSeries, best: best, HON_ORDER: HON_ORDER, PLAYER_VIEWS: PLAYER_VIEWS };
+    record: record, peaks: peaks, peakMin: peakMin, radarMinGp: radarMinGp, smallSampleMin: smallSampleMin, skaterRadars: skaterRadars, goalieRadar: goalieRadar, showcase: showcase, team: team, histOf: histOf, histSeries: histSeries, best: best, HON_ORDER: HON_ORDER, PLAYER_VIEWS: PLAYER_VIEWS };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.FTCC = api;
 })(typeof window !== 'undefined' ? window : this);
 
@@ -226,6 +234,7 @@
     function tname(en) { var x = TEAM_EN[en]; return x ? (state.lang === 'en' ? x.en : x.fr || x.en) : en; }
     function nm(id) { var p = M.byId[id]; return p ? (p.first ? p.first.charAt(0) + '. ' + p.last : p.name) : ''; }
     function key() { return state.gt + '_' + state.scope; }
+    function npHist() { return raw('card.h_np_hist') ? t('card.h_np_hist') : t('card.col_np', true); }   // « Non joué » (saison historique) : clé proposée card.h_np_hist, repli sur le court de card.col_np
     function check(v) { return v == null ? '—' : v >= 1 ? '<span class="fc-check">' + IC.ok + esc(t('card.yes')) + '</span>' : '<span class="fc-check no">' + IC.no + esc(t('card.no')) + '</span>'; }
 
     // ---------- graphiques : spécifications communes (dessinées après le rendu par after()) ----------
@@ -350,8 +359,9 @@
         var p1 = function (v) { return pf(v, 1); };
         var spec3 = { id: 'health', kind: 'xy', title: title3, cats: ds.map(function (r) { return sls(r.season); }), tip: ds.map(function (r) { return sl(r.season) + ' (' + t('card.games_v', [r.available_gp]) + ')'; }), y: [{ name: t('card.health_axis'), fmt: function (v) { return pf(v, 0); }, min: 0, max: 1 }],
           series: [{ name: t('card.h_played'), type: 'bar', stack: 'h', key: 'c1', data: ds.map(function (r) { return r.pct_played; }), fmt: p1 }, { name: t('card.h_injured'), type: 'bar', stack: 'h', key: 'hatch', data: ds.map(function (r) { return r.pct_injured; }), fmt: p1 },
-            { name: t('card.h_np'), type: 'bar', stack: 'h', key: 'empty', data: ds.map(function (r) { return r.pct_not_played; }), fmt: p1 }] };
-        h += '<section class="card s6">' + cardHead(title3, t('card.health_sub')) + chartBox(spec3, 'short') + legend([['c1', t('card.h_played')], ['hatch', t('card.h_injured')], ['empty', t('card.h_np')]]) + '</section>';
+            { name: t('card.h_np'), type: 'bar', stack: 'h', key: 'empty', data: ds.map(function (r) { return r.origin === 'historical' ? null : r.pct_not_played; }), fmt: p1 }]
+            .concat(ds.some(function (r) { return r.origin === 'historical'; }) ? [{ name: npHist(), type: 'bar', stack: 'h', key: 'empty', data: ds.map(function (r) { return r.origin === 'historical' ? r.pct_not_played : null; }), fmt: p1 }] : []) };   // saisons historiques : blessures non suivies (décision du 2026-11-26)
+        h += '<section class="card s6">' + cardHead(title3, t('card.health_sub')) + chartBox(spec3, 'short') + legend([['c1', t('card.h_played')], ['hatch', t('card.h_injured')], ['empty', t('card.h_np')]].concat(ds.some(function (r) { return r.origin === 'historical'; }) ? [['empty', npHist()]] : [])) + '</section>';
       }
       if (du && du.franchise_gp) {   // blessures suivies seulement pendant le mode franchise
         var injT = du.injuries ? t(du.injuries === 1 ? 'card.inj_title_one' : 'card.inj_title', [nf(du.injuries), nf(du.games_missed)]) : t('card.inj_title_none');
@@ -381,13 +391,15 @@
         (year ? '<text x="60" y="74" text-anchor="middle" font-size="10" font-weight="700" fill="' + gold2 + '" font-family="system-ui,sans-serif">' + esc(year) + '</text>' : '') +
         lines.map(function (l, i) { return '<text x="60" y="' + (y0 + i * (fs + 2)) + '" text-anchor="middle" font-size="' + fs + '" font-weight="900" fill="url(#' + gid + ')" font-family="system-ui,sans-serif">' + esc(l) + '</text>'; }).join('') + '</svg>';
     }
+    // année inconnue : la phrase sur les Coupes ne vaut que pour la Coupe Stanley (clé proposée card.hon_year_unknown_cup ; card.hon_year_unknown à réduire à la 1re phrase)
+    function yearUnknown(code) { return code === 'stanley_cup' && raw('card.hon_year_unknown_cup') ? t('card.hon_year_unknown_cup') : t('card.hon_year_unknown'); }
     function trophyName(c) { return c === 'stanley_cup' ? t('card.hon_cup') : c === 'all_star_1' ? t('card.hon_as1') : c === 'all_star_2' ? t('card.hon_as2') : c === 'hall_of_fame' ? t('card.hon_hof') : t('award.' + c); }
     function trophyImg(c) { return (root.FT_TROPHY_BASE || '') + c + '.png'; }
     function honors(list) {
       return '<section class="card" data-card="honors"><ul class="fc-case" aria-label="' + esc(t('card.hon_show')) + '">' + list.map(function (x) {
         var img = x.code === 'all_star_1' || x.code === 'all_star_2' ? allStarSVG(x.lastEnd, x.code === 'all_star_2' ? 2 : 1) : (TROPHY[x.code] ? '<img src="' + TROPHY[x.code] + '" alt="">' : '');
         var last = x.lastEnd == null ? '—' : x.code === 'hall_of_fame' ? t('card.hon_in_v', [x.lastEnd]) : t('card.hon_last_v', [x.lastEnd]);
-        return '<li class="fc-troph"><div class="im">' + img + '</div><p class="nm">' + esc(trophyName(x.code)) + '</p>' + (x.code === 'hall_of_fame' ? '' : '<p class="n">' + esc(t(x.n === 1 ? 'card.hon_n_one' : 'card.hon_n_other', [nf(x.n)])) + '</p>') + (x.lastEnd == null ? '<p class="ly" title="' + esc(t('card.hon_year_unknown')) + '"><span aria-hidden="true">—</span><span class="vh">' + esc(t('card.hon_year_unknown')) + '</span></p>' : '<p class="ly">' + esc(last) + '</p>') + '</li>';
+        return '<li class="fc-troph"><div class="im">' + img + '</div><p class="nm">' + esc(trophyName(x.code)) + '</p>' + (x.code === 'hall_of_fame' ? '' : '<p class="n">' + esc(t(x.n === 1 ? 'card.hon_n_one' : 'card.hon_n_other', [nf(x.n)])) + '</p>') + (x.lastEnd == null ? (function (u) { return '<p class="ly" title="' + esc(u) + '"><span aria-hidden="true">—</span><span class="vh">' + esc(u) + '</span></p>'; })(yearUnknown(x.code)) : '<p class="ly">' + esc(last) + '</p>') + '</li>';
       }).join('') + '</ul></section>';
     }
     var TROPHY = (function () { var T = root.FT_TROPHY_IMG || {}; return T; })();   // images transparentes des trophées (cards/trophies.js, base 64) ; absentes : nom seulement
@@ -400,7 +412,7 @@
       var body = rows.map(function (r) {
         return '<tr data-season="' + r.season + '"' + (r.origin === 'historical' ? ' class="hist" title="' + esc(t('card.det_hist')) + '"' : '') + '>' + cols.map(function (c, i) {
           var v = c.v(r), txt = c.f(v, r), isB = !!(pk && c.pk && v != null && pk.is(c.pm || PKMODE[state.mode], c.pk, r.season));
-          return '<td class="' + cls(c, v == null && i ? 'nil' : '') + '">' + (isB ? '<span class="best">' + esc(txt) + '</span>' : esc(txt)) + '</td>';
+          return '<td class="' + cls(c, v == null && i ? 'nil' : '') + '"' + (c.tipHist && r.origin === 'historical' ? ' title="' + esc(npHist()) + '"' : '') + '>' + (isB ? '<span class="best">' + esc(txt) + '</span>' : esc(txt)) + '</td>';
         }).join('') + '</tr>';
       }).join('');
       var foot = careerRow ? '<tfoot><tr>' + cols.map(function (c, i) { var v = i ? (c.cv ? c.cv(careerRow) : null) : null; return '<td class="' + cls(c) + '">' + (i ? (v == null ? '' : esc(c.f(v, careerRow))) : esc(t('ui.career'))) + '</td>'; }).join('') + '</tr></tfoot>' : '';
@@ -417,7 +429,7 @@
       var cnt = function (k, lbl, gs) { return { k: k, l: lbl, gs: gs, pk: k, v: function (r) { if (!tracked(r, k)) return null; return RT ? (r.rates ? r.rates[k + RT] : null) : r[k]; }, f: RT ? D2 : (k === 'plus_minus' ? SGN : I), cv: function (c) { return RT ? c[k + RT] : c[k]; } }; };
       return [{ k: 'season', l: 'ui.season', v: function (r) { return r.season; }, f: function (v) { return sl(v); } },
         { k: 'age', l: 'ui.age', v: function (r) { return r.age; }, f: I }, { k: 'gp', l: 'stat.gp', pk: 'gp', pm: 'abs', v: function (r) { return r.gp; }, f: I, cv: function (c) { return c.gp; } },
-        { k: 'inj', l: 'card.col_inj', ro: 1, v: function (r) { return r.inj; }, f: I }, { k: 'np', l: 'card.col_np', ro: 1, v: function (r) { return r.np; }, f: I },
+        { k: 'inj', l: 'card.col_inj', ro: 1, v: function (r) { return r.inj; }, f: I }, { k: 'np', l: 'card.col_np', ro: 1, tipHist: 1, v: function (r) { return r.np; }, f: I },
         cnt('g', 'stat.g', 1), cnt('a', 'stat.a'), Object.assign(cnt('pts', 'stat.pts'), { ro: 1 }), cnt('plus_minus', 'stat.plus_minus'), cnt('pim', 'stat.pim'), cnt('shots', 'stat.shots'),
         { k: 'shot_pct', l: 'stat.shot_pct', ro: 1, pk: 'shot_pct', pm: 'abs', v: function (r) { return r.shots_tracked === 0 ? null : r.shot_pct; }, f: P1, cv: function (c) { return c.shot_pct; } },
         cnt('gwg', 'stat.gwg', 1), cnt('ppg', 'stat.ppg'), cnt('ppp', 'stat.ppp'), cnt('shg', 'stat.shg'), cnt('shp', 'stat.shp'),
@@ -430,7 +442,7 @@
     function gkCols() {
       var c = function (k, l, o) { return Object.assign({ k: k, l: l, v: function (r) { return r[k]; }, f: I, cv: function (x) { return x[k]; } }, o || {}); };
       return [{ k: 'season', l: 'ui.season', v: function (r) { return r.season; }, f: function (v) { return sl(v); } }, { k: 'age', l: 'ui.age', v: function (r) { return r.age; }, f: I },
-        c('gp', 'stat.gp', { pk: 'gp' }), { k: 'inj', l: 'card.col_inj', ro: 1, v: function (r) { return r.inj; }, f: I }, { k: 'np', l: 'card.col_np', ro: 1, v: function (r) { return r.np; }, f: I },
+        c('gp', 'stat.gp', { pk: 'gp' }), { k: 'inj', l: 'card.col_inj', ro: 1, v: function (r) { return r.inj; }, f: I }, { k: 'np', l: 'card.col_np', ro: 1, tipHist: 1, v: function (r) { return r.np; }, f: I },
         c('w', 'stat.w', { gs: 1, pk: 'w' }), c('l', 'stat.l'), c('otl', 'stat.otl'), c('so', 'stat.so', { pk: 'so' }),
         c('sv_pct', 'stat.sv_pct', { ro: 1, pk: 'sv_pct', f: P1 }), c('gaa', 'stat.gaa', { ro: 1, pk: 'gaa', f: D2 }),
         c('saves', 'stat.saves', { gs: 1, pk: 'saves' }), c('shots_against', 'stat.sa'), c('goals_against', 'stat.ga'), c('minutes', 'stat.min', { pk: 'minutes' }),
@@ -443,6 +455,23 @@
       h += '<h2 class="fc-h" id="sec-contract" tabindex="-1">' + esc(t('card.sec.contract')) + (state.gt === 'PO' ? ' <small>' + esc(t('card.rs_only')) + '</small>' : '') + '</h2><div class="fc-grid">' + contractBlock(pid, kind) + '</div>';
       if (list.length) h += '<h2 class="fc-h" id="sec-honors" tabindex="-1">' + esc(t('card.sec.honors')) + '</h2>' + honors(list);
       return { html: h, nav: SECS.filter(function (x) { return (x !== 'honors' || list.length) && (x !== 'stats' || hasRows); }) };
+    }
+
+    // ---------- profil par poste (maquettes carriere_par_poste.html et radar_par_poste.html) : joueur qui a joué aux deux postes ----------
+    // en-tête du poste, chiffres de carrière à ce poste (v_skater_career, position_group F / D), bande des saisons (v_skater_season par saison
+    // et position_group : hauteur = MJ de la saison, en couleur les saisons à ce poste), mention « petit échantillon » si un minimum est donné
+    function groupPanel(p, g) {
+      var c = CC.one(M, 'v_skater_career', p.id, function (r) { return r.game_type === state.gt && r.scope === state.scope && r.position_group === g; });
+      var all = CC.rows(M, 'v_skater_season', p.id).filter(function (r) { return r.game_type === state.gt && (state.scope === 'all' || r.origin === 'franchise'); });
+      var mx = Math.max.apply(null, all.map(function (r) { return r.gp || 0; }).concat([1])), min = c ? c.profile_min_gp : null, small = !!(c && c.small_sample === 1);   // seuil et verdict lus dans v_skater_career (record_threshold profile_gp)
+      var name = t('pos.' + g), meta = c ? t('ui.season_range', [sl(c.first_season), sl(c.last_season)]) + ', ' + t(c.seasons_played === 1 ? 'ui.n_season_one' : 'ui.n_seasons', [c.seasons_played]) : '';
+      var strip = '<div class="gstrip" role="img" aria-label="' + esc(t('ui.seasons') + ' (' + name + ') : ' + all.filter(function (r) { return r.position_group === g; }).map(function (r) { return sl(r.season); }).join(', ')) + '">' +
+        all.map(function (r) { var on = r.position_group === g; return '<i class="' + (on ? 'on' : '') + '" style="height:' + Math.max(8, 100 * (r.gp || 0) / mx).toFixed(0) + '%" title="' + esc(sl(r.season) + ' : ' + t('pos.' + r.position_group) + ', ' + nf(r.gp) + ' ' + t('stat.gp', true)) + '"></i>'; }).join('') + '</div>';
+      var stats = c ? '<dl class="pgrp-stats" aria-label="' + esc(t('ui.career_by_group') + ' : ' + name) + '">' + [['stat.gp', nf(c.gp)], ['stat.g', nf(c.g)], ['stat.a', nf(c.a)], ['stat.pts', nf(c.pts)], ['stat.plus_minus', sg(c.plus_minus)]]
+        .map(function (d) { return '<div><dt title="' + esc(t(d[0])) + '"><span aria-hidden="true">' + esc(t(d[0], true)) + '</span><span class="vh">' + esc(t(d[0])) + '</span></dt><dd>' + esc(d[1]) + '</dd></div>'; }).join('') + '</dl>' : '';
+      return '<section class="card s12 pgrp' + (small ? ' small' : '') + '" data-grp="' + g + '" aria-labelledby="pgrp-h-' + g + '"><div class="pgrp-h"><h4 id="pgrp-h-' + g + '">' + esc(t('ui.profile_by_group')) + ' : ' + esc(name) + '</h4><span class="pgrp-meta">' + esc(meta) + '</span>' +
+        (small ? '<span class="smp">' + esc(t('ui.small_sample', [nf(c.gp)])) + '</span>' : '') + '</div>' + strip + stats +
+        (small ? '<p class="note muted">' + esc(t('ui.small_sample_note', [nf(min)])) + '</p>' : '') + '<p class="note muted">' + esc(t('ui.group_strip_note')) + '</p></section>';
     }
 
     // ---------- fiche Joueur ----------
@@ -478,7 +507,7 @@
         var multi = rads.length > 1;   // joueur qui a joué aux deux postes : un profil par poste (décision du 2026-11-14, gardée le 2026-11-26)
         rads.forEach(function (rd) {
           var sfx = multi ? '-' + rd.grp : '';
-          if (multi) h += '<h3 class="fc-band s12" data-grp="' + rd.grp + '">' + esc(t('ui.profile_by_group')) + ' : ' + esc(t('pos.' + rd.grp)) + '</h3>';
+          if (multi) h += groupPanel(p, rd.grp);
           var rc = crad.filter(function (x) { return x.grp === rd.grp; })[0] || null;
           var vf = function (k, v) { if (v == null) return t('ui.no_tracking', true); if (k === 'puck' || (k === 'slot4' && rd.grp === 'F') || k === 'pp_share' || k === 'toi_share') return pf(v, 0); if (k === 'pm_season') return sg(v, 1); return nf(v, 2); };
           var axP = [['ppg', 'metric.ppg'], ['puck', 'metric.puck_control'], ['phys', rd.grp === 'D' ? 'metric.physical_d' : 'metric.physical'], ['slot4', rd.grp === 'D' ? 'metric.blocks_d' : 'metric.faceoffs'], ['toi_share', 'metric.toi_share'], ['pm_season', 'metric.pm_season']];
@@ -677,6 +706,8 @@
     function rgba(hex, a) { return 'rgba(' + parseInt(hex.substr(1, 2), 16) + ',' + parseInt(hex.substr(3, 2), 16) + ',' + parseInt(hex.substr(5, 2), 16) + ',' + a + ')'; }
     function palette() { var o = {}; ['--c1', '--ink1', '--c2', '--ink2', '--muted', '--line', '--line-strong', '--fg', '--panel', '--panel-2', '--field-line'].forEach(function (v) { o[v.slice(2).replace('-', '_')] = resolve(v); }); o.font = getComputedStyle(doc.body).fontFamily; o.c1b = mixHex(o.c1, o.panel, 0.4); return o; }
     var EC = [];
+    // écran étroit (radar de moins de 480 px) : une étiquette de plus de 10 caractères passe sur deux lignes, coupée au premier espace
+    function wrapAx(str, w) { return w < 480 && str.length > 10 && str.indexOf(' ') > 0 ? str.replace(' ', '\n') : str; }
     function nf0(x, d) { return new Intl.NumberFormat(doc.documentElement.lang === 'en' ? 'en-CA' : 'fr-CA', { minimumFractionDigits: d || 0, maximumFractionDigits: d || 0 }).format(x); }
     function ecDraw(el, s, P) {
       var reduce = root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches, ch = root.echarts.init(el, null, { renderer: 'svg' }); EC.push(ch);
@@ -686,10 +717,10 @@
         s.series.forEach(function (x) { ser.push(x.key === 'p2' ? { name: x.name, value: x.data.map(function (v) { return v == null ? 0 : v; }), symbol: 'circle', symbolSize: 5, itemStyle: { color: P.ink2 }, lineStyle: { color: P.ink2, width: 2, type: [6, 4] }, areaStyle: { color: rgba(P.c2, 0.12) } } : { name: x.name, value: x.data.map(function (v) { return v == null ? 0 : v; }), symbol: 'circle', symbolSize: 6, itemStyle: { color: P.ink1 }, lineStyle: { color: P.ink1, width: 2.5 }, areaStyle: { color: rgba(P.c1, 0.26) } }); });
         ch.setOption(Object.assign(base, {
           tooltip: Object.assign(base.tooltip, { trigger: 'item', formatter: function (p) { var x = s.series[p.seriesIndex - 2] || s.series[p.dataIndex - 2]; if (!x) return ''; var si = s.series.indexOf(x); return '<b>' + esc(x.name) + '</b><br>' + s.axes.map(function (a, i) { return esc(a.short) + ' : ' + (x.data[i] == null ? '—' : nf0(x.data[i], 0)) + ' (' + esc(a.vals[si] || '') + ')'; }).join('<br>'); } }),
-          radar: { indicator: s.axes.map(function (a, i) { var v = s.series[0].data[i]; return { name: a.short + '\n' + (v == null ? '—' : nf0(v, 0)) + '  ' + a.vals[0], max: 100, min: 0 }; }), radius: '60%', center: ['50%', '53%'], splitNumber: 2, shape: 'polygon', triggerEvent: true,
-            axisName: { color: P.fg, fontSize: 12, fontWeight: 600, lineHeight: 16 }, splitLine: { lineStyle: { color: P.line } }, splitArea: { show: false }, axisLine: { lineStyle: { color: P.line } } },
+          radar: { indicator: s.axes.map(function (a, i) { var v = s.series[0].data[i]; return { name: wrapAx(a.short, el.clientWidth) + '\n' + (v == null ? '—' : nf0(v, 0)) + '  ' + a.vals[0], max: 100, min: 0 }; }), radius: el.clientWidth < 480 ? '46%' : '60%', center: ['50%', '53%'], splitNumber: 2, shape: 'polygon', triggerEvent: true,   // écran étroit : rayon réduit, étiquettes coupées en lignes
+            axisName: { color: P.fg, fontSize: el.clientWidth < 480 ? 11 : 12, fontWeight: 600, lineHeight: 15, width: Math.max(64, Math.round(el.clientWidth * 0.26)), overflow: 'break' }, splitLine: { lineStyle: { color: P.line } }, splitArea: { show: false }, axisLine: { lineStyle: { color: P.line } } },
           series: [{ type: 'radar', emphasis: { disabled: true }, data: ser }] }));
-        ch.on('mouseover', function (e) { if (e.componentType === 'radar' && e.targetType === 'axisName') { var i = s.axes.map(function (a) { return a.short; }).indexOf(String(e.name).split('\n')[0]); if (i >= 0 && e.event) tipShow(s.axes[i].tip, null, e.event.event.clientX, e.event.event.clientY); } });
+        ch.on('mouseover', function (e) { if (e.componentType === 'radar' && e.targetType === 'axisName') { var i = s.axes.map(function (a) { return wrapAx(a.short, el.clientWidth).split('\n')[0]; }).indexOf(String(e.name).split('\n')[0]); if (i >= 0 && e.event) tipShow(s.axes[i].tip, null, e.event.event.clientX, e.event.event.clientY); } });
         ch.on('mouseout', tipHide); return;
       }
       function itemStyle(x) {
@@ -716,7 +747,7 @@
     function svgDraw(el, s) {
       var W = Math.max(el.clientWidth, 280), H = Math.max(el.clientHeight, 180), g = '';
       if (s.kind === 'radar') {
-        var cx = W / 2, cy = H / 2 + 6, R = Math.min(W * 0.3, H * 0.34), n = s.axes.length;
+        var cx = W / 2, cy = H / 2 + 6, R = Math.min(W < 480 ? W * 0.22 : W * 0.3, H * 0.34), n = s.axes.length;
         var pt = function (i, v) { var a = -Math.PI / 2 + i * 2 * Math.PI / n; return [cx + Math.cos(a) * R * v / 100, cy + Math.sin(a) * R * v / 100]; };
         var poly = function (vs) { return vs.map(function (v, i) { return pt(i, v == null ? 0 : v).map(function (x) { return x.toFixed(1); }).join(','); }).join(' '); };
         g += '<polygon class="gl" fill="none" points="' + poly(s.axes.map(function () { return 100; })) + '"/>';
@@ -725,7 +756,8 @@
         s.series.slice().reverse().forEach(function (x) { g += '<polygon class="' + (x.key === 'p2' ? 'poly2' : 'poly1') + '" points="' + poly(x.data) + '"><title>' + esc(x.name) + '</title></polygon>'; });
         s.axes.forEach(function (a, i) {
           var ang = -Math.PI / 2 + i * 2 * Math.PI / n, lx = cx + Math.cos(ang) * (R + 16), ly = cy + Math.sin(ang) * (R + 16), anc = Math.abs(Math.cos(ang)) < 0.2 ? 'middle' : Math.cos(ang) > 0 ? 'start' : 'end', dy = Math.sin(ang) > 0.5 ? 12 : Math.sin(ang) < -0.5 ? -16 : -2;
-          g += '<text x="' + lx.toFixed(1) + '" y="' + (ly + dy).toFixed(1) + '" text-anchor="' + anc + '" class="axname">' + esc(a.short) + '</text><text x="' + lx.toFixed(1) + '" y="' + (ly + dy + 13).toFixed(1) + '" text-anchor="' + anc + '" class="axval"><tspan class="s1">' + (s.series[0].data[i] == null ? '—' : nf0(s.series[0].data[i], 0)) + '</tspan>' +
+          var nl = wrapAx(a.short, W).split('\n'), up = Math.sin(ang) < -0.5 ? (nl.length - 1) * 13 : 0;
+          g += nl.map(function (ln, j) { return '<text x="' + lx.toFixed(1) + '" y="' + (ly + dy - up + j * 13).toFixed(1) + '" text-anchor="' + anc + '" class="axname">' + esc(ln) + '</text>'; }).join('') + '<text x="' + lx.toFixed(1) + '" y="' + (ly + dy - up + nl.length * 13).toFixed(1) + '" text-anchor="' + anc + '" class="axval"><tspan class="s1">' + (s.series[0].data[i] == null ? '—' : nf0(s.series[0].data[i], 0)) + '</tspan>' +
             (s.series[1] ? '<tspan class="s2"> · ' + (s.series[1].data[i] == null ? '—' : nf0(s.series[1].data[i], 0)) + '</tspan>' : '') + '<tspan class="raw"> ' + esc(a.vals[0]) + '</tspan></text>';
         });
         el.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" aria-hidden="true">' + g + '</svg>'; return;

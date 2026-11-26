@@ -512,7 +512,8 @@ a.ft-side-t:hover .ic{color:var(--ink1)}
 .ft-menu[aria-expanded=true]{background:var(--on-base1);color:var(--base1)}
 .ft-menu:focus-visible{outline:3px solid var(--on-base1);outline-offset:2px}
 .ft-side-scrim{position:fixed;inset:var(--ft-top-h,0px) 0 0 0;z-index:54;background:color-mix(in srgb,#000 40%,transparent)}
-@media (max-width:900px){
+/* repliée derrière le bouton Menu jusqu'à 1440 px (décision du 2026-11-26) : toute la largeur aux tableaux sur les écrans de 1280 à 1440 px */
+@media (max-width:1440px){
   .ft-layout{grid-template-columns:minmax(0,1fr)}
   .ft-menu{display:inline-flex}
   .ft-side{position:fixed;z-index:55;top:var(--ft-top-h,0px);left:0;bottom:0;width:min(300px,86vw);max-height:none;transform:translateX(-102%);visibility:hidden;transition:transform .18s ease,visibility 0s linear .18s;box-shadow:var(--sh-2)}

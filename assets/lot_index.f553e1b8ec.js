@@ -271,7 +271,7 @@
       if (x && x.id !== S.tab) { S.tab = x.id; lsSet('ft_tab_' + gid, x.id); try { root.history.replaceState(null, '', root.location.pathname + root.location.search + '#' + x.id); } catch (e) { /* ignore */ } }
     }
     html = html.replace(/(<header class="top">[\s\S]*?<div class="sub">)[^<]*(<\/div>)/, function (m, x, y) { return x + esc(lbl(L, 'nav.g.' + gid)) + y; });   // sous-titre : le groupe
-    // bande du haut : bouton Menu (barre repliée à 900 px et moins) et compteur des saisies en attente ; l'accueil est en tête de la barre verticale
+    // bande du haut : bouton Menu (barre repliée à 1440 px et moins) et compteur des saisies en attente ; l'accueil est en tête de la barre verticale
     html = html.replace('<div class="ctl">', '<div class="ctl">' + menuButton(L) + pendBadge(L, pend, qs));
     var top = (S.soon ? '' : pageTitle(L, gid, S.tab)) + (S.moved ? movedMsg(L, S.moved.g, S.moved.t) : '');
     if (S.soon) html = html.replace(/<main[\s\S]*<\/main>/, soonMain(L, gid, S.soon));
@@ -282,7 +282,7 @@
   }
 
   // ---- évènements : onglets (clic, clavier), « Aller à », retour arrière, sortie de l'application ----
-  // menu replié (900 px et moins) : l'état survit aux dessins (le rendu remplace innerHTML) ; le focus va à l'onglet affiché, puis revient au bouton
+  // menu replié (1440 px et moins) : l'état survit aux dessins (le rendu remplace innerHTML) ; le focus va à l'onglet affiché, puis revient au bouton
   function menuApply(focus) {
     var doc = root.document; if (!doc || typeof doc.querySelector !== 'function') return;
     var b = doc.querySelector('.ft-menu'), sd = doc.getElementById('ft-side'), sc = doc.querySelector('.ft-side-scrim'), v = !!S.menu; if (!b || !sd) return;
@@ -317,7 +317,7 @@
       var gt = t.closest('[data-go-tab]'); if (gt) { e.preventDefault(); e.stopPropagation(); go(gt.getAttribute('data-go-tab'), true, false); return; }
       var a = t.closest('a[href]'); if (a && a.target !== '_blank') { try { var u = new URL(a.getAttribute('href'), root.location.href); if (u.origin === root.location.origin || (u.protocol === 'file:' && root.location.protocol === 'file:')) { S.leaving = true; setTimeout(function () { S.leaving = false; }, 2000); } } catch (x2) { /* ignore */ } }
     }, true);
-    // barre verticale : Entrée sur un onglet « À venir » du groupe courant ; Échap ferme le menu replié (900 px et moins)
+    // barre verticale : Entrée sur un onglet « À venir » du groupe courant ; Échap ferme le menu replié (1440 px et moins)
     on(doc, 'keydown', function (e) {
       if (e.key !== 'Enter' && e.key !== ' ') return;
       var sp = e.target && e.target.closest ? e.target.closest('span.ft-side-t[data-navtab]') : null; if (!sp) return;

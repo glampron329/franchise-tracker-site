@@ -256,3 +256,6 @@ table.ft-stats.fc-hon td.n{font-size:var(--fs-3);font-weight:var(--w-bold)}
 
 .fc-libmsg{margin:0 0 var(--sp-3)}
 main.fc>.card.sb{margin:0 0 var(--sp-3)}
+
+/* profil par poste dans une carte de la fiche : la marge de .pgrp (0 à gauche) ne doit pas écraser celle de la carte (revue qa-tester) */
+.card.pgrp{padding:var(--sp-4) 18px}
