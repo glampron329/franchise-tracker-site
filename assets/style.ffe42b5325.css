@@ -444,7 +444,7 @@ td.na{background:repeating-linear-gradient(135deg,transparent 0 5px,var(--hatch)
 
 /* ===================================================================================================
    Coquille de navigation (phase 4b ; maquettes docs/maquettes/nav_*.html, docs/NAVIGATION.md).
-   Sélecteurs produits par connect/ft_nav.js : nav.ft-groups, .ft-tabs[role=tablist], a.ft-pend, .ft-empty, footer.ft-foot,
+   Sélecteurs produits par connect/ft_shell.js : nav#ft-side.ft-side, a.ft-side-t[data-g][data-t], div.ft-ptitle, button.ft-menu, a.ft-pend, .ft-empty, footer.ft-foot,
    main.ft-index, p.ft-redirect. Aucune couleur d'équipe en dur : aplat --base1 / --on-base1 (groupe actif), encre --ink1, focus commun.
    =================================================================================================== */
 
@@ -455,21 +455,8 @@ td.na{background:repeating-linear-gradient(135deg,transparent 0 5px,var(--hatch)
 .ft-pend:hover{box-shadow:inset 0 0 0 2px var(--on-base1)}
 .ft-pend[data-n="0"],.ft-pend:not([data-n]){display:none}
 
-/* Barre de groupes, sous l'en-tête : une rangée « Saisir », une rangée « Consulter » (une seule ligne sur un grand écran).
-   Le groupe actif est le seul aplat de couleur de la page ; un groupe sans onglet prêt est grisé, sans lien. */
-.ft-groups{display:flex;flex-wrap:wrap;gap:0 var(--sp-6);padding:6px var(--sp-5);background:var(--panel);border-bottom:1px solid var(--line)}
-.ft-gsec{display:flex;align-items:center;gap:var(--sp-2);min-width:0;padding:2px 0}
-.ft-gsec-l{display:inline-flex;align-items:center;gap:5px;flex:none;width:86px;font-size:var(--fs-1);font-weight:var(--w-semi);color:var(--muted)}
-.ft-gsec-l .ic{width:14px;height:14px}
-.ft-gsec ul{display:flex;flex-wrap:wrap;gap:0;margin:0;padding:0;list-style:none}
-.ft-g{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 8px;border-radius:var(--r-2);font-size:var(--fs-2);font-weight:var(--w-semi);color:var(--fg);text-decoration:none;white-space:nowrap}
-a.ft-g:hover{background:var(--panel-2)}
-.ft-g[aria-current=page]{background:var(--base1);color:var(--on-base1);box-shadow:inset 0 -3px 0 var(--base2)}
-a.ft-g[aria-current=page]:hover{background:var(--base1)}
-.ft-g[aria-disabled=true]{color:var(--muted);font-weight:var(--w-reg);cursor:default}
 .ft-cnt{display:inline-block;min-width:18px;height:18px;padding:0 5px;border-radius:var(--r-pill);font-size:11px;line-height:18px;font-weight:var(--w-bold);text-align:center;
   background:var(--ink1);color:var(--panel);font-variant-numeric:tabular-nums}
-.ft-g[aria-current=page] .ft-cnt{background:var(--on-base1);color:var(--base1)}
 
 /* Message de redirection (ancienne adresse) : information neutre, sous la barre de groupes */
 .ft-redirect{display:flex;align-items:flex-start;gap:var(--sp-2);max-width:min(78ch,calc(100% - 2 * var(--sp-5)));margin:var(--sp-3) var(--sp-5) 0;padding:var(--sp-2) var(--sp-3);
@@ -477,28 +464,62 @@ a.ft-g[aria-current=page]:hover{background:var(--base1)}
 .ft-redirect .ic{color:var(--st-info);margin-top:1px}
 .ft-redirect:empty{display:none}
 
-/* Onglets : role=tablist ; flèches gauche/droite, Début/Fin ; un seul arrêt de tabulation (l'onglet actif) */
-.ft-tabs{display:flex;flex-wrap:wrap;gap:2px;margin:0;padding:0;grid-column:1/-1;min-width:0}
-.ft-tab{font:inherit;font-size:var(--fs-2);font-weight:var(--w-semi);display:inline-flex;align-items:center;gap:6px;cursor:pointer;color:var(--muted);background:transparent;border:0;white-space:nowrap}
-.ft-tab[aria-selected=true]{color:var(--fg);font-weight:var(--w-bold)}
-/* « à venir » : visible, grisé, joignable au clavier ; ouvre un état vide (aria-disabled, jamais disabled) */
-.ft-tab[aria-disabled=true]{color:var(--muted);font-weight:var(--w-reg)}
 .ft-soon{font-size:11px;font-weight:var(--w-semi);line-height:16px;padding:0 6px;border-radius:var(--r-1);border:1px dashed var(--field-line);color:var(--muted)}
-/* Saisie : onglets « intercalaires » rattachés à la feuille qui suit (trait --ink1 en haut de l'onglet actif) */
-.ft-tabs[data-mode=enter]{position:relative;z-index:1;margin-bottom:-1px}
-.ft-tabs[data-mode=enter] .ft-tab{height:36px;padding:0 14px;border:1px solid transparent;border-bottom:0;border-radius:var(--r-2) var(--r-2) 0 0}
-.ft-tabs[data-mode=enter] .ft-tab:hover:not([aria-selected=true]){background:var(--panel-2);color:var(--fg)}
-.ft-tabs[data-mode=enter] .ft-tab[aria-selected=true]{background:var(--panel);border-color:var(--line);box-shadow:inset 0 3px 0 var(--ink1)}
-.ft-tabs[data-mode=enter] .ft-tab:focus-visible{outline-offset:-2px;box-shadow:inset 0 0 0 4px var(--focus-halo)}
-.ft-tabs[data-mode=enter] .ft-tab[aria-selected=true]:focus-visible{box-shadow:inset 0 3px 0 var(--ink1),inset 0 0 0 4px var(--focus-halo)}
-.ft-tabs[data-mode=enter]+:is(.card,.ft-sheet,.ft-empty){border-top-left-radius:0}
-.ft-sheet{background:var(--panel);border:1px solid var(--line);border-radius:0 var(--r-3) var(--r-3) var(--r-3);padding:var(--sp-3) var(--sp-4) var(--sp-4);min-width:0}
-/* Consultation : onglets soulignés sur le fond de page (le contenu est fait de cartes) */
-.ft-tabs[data-mode=view]{border-bottom:1px solid var(--line-strong);margin-bottom:var(--sp-4)}
-.ft-tabs[data-mode=view] .ft-tab{height:36px;padding:0 12px}
-.ft-tabs[data-mode=view] .ft-tab:hover:not([aria-selected=true]){color:var(--fg)}
-.ft-tabs[data-mode=view] .ft-tab[aria-selected=true]{box-shadow:inset 0 -3px 0 var(--ink1)}
-.ft-tabs[data-mode=view] .ft-tab:focus-visible{outline-offset:-2px}
+.ft-sheet{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-3);padding:var(--sp-3) var(--sp-4) var(--sp-4);min-width:0}
+
+/* Barre verticale (décision du 2026-11-26, maquette docs/maquettes/4e_nav.css) : remplace la barre de groupes et la rangée d'onglets.
+   Structure : header.top (bouton .ft-menu visible à 900 px et moins) > div.ft-layout > nav#ft-side.ft-side + div.ft-content
+   ===================================================================================================== */
+.ft-layout{display:grid;grid-template-columns:236px minmax(0,1fr);align-items:start;min-height:calc(100vh - var(--ft-top-h,64px))}
+.ft-content{min-width:0}
+.ft-side{position:sticky;top:var(--ft-top-h,0px);max-height:calc(100vh - var(--ft-top-h,0px));overflow-y:auto;overscroll-behavior:contain;
+  padding:var(--sp-3) var(--sp-2) var(--sp-5);background:var(--panel);border-right:1px solid var(--line);font-size:var(--fs-2)}
+.ft-side .ic{width:16px;height:16px;flex:none}
+.ft-side-home{display:flex;align-items:center;gap:var(--sp-2);height:34px;padding:0 var(--sp-2);border-radius:var(--r-2);color:var(--fg);font-weight:var(--w-bold);text-decoration:none}
+.ft-side-home:hover{background:var(--panel-2)}
+.ft-side-home[aria-current=page]{background:var(--base1);color:var(--on-base1)}
+/* titres de section : Saisir, Consulter */
+.ft-side-sec{margin-top:var(--sp-3);padding-top:var(--sp-3);border-top:1px solid var(--line)}
+.ft-side-sec>h2{display:flex;align-items:center;gap:6px;margin:0 0 var(--sp-1);padding:0 var(--sp-2);font-size:var(--fs-1);font-weight:var(--w-bold);color:var(--muted)}
+.ft-side-sec>h2 .ic{width:14px;height:14px}
+/* groupe : nom (non cliquable : ses onglets le sont), toujours déplié */
+.ft-side-g{margin:var(--sp-2) 0 0}
+.ft-side-gn{display:flex;align-items:center;gap:6px;margin:0;padding:2px var(--sp-2);font-size:var(--fs-2);font-weight:var(--w-bold);color:var(--fg)}
+.ft-side-g.soon .ft-side-gn{color:var(--muted);font-weight:var(--w-semi)}
+.ft-side-g ul{margin:0;padding:0;list-style:none}
+.ft-side-t{position:relative;display:flex;align-items:center;gap:var(--sp-2);min-height:30px;padding:3px var(--sp-2) 3px 14px;border-radius:var(--r-2);color:var(--fg);text-decoration:none;line-height:1.25}
+.ft-side-t .ic{color:var(--muted)}
+.ft-side-t .nm{flex:1 1 auto;min-width:0}
+a.ft-side-t:hover{background:var(--panel-2)}
+a.ft-side-t:hover .ic{color:var(--ink1)}
+/* onglet affiché : le seul aplat de couleur de la barre (comme le groupe actif d'avant) */
+.ft-side-t[aria-current=page]{background:var(--base1);color:var(--on-base1);font-weight:var(--w-bold);box-shadow:inset 4px 0 0 var(--base2)}
+.ft-side-t[aria-current=page] .ic{color:var(--on-base1)}
+.ft-side-t[aria-current=page] .ft-cnt{background:var(--on-base1);color:var(--base1)}
+.ft-side-t[aria-disabled=true]{color:var(--muted);cursor:default}
+.ft-side-t[aria-disabled=true] .ft-soon{font-size:10px;padding:0 4px}
+.ft-side :is(a,[tabindex]):focus-visible{outline:2px solid var(--focus);outline-offset:-2px;box-shadow:inset 0 0 0 4px var(--focus-halo)}
+.ft-side-foot{margin:var(--sp-4) 0 0;padding:var(--sp-3) var(--sp-2) 0;border-top:1px solid var(--line);font-size:var(--fs-1)}
+/* titre de page : groupe › onglet (remplace la rangée d'onglets) */
+.ft-ptitle{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px var(--sp-2);margin:0 0 var(--sp-3)}
+.ft-ptitle h1{margin:0;font-size:var(--fs-4);font-weight:var(--w-bold);display:flex;align-items:center;gap:var(--sp-2)}
+.ft-ptitle h1 .ic{width:20px;height:20px;color:var(--ink1)}
+.ft-ptitle .grp{font-size:var(--fs-2);color:var(--muted)}
+/* bouton de menu (bande du haut), caché sur grand écran */
+.ft-menu{display:none;align-items:center;gap:6px;height:34px;padding:0 12px;border-radius:var(--r-2);border:0;background:transparent;color:var(--on-base1);font:inherit;font-size:var(--fs-2);font-weight:var(--w-semi);cursor:pointer;
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--on-base1) 55%,transparent)}
+.ft-menu .ic{width:16px;height:16px}
+.ft-menu[aria-expanded=true]{background:var(--on-base1);color:var(--base1)}
+.ft-menu:focus-visible{outline:3px solid var(--on-base1);outline-offset:2px}
+.ft-side-scrim{position:fixed;inset:var(--ft-top-h,0px) 0 0 0;z-index:54;background:color-mix(in srgb,#000 40%,transparent)}
+@media (max-width:900px){
+  .ft-layout{grid-template-columns:minmax(0,1fr)}
+  .ft-menu{display:inline-flex}
+  .ft-side{position:fixed;z-index:55;top:var(--ft-top-h,0px);left:0;bottom:0;width:min(300px,86vw);max-height:none;transform:translateX(-102%);visibility:hidden;transition:transform .18s ease,visibility 0s linear .18s;box-shadow:var(--sh-2)}
+  .ft-side.open{transform:none;visibility:visible;transition:transform .18s ease}
+  html.ft-side-lock{overflow:hidden}
+}
+@media (prefers-reduced-motion:reduce){.ft-side{transition:none!important}}
 
 /* État vide (onglet à venir, liste vide) : dit ce qui se passe et propose une action */
 .ft-empty{display:grid;justify-items:start;gap:var(--sp-2);padding:var(--sp-5);border:1px dashed var(--field-line);border-radius:var(--r-3);background:var(--panel);max-width:62ch;grid-column:1/-1}
@@ -536,7 +557,7 @@ main.ft-index>.ft-foot{grid-column:1/-1;max-width:none;margin-left:0;margin-righ
 
 /* Écran étroit */
 @media (max-width:640px){
-  .ft-gsec-l{width:auto}.ft-groups,main.ft-index,.ft-foot{padding-left:var(--sp-3);padding-right:var(--sp-3)}
+  main.ft-index,.ft-foot{padding-left:var(--sp-3);padding-right:var(--sp-3)}
   .ft-redirect{margin-left:var(--sp-3);margin-right:var(--sp-3);max-width:calc(100% - 2 * var(--sp-3))}
   .ft-irow{padding-left:var(--sp-4)}.ft-iname{position:static;width:100%}}
 
@@ -920,3 +941,7 @@ table.ft-stats.pk2 tbody tr.y0:not(:first-child)>td:first-child{box-shadow:inset
 table.ft-stats.pk2 td.rep{color:var(--muted)}
 table.ft-stats.pk2 td.ro{color:var(--fg)}
 table.ft-stats.pk2 tfoot .tc{margin-left:6px;font-weight:var(--w-reg);color:var(--muted)}
+
+/* Titre de page et message de redirection : en tête du contenu, sur toute la largeur de la grille de la page */
+main>.ft-ptitle,main>.ft-redirect{grid-column:1/-1}
+main>.ft-redirect{margin:0;max-width:78ch}

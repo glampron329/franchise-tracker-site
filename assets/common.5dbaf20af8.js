@@ -770,7 +770,8 @@
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.FTNAV = api;
 })(typeof window !== 'undefined' ? window : this);
 
-;/* Coquille de navigation (phase 4b, docs/NAVIGATION.md) : barre de groupes, rangée d'onglets, compteur de saisies en attente,
+;/* Coquille de navigation (phase 4b, docs/NAVIGATION.md ; barre verticale décidée le 2026-11-26, maquette docs/maquettes/4e_nav.js) : barre verticale
+   (Accueil, Saisir, Consulter, groupes dépliés et leurs onglets), titre de la page, compteur de saisies en attente,
    onglets « À venir », onglet dans l'URL (#onglet), volets d'une page (Franchise : deux applications), pied de page.
    La page déclare window.FT_PAGE = { group, panes: ['main'] | ['setup', 'hist'], attr: 'tab' | 'view', index, connect }.
    live_mount.js appelle decorate() à chaque dessin d'un volet ; les applications gardent leur état (state.tab ou state.view). */
@@ -789,26 +790,92 @@
   // ---- rendu (fonctions pures, testées sous Node) ; L(clé, court) = libellé ----
   function lbl(L, k, short) { var v = L(k, short); return v == null ? k : v; }
   function search(loc) { return String(loc || '').replace(/([?&])moved=[^&]*&?/, '$1').replace(/[?&]$/, ''); }
-  function groupBar(L, active, pend, q) {
-    function sec(id, icon) {
-      return '<div class="ft-gsec" data-sec="' + id + '"><span class="ft-gsec-l">' + icon + esc(lbl(L, 'nav.sec.' + id)) + '</span><ul>' + NAV.GROUPS.filter(function (g) { return g.sec === id; }).map(function (g) {
-        var name = esc(lbl(L, 'nav.g.' + g.id)), n = pend && pend[g.id] ? pend[g.id].total : 0;
-        var c = n ? '<span class="ft-cnt" title="' + esc(fill(lbl(L, n === 1 ? 'nav.pending_group_one' : 'nav.pending_group_other'), [n])) + '">' + n + '</span>' : '';
-        if (!NAV.ready(g)) return '<li><span class="ft-g" data-g="' + g.id + '" aria-disabled="true" title="' + esc(lbl(L, 'nav.soon_hint')) + '">' + name + '</span></li>';
-        return '<li><a class="ft-g" data-g="' + g.id + '" href="' + NAV.href(g.id) + (q || '') + '"' + (g.id === active ? ' aria-current="page"' : '') + '>' + name + c + '</a></li>';
-      }).join('') + '</ul></div>';
+  // Icônes de la barre verticale (maquette docs/maquettes/4e_nav.js, approuvée le 2026-11-26) : 16 × 16, trait 1,5, couleur du texte ; une par onglet
+  var ICONS = {
+    home: '<path d="M2.5 7.5 8 2.8l5.5 4.7v6H9.8V10H6.2v3.5H2.5z"/>',
+    shield: '<path d="M8 1.8 13.2 3.6v4.1c0 3-2.2 5.3-5.2 6.5-3-1.2-5.2-3.5-5.2-6.5V3.6z"/>',
+    clockBack: '<path d="M3.2 8a4.8 4.8 0 1 0 1.4-3.4"/><path d="M4.6 1.8v2.8h2.8"/><path d="M8 5.6V8l1.8 1.2"/>',
+    people: '<circle cx="5.6" cy="5.2" r="2.1"/><path d="M1.8 13.4c.3-2.4 1.8-3.8 3.8-3.8s3.5 1.4 3.8 3.8"/><circle cx="11.2" cy="5.8" r="1.7"/><path d="M10.4 9.7c1.9 0 3.3 1.2 3.7 3.4"/>',
+    ticket: '<path d="M2 4.5h12v2.2a1.4 1.4 0 0 0 0 2.6v2.2H2V9.3a1.4 1.4 0 0 0 0-2.6z"/><path d="M10 4.8v6.4" stroke-dasharray="1.2 1.4"/>',
+    cap: '<path d="M2 3.5h12"/><path d="M4 13.5V7M8 13.5V5.5M12 13.5V8.5"/><path d="M2 13.5h12"/>',
+    lines: '<path d="M2.5 4h5M9.5 4h4M2.5 8h3M7.5 8h6M2.5 12h7M11.5 12h2"/>',
+    star: '<path d="m8 2 1.8 3.8 4 .5-3 2.8.8 4L8 11.1 4.4 13l.8-4-3-2.8 4-.5z"/>',
+    calendar: '<rect x="2.3" y="3.3" width="11.4" height="10.4" rx="1.4"/><path d="M2.3 6.5h11.4M5.3 2v2.6M10.7 2v2.6"/><path d="M5 9h1.2M7.4 9h1.2M9.8 9H11M5 11.3h1.2M7.4 11.3h1.2"/>',
+    stick: '<path d="M11.8 1.8 6.4 11.6"/><path d="M6.4 11.6c-.6 1.1-1.5 1.6-2.7 1.6H2"/><circle cx="12.6" cy="12.6" r="1.4"/>',
+    mask: '<path d="M4 3.2c1.2-1 6.8-1 8 0 .6 3 .4 6.6-1.4 8.6-.8.9-1.6 1.6-2.6 2-1-.4-1.8-1.1-2.6-2C3.6 9.8 3.4 6.2 4 3.2z"/><path d="M6 6.3h4M6 8.6h4M8 5v5.4"/>',
+    bars: '<path d="M2 13.5h12"/><path d="M3.8 11V8M7 11V4M10.2 11V6.5M13 11V9"/>',
+    cross: '<rect x="2.3" y="2.3" width="11.4" height="11.4" rx="2.2"/><path d="M8 5v6M5 8h6"/>',
+    updown: '<path d="M5 13V3M2.6 5.4 5 3l2.4 2.4M11 3v10M8.6 10.6 11 13l2.4-2.4"/>',
+    swap: '<path d="M2.5 5h10M10.2 2.6 12.6 5l-2.4 2.4M13.5 11h-10M5.8 8.6 3.4 11l2.4 2.4"/>',
+    doc: '<path d="M4 1.8h5.4L12 4.4v9.8H4z"/><path d="M9.2 1.8v2.8H12"/><path d="M5.8 8h4.4M5.8 10.4h3"/>',
+    docAlert: '<path d="M4 1.8h5.4L12 4.4v9.8H4z"/><path d="M8 6.2v3.4"/><circle cx="8" cy="11.6" r=".4" fill="currentColor"/>',
+    posSwap: '<circle cx="4.4" cy="4.4" r="2"/><circle cx="11.6" cy="11.6" r="2"/><path d="M6.8 4.4h3.4c.8 0 1.4.6 1.4 1.4v2.6M9.2 11.6H5.8c-.8 0-1.4-.6-1.4-1.4V7.6"/>',
+    list: '<path d="M5.5 4h8M5.5 8h8M5.5 12h8"/><circle cx="2.8" cy="4" r=".5" fill="currentColor"/><circle cx="2.8" cy="8" r=".5" fill="currentColor"/><circle cx="2.8" cy="12" r=".5" fill="currentColor"/>',
+    podium: '<path d="M1.8 13.5h12.4M2.2 13.5V9h3.6v4.5M5.8 13.5V5.8h4.4v7.7M10.2 13.5v-3h3.6v3"/><path d="M8 2.3v1.6"/>',
+    bracket: '<path d="M2 3h3.5v4H9M2 11h3.5V7M9 7h1.5M10.5 4.5V9.5H14"/><path d="M10.5 4.5H14"/>',
+    cup: '<path d="M4.5 2.2h7v3.6a3.5 3.5 0 0 1-7 0z"/><path d="M8 9.3v2.4M5.2 13.8h5.6M6.2 11.7h3.6"/><path d="M4.5 3.4H2.6c0 1.8.8 2.8 2.1 3M11.5 3.4h1.9c0 1.8-.8 2.8-2.1 3"/>',
+    jersey: '<path d="M5.6 2.2 2 4.2l1.2 3 1.4-.6v7.2h6.8V6.6l1.4.6 1.2-3-3.6-2c-.4 1-1.3 1.6-2.4 1.6S6 3.2 5.6 2.2z"/>',
+    lottery: '<circle cx="5.4" cy="10" r="3.2"/><circle cx="11" cy="5.6" r="3"/><path d="M4.6 9.2h1.6v1.6M10.4 5h1.2v1.2"/>',
+    rank: '<path d="M6.5 4h7M6.5 8h7M6.5 12h7"/><path d="M2.4 2.8 3.4 2.2v3.4M2.2 7.2c.6-.8 2-.6 1.8.4l-1.8 2h2M2.2 11.2c.8-.6 2-.2 1.8.6-.1.4-.6.6-1 .6.6 0 1.2.3 1.1.9-.2.8-1.4.9-2 .3"/>',
+    medal: '<path d="M5.2 1.8 8 6.4l2.8-4.6"/><circle cx="8" cy="10.2" r="3.6"/><path d="M8 8.6v3.2"/>',
+    pick: '<path d="M3.2 8.4 6.4 11.6 12.8 4.4"/><rect x="1.8" y="1.8" width="12.4" height="12.4" rx="2"/>',
+    lens: '<path d="M2 13.5h4M2.8 11V8.5M5.2 11V6.5"/><circle cx="10.4" cy="7.2" r="3"/><path d="m12.6 9.4 1.8 1.8"/>',
+    person: '<circle cx="8" cy="4.6" r="2.6"/><path d="M3 14c.4-3.2 2.3-5 5-5s4.6 1.8 5 5"/>',
+    recSk: '<path d="M10 1.8 5.6 9.8c-.5.9-1.2 1.4-2.2 1.4H2.4"/><path d="m11.8 8.6.9 1.9 2 .3-1.5 1.4.4 2-1.8-1-1.8 1 .4-2-1.5-1.4 2-.3z"/>',
+    recG: '<path d="M2.6 3c1-.8 5.6-.8 6.6 0 .5 2.5.3 5.4-1.1 7.1-.7.8-1.3 1.3-2.2 1.6-.9-.3-1.5-.8-2.2-1.6C2.3 8.4 2.1 5.5 2.6 3z"/><path d="m12 8.6.9 1.9 2 .3-1.5 1.4.4 2-1.8-1-1.8 1 .4-2-1.5-1.4 2-.3z"/>',
+    recTm: '<path d="M6 1.8 10.2 3.3v3.2c0 2.4-1.8 4.3-4.2 5.3-2.4-1-4.2-2.9-4.2-5.3V3.3z"/><path d="m12 8.6.9 1.9 2 .3-1.5 1.4.4 2-1.8-1-1.8 1 .4-2-1.5-1.4 2-.3z"/>',
+    globe: '<circle cx="8" cy="8" r="6"/><path d="M2 8h12M8 2c1.8 1.8 2.6 3.8 2.6 6S9.8 12.2 8 14C6.2 12.2 5.4 10.2 5.4 8S6.2 3.8 8 2z"/>',
+    columns: '<path d="M2 5.2 8 2l6 3.2zM2 14h12M3.8 6.4v6M6.6 6.4v6M9.4 6.4v6M12.2 6.4v6"/>',
+    puck: '<ellipse cx="8" cy="6" rx="5.6" ry="2.2"/><path d="M2.4 6v3.4c0 1.2 2.5 2.2 5.6 2.2s5.6-1 5.6-2.2V6"/>',
+    layers: '<path d="M8 2 14 5 8 8 2 5z"/><path d="m2 8 6 3 6-3M2 11l6 3 6-3"/>',
+    money: '<rect x="1.8" y="4" width="12.4" height="8" rx="1.2"/><circle cx="8" cy="8" r="1.8"/><path d="M4 6v4M12 6v4"/>',
+    trend: '<path d="M2 13.5h12"/><path d="m2.6 10.4 3.4-3.6 2.6 2 4.8-5"/><path d="M10.6 3.8h2.8v2.8"/>',
+    pie: '<path d="M8 2a6 6 0 1 0 6 6H8z"/><path d="M10 1.9A6 6 0 0 1 14.1 6H10z"/>',
+    swapLens: '<path d="M2 4.5h8M8 2.5l2 2-2 2M10.5 9.5h-8M4.5 7.5l-2 2 2 2"/><circle cx="12" cy="11.4" r="2"/><path d="m13.4 12.8 1.2 1.2"/>',
+    menu: '<path d="M2.5 4h11M2.5 8h11M2.5 12h11"/>', close: '<path d="m3.5 3.5 9 9M12.5 3.5l-9 9"/>',
+    pen: '<path d="M10.6 2.4l3 3L5.4 13.6 2 14l.4-3.4z"/>', view: '<path d="M2 13.5h12M3.5 11V7.5M7 11V3.5M10.5 11V6M14 11V8.5"/>'
+  };
+  var TAB_IC = {
+    'franchise.franchise': 'shield', 'franchise.history_fix': 'clockBack', 'start.roster0': 'people', 'start.picks0': 'ticket',
+    'preseason.cap': 'cap', 'preseason.lineup': 'lines', 'preseason.ratings': 'star', 'preseason.schedule': 'calendar',
+    'stats.skaters': 'stick', 'stats.goalies': 'mask', 'stats.team': 'bars',
+    'roster.injuries': 'cross', 'roster.moves': 'updown', 'roster.trades': 'swap', 'roster.contracts': 'doc', 'roster.offers': 'docAlert', 'roster.positions': 'posSwap', 'roster.players': 'list',
+    'results.standings': 'podium', 'results.series': 'bracket', 'results.cup': 'cup',
+    'honors.awards': 'medal', 'honors.allstar': 'star', 'honors.retire': 'jersey',
+    'draft.owned': 'ticket', 'draft.lottery': 'lottery', 'draft.ranks': 'rank', 'draft.top3': 'podium', 'draft.picks': 'pick', 'draft.board': 'lens',
+    'cards.player': 'person', 'cards.goalie': 'mask', 'cards.team': 'shield',
+    'team_records.skaters': 'recSk', 'team_records.goalies': 'recG', 'team_records.team': 'recTm',
+    'league_records.players': 'people', 'league_records.teams': 'globe', 'league_records.hof': 'columns',
+    'analysis.opening': 'puck', 'analysis.depth': 'layers', 'analysis.contracts': 'money', 'analysis.evolution': 'trend', 'analysis.makeup': 'pie', 'analysis.trades': 'swapLens'
+  };
+  function icon(name) { return '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' + (ICONS[name] || ICONS.list) + '</g></svg>'; }
+  // Barre verticale (décision du 2026-11-26) : Accueil, puis Saisir et Consulter, groupes toujours dépliés avec leurs onglets dessous.
+  // gid : groupe de la page ('index' pour l'accueil) ; cur : onglet affiché ; pane / attr : volet affiché et attribut lu par son application
+  // (les onglets du groupe courant portent data-navtab, et data-<attr> quand l'application du volet les sert elle-même) ; q : paramètres gardés.
+  function side(L, gid, cur, pane, attr, pend, q, index) {
+    function sec(id) {
+      return '<section class="ft-side-sec" aria-labelledby="ft-side-' + id + '"><h2 id="ft-side-' + id + '">' + icon(id === 'enter' ? 'pen' : 'view') + esc(lbl(L, 'nav.sec.' + id)) + '</h2>' +
+        NAV.GROUPS.filter(function (g) { return g.sec === id; }).map(function (g) {
+          var here = g.id === gid, n = pend && pend[g.id] ? pend[g.id].total : 0, counts = pend && pend[g.id] && pend[g.id].tabs ? pend[g.id].tabs : {};
+          var cnt = n ? '<span class="ft-cnt" title="' + esc(fill(lbl(L, n === 1 ? 'nav.pending_group_one' : 'nav.pending_group_other'), [n])) + '">' + n + '</span>' : '';
+          return '<div class="ft-side-g' + (NAV.ready(g) ? '' : ' soon') + (here ? ' on' : '') + '" data-g="' + g.id + '"><p class="ft-side-gn">' + esc(lbl(L, 'nav.g.' + g.id)) + cnt + '</p><ul>' +
+            g.tabs.map(function (x) {
+              var name = esc(lbl(L, 'nav.t.' + g.id + '.' + x.id, true)), full = lbl(L, 'nav.t.' + g.id + '.' + x.id), c = counts[x.id] || 0;
+              var nav = here ? ' data-navtab="' + x.id + '" data-kind="' + x.kind + '"' + (!x.soon && x.app && x.pane === pane ? ' data-' + attr + '="' + x.app + '"' : '') : '';
+              var inner = icon(TAB_IC[g.id + '.' + x.id]) + '<span class="nm">' + name + '</span>' + (c ? '<span class="ft-cnt">' + c + '</span>' : '') + (x.soon ? '<span class="ft-soon">' + esc(lbl(L, 'nav.soon')) + '</span>' : '');
+              if (x.soon) return '<li><span class="ft-side-t" data-g="' + g.id + '" data-t="' + x.id + '"' + nav + ' aria-disabled="true"' + (here ? ' role="link" tabindex="0"' : '') + (here && x.id === cur ? ' aria-current="page"' : '') + ' title="' + esc(full + ' : ' + lbl(L, 'nav.soon_hint')) + '">' + inner + '</span></li>';
+              return '<li><a class="ft-side-t" data-g="' + g.id + '" data-t="' + x.id + '"' + nav + ' href="' + NAV.href(g.id) + (q || '') + '#' + x.id + '"' + (here && x.id === cur ? ' aria-current="page"' : '') + (full !== name ? ' title="' + esc(full) + '"' : '') + '>' + inner +
+                '<span class="vh">, ' + esc(lbl(L, x.kind === 'view' ? 'nav.kind_view' : 'nav.kind_enter')) + '</span></a></li>';
+            }).join('') + '</ul></div>';
+        }).join('') + '</section>';
     }
-    return '<nav class="ft-groups" aria-label="' + esc(lbl(L, 'nav.groups')) + '">' + sec('enter', IC.pen) + sec('view', IC.view) + '</nav>';
+    return '<nav class="ft-side" id="ft-side" aria-label="' + esc(lbl(L, 'nav.side_label')) + '"><a class="ft-side-home" href="' + esc(index || 'index.html') + (q || '') + '"' + (gid === 'index' ? ' aria-current="page"' : '') + '>' + icon('home') + esc(lbl(L, 'nav.side_home')) + '</a>' + sec('enter') + sec('view') + '</nav><div class="ft-side-scrim" hidden></div>';
   }
-  // pane : volet affiché ; attr : attribut que l'application du volet lit (data-tab ou data-view)
-  function tabRow(L, gid, cur, pane, attr, pend) {
-    var g = NAV.group(gid), x0 = NAV.tab(gid, cur) || NAV.firstReady(g), counts = pend && pend[gid] ? pend[gid].tabs : {};
-    return '<div class="ft-tabs" role="tablist" data-mode="' + (x0 ? x0.kind : g.sec) + '" data-group="' + gid + '" aria-label="' + esc(fill(lbl(L, 'nav.tabs'), [lbl(L, 'nav.g.' + gid)])) + '">' + g.tabs.map(function (x) {
-      var on = x.id === cur, own = !x.soon && x.app && x.pane === pane ? ' data-' + attr + '="' + x.app + '"' : '', n = counts[x.id] || 0;
-      return '<button type="button" role="tab" class="ft-tab" id="tab-' + gid + '-' + x.id + '" data-navtab="' + x.id + '" data-kind="' + x.kind + '"' + own + ' aria-selected="' + on + '" aria-pressed="' + on + '" tabindex="' + (on ? 0 : -1) + '"' +
-        (x.soon ? ' aria-disabled="true" title="' + esc(lbl(L, 'nav.soon_hint')) + '"' : '') + '>' + esc(lbl(L, 'nav.t.' + gid + '.' + x.id, true)) +
-        (n ? '<span class="ft-cnt">' + n + '</span>' : '') + (x.soon ? '<span class="ft-soon">' + esc(lbl(L, 'nav.soon')) + '</span>' : '') + '<span class="vh">, ' + esc(lbl(L, x.kind === 'view' ? 'nav.kind_view' : 'nav.kind_enter')) + '</span></button>';
-    }).join('') + '</div>';
+  function menuButton(L) { return '<button type="button" class="ft-menu" aria-controls="ft-side" aria-expanded="false">' + icon('menu') + '<span>' + esc(lbl(L, 'nav.menu')) + '</span></button>'; }
+  // titre de la page (remplace la rangée d'onglets) : icône et nom de l'onglet, puis « Saisir › Groupe »
+  function pageTitle(L, gid, cur) {
+    var g = NAV.group(gid), x = NAV.tab(gid, cur) || NAV.firstReady(g); if (!x) return '';
+    return '<div class="ft-ptitle"><h1>' + icon(TAB_IC[gid + '.' + x.id]) + esc(lbl(L, 'nav.t.' + gid + '.' + x.id)) + '</h1><span class="grp">' + esc(lbl(L, 'nav.sec.' + g.sec)) + ' › ' + esc(lbl(L, 'nav.g.' + gid)) + '</span></div>';
   }
   function soonMain(L, gid, tid) {
     var first = NAV.firstReady(NAV.group(gid));
@@ -824,7 +891,7 @@
   function movedMsg(L, gid, tid) { return '<p class="ft-redirect" role="status">' + esc(fill(lbl(L, 'nav.redirect'), [lbl(L, 'nav.g.' + gid) + ' › ' + lbl(L, 'nav.t.' + gid + '.' + tid)])) + '</p>'; }
 
   // ---- état de la page ----
-  var S = { page: null, tab: null, soon: null, pane: null, hosts: {}, mounts: {}, mounted: {}, moved: null, fid: null, leaving: false, store: null };
+  var S = { menu: false, page: null, tab: null, soon: null, pane: null, hosts: {}, mounts: {}, mounted: {}, moved: null, fid: null, leaving: false, store: null };
   function P() { return S.page; }
   function lsGet(k) { try { return root.localStorage ? root.localStorage.getItem(k) : null; } catch (e) { return null; } }
   function lsSet(k, v) { try { if (root.localStorage) root.localStorage.setItem(k, v); } catch (e) { /* ignore */ } }
@@ -891,35 +958,57 @@
       if (x && x.id !== S.tab) { S.tab = x.id; lsSet('ft_tab_' + gid, x.id); try { root.history.replaceState(null, '', root.location.pathname + root.location.search + '#' + x.id); } catch (e) { /* ignore */ } }
     }
     html = html.replace(/(<header class="top">[\s\S]*?<div class="sub">)[^<]*(<\/div>)/, function (m, x, y) { return x + esc(lbl(L, 'nav.g.' + gid)) + y; });   // sous-titre : le groupe
-    var bar = groupBar(L, gid, pend, qs) + tabRow(L, gid, S.tab, c.pane, attr(), pend) + (S.moved ? movedMsg(L, S.moved.g, S.moved.t) : '');
-    html = html.replace('<div class="ctl">', '<div class="ctl"><a class="ft-home" href="' + esc(S.page.index || 'index.html') + qs + '" title="' + esc(lbl(L, 'nav.home')) + '" aria-label="' + esc(lbl(L, 'nav.home')) + '">' + IC.home + '</a>' + pendBadge(L, pend, qs));
-    var hi = html.indexOf('</header>');
-    html = hi >= 0 ? html.slice(0, hi + 9) + bar + html.slice(hi + 9) : bar + html;
+    // bande du haut : bouton Menu (barre repliée à 900 px et moins) et compteur des saisies en attente ; l'accueil est en tête de la barre verticale
+    html = html.replace('<div class="ctl">', '<div class="ctl">' + menuButton(L) + pendBadge(L, pend, qs));
+    var top = (S.soon ? '' : pageTitle(L, gid, S.tab)) + (S.moved ? movedMsg(L, S.moved.g, S.moved.t) : '');
     if (S.soon) html = html.replace(/<main[\s\S]*<\/main>/, soonMain(L, gid, S.soon));
-    return html + footer(L, S.page.connect);
+    var hi = html.indexOf('</header>'), head = hi >= 0 ? html.slice(0, hi + 9) : '', body = hi >= 0 ? html.slice(hi + 9) : html;
+    if (top) body = /<main[^>]*>/.test(body) ? body.replace(/<main[^>]*>/, function (m) { return m + top; }) : top + body;
+    var out = head + '<div class="ft-layout">' + side(L, gid, S.tab, c.pane, attr(), pend, qs, S.page.index) + '<div class="ft-content">' + body + footer(L, S.page.connect) + '</div></div>';
+    return S.menu ? out.replace('class="ft-menu" aria-controls="ft-side" aria-expanded="false"', 'class="ft-menu" aria-controls="ft-side" aria-expanded="true"').replace('<nav class="ft-side" id="ft-side"', '<nav class="ft-side open" id="ft-side"').replace('<div class="ft-side-scrim" hidden>', '<div class="ft-side-scrim">') : out;
   }
 
   // ---- évènements : onglets (clic, clavier), « Aller à », retour arrière, sortie de l'application ----
+  // menu replié (900 px et moins) : l'état survit aux dessins (le rendu remplace innerHTML) ; le focus va à l'onglet affiché, puis revient au bouton
+  function menuApply(focus) {
+    var doc = root.document; if (!doc || typeof doc.querySelector !== 'function') return;
+    var b = doc.querySelector('.ft-menu'), sd = doc.getElementById('ft-side'), sc = doc.querySelector('.ft-side-scrim'), v = !!S.menu; if (!b || !sd) return;
+    b.setAttribute('aria-expanded', String(v)); sd.classList.toggle('open', v); if (sc) sc.hidden = !v; doc.documentElement.classList.toggle('ft-side-lock', v);
+    if (focus) { if (v) { var cur = sd.querySelector('[aria-current=page]') || sd.querySelector('a'); if (cur) { cur.focus(); if (cur.scrollIntoView) cur.scrollIntoView({ block: 'center' }); } } else b.focus(); }
+  }
+  function menu(v) { S.menu = !!v; menuApply(true); }
+  // bouton Menu, voile et Échap : sur toutes les pages, accueil compris (index_ui.js l'appelle aussi)
+  var menuWired = false;
+  function wireMenu() {
+    if (menuWired || !root.document) return; menuWired = true; var doc = root.document;
+    on(doc, 'click', function (e) {
+      var t = e.target && e.target.closest ? e.target : null; if (!t) return;
+      if (t.closest('.ft-menu')) { e.preventDefault(); menu(doc.querySelector('.ft-menu').getAttribute('aria-expanded') !== 'true'); return; }
+      if (t.closest('.ft-side-scrim')) menu(false);
+    });
+    on(doc, 'keydown', function (e) { if (e.key === 'Escape' && doc.querySelector('.ft-menu[aria-expanded=true]')) { e.preventDefault(); menu(false); } });
+  }
   var wired = false;
   function wire() {
-    if (wired || !root.document) return; wired = true; var doc = root.document;
+    if (wired || !root.document) return; wired = true; var doc = root.document; wireMenu();
     on(doc, 'click', function (e) {
       var t = e.target && e.target.closest ? e.target : null; if (!t) return;
       var b = t.closest('[data-navtab]');
       if (b) {
-        var x = NAV.tab(S.page.group, b.getAttribute('data-navtab')), own = x && !x.soon && b.hasAttribute('data-' + attr());
+        var x = NAV.tab(S.page.group, b.getAttribute('data-navtab')), own = x && !x.soon && b.tagName === 'BUTTON' && b.hasAttribute('data-' + attr());   // un lien de la barre verticale : la coquille change l'onglet elle-même
         if (!x) return; if (!own) { e.preventDefault(); e.stopPropagation(); }
-        go(x.id, true, own); return;
+        S.menu = false; go(x.id, true, own);
+        if (e.detail === 0) setTimeout(function () { var el = doc.querySelector('#ft-side [data-navtab="' + x.id + '"]'); if (el) el.focus(); }, 0);   // activé au clavier : le focus reste sur l'onglet après le dessin
+        return;
       }
       var gt = t.closest('[data-go-tab]'); if (gt) { e.preventDefault(); e.stopPropagation(); go(gt.getAttribute('data-go-tab'), true, false); return; }
       var a = t.closest('a[href]'); if (a && a.target !== '_blank') { try { var u = new URL(a.getAttribute('href'), root.location.href); if (u.origin === root.location.origin || (u.protocol === 'file:' && root.location.protocol === 'file:')) { S.leaving = true; setTimeout(function () { S.leaving = false; }, 2000); } } catch (x2) { /* ignore */ } }
     }, true);
+    // barre verticale : Entrée sur un onglet « À venir » du groupe courant ; Échap ferme le menu replié (900 px et moins)
     on(doc, 'keydown', function (e) {
-      var tab = e.target && e.target.closest ? e.target.closest('.ft-tabs [role=tab]') : null; if (!tab) return;
-      var list = [].slice.call(tab.parentNode.querySelectorAll('[role=tab]')), i = list.indexOf(tab), j = null;
-      if (e.key === 'ArrowRight') j = (i + 1) % list.length; else if (e.key === 'ArrowLeft') j = (i - 1 + list.length) % list.length; else if (e.key === 'Home') j = 0; else if (e.key === 'End') j = list.length - 1;
-      if (j == null) return; e.preventDefault(); var id = list[j].id; list[j].click();
-      setTimeout(function () { var el = doc.getElementById(id); if (el) el.focus(); }, 0);
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      var sp = e.target && e.target.closest ? e.target.closest('span.ft-side-t[data-navtab]') : null; if (!sp) return;
+      e.preventDefault(); sp.click();
     });
     on(root, 'hashchange', function () { var h = hashTab(); if (h && h !== S.tab && NAV.tab(S.page.group, h)) go(h, false, false); });
     // saisies non envoyées : avertissement en quittant l'application (pas en passant d'un groupe à l'autre : elles restent dans ce navigateur)
@@ -929,7 +1018,7 @@
   }
 
   var api = { init: init, mount: mount, addHost: addHost, applyTo: applyTo, decorate: decorate, go: go, state: function () { return S; }, page: P,
-              groupBar: groupBar, tabRow: tabRow, soonMain: soonMain, pendBadge: pendBadge, footer: footer, IC: IC, esc: esc, fill: fill };
+              side: side, pageTitle: pageTitle, wireMenu: wireMenu, menuButton: menuButton, menuApply: menuApply, TAB_IC: TAB_IC, icon: icon, soonMain: soonMain, pendBadge: pendBadge, footer: footer, IC: IC, esc: esc, fill: fill };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.FTSHELL = api;
   if (typeof window !== 'undefined' && root.FT_PAGE && root.document) init(root.FT_PAGE);
 })(typeof window !== 'undefined' ? window : this);
