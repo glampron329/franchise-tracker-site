@@ -65,6 +65,10 @@
     M.league = {}; table(V.v_team_league_compare).forEach(function (r) { M.league[r.season] = r; });
     M.hist = by(table(V.v_team_season_hist), function (r) { return r.game_type + '|' + r.scope + '|' + r.season; });
     Object.keys(M.hist).forEach(function (k) { M.hist[k].sort(function (a, b) { return a.ord - b.ord; }); });
+    // saisons d'une portée de la fiche Équipe (ères, migration 87) : celles de v_team_season_hist pour (type, portée) ; une ère sans saison n'a pas de ligne
+    M.scopeSeasons = {}; Object.keys(M.hist).forEach(function (k) { var p = k.split('|'), g = p[0] + '|' + p[1]; (M.scopeSeasons[g] = M.scopeSeasons[g] || {})[p[2]] = 1; });
+    // records d'équipe du tableau détaillé (v_team_season_peak, migration 87) : une ligne par (type, portée, statistique, saison du record)
+    M.teamPeak = {}; table(V.v_team_season_peak).forEach(function (r) { M.teamPeak[r.game_type + '|' + r.scope + '|' + r.stat + '|' + r.season] = 1; });
     // listes de choix : joueurs qui ont au moins une saison (patineurs, gardiens), par nom
     var name = function (a, b) { return String(a.name).localeCompare(String(b.name)); };
     M.skaters = Object.keys(M.P.v_skater_season).map(function (id) { return M.byId[id]; }).sort(name);
@@ -129,9 +133,11 @@
     });
   }
   function team(M, gt, scope) {
-    var list = (M.teamSeason[gt] || []).filter(inScope(scope));
+    var set = M.scopeSeasons[gt + '|' + scope];   // saisons de la portée lues dans la vue ; sans ligne : Toute l'histoire et Mode franchise par l'origine, une ère est vide
+    var list = (M.teamSeason[gt] || []).filter(set ? function (r) { return !!set[r.season]; } : scope === 'all' || scope === 'franchise' ? inScope(scope) : function () { return false; });
     return { seasons: list, career: M.teamCareer.filter(function (r) { return r.game_type === gt && r.scope === scope; })[0] || null };
   }
+  function teamPeak(M, gt, scope, stat, season) { return !!M.teamPeak[gt + '|' + scope + '|' + stat + '|' + season]; }
   function histOf(M, gt, scope, season) { return M.hist[gt + '|' + scope + '|' + season] || []; }
   // 25 dernières saisons au plus d'une mesure (graphique à bandes de la fiche Équipe), dans l'ordre des saisons
   function histSeries(M, gt, scope, measure, upto) {
@@ -163,8 +169,30 @@
   function best(list, f) { var b = null; list.forEach(function (r) { var v = f(r); if (v != null && (b == null || v > f(b))) b = r; }); return b; }
 
   var api = { table: table, index: index, rows: rows, one: one, defaultPlayer: defaultPlayer, skaterSeasons: skaterSeasons, goalieSeasons: goalieSeasons, skaterCareer: skaterCareer, goalieCareer: goalieCareer,
-    record: record, peaks: peaks, peakMin: peakMin, radarMinGp: radarMinGp, smallSampleMin: smallSampleMin, skaterRadars: skaterRadars, goalieRadar: goalieRadar, showcase: showcase, team: team, histOf: histOf, histSeries: histSeries, best: best, HON_ORDER: HON_ORDER, PLAYER_VIEWS: PLAYER_VIEWS };
+    record: record, peaks: peaks, peakMin: peakMin, radarMinGp: radarMinGp, smallSampleMin: smallSampleMin, skaterRadars: skaterRadars, goalieRadar: goalieRadar, showcase: showcase, team: team, teamPeak: teamPeak, histOf: histOf, histSeries: histSeries, best: best, HON_ORDER: HON_ORDER, PLAYER_VIEWS: PLAYER_VIEWS };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.FTCC = api;
+})(typeof window !== 'undefined' ? window : this);
+
+;/* Logo noir et or des équipes d'étoiles (décision du 2026-11-26), commun aux fiches (cards/cards_ui.js, vitrine des trophées)
+   et à la saisie Honneurs › Étoiles (season/screens_cfg.js, titre de chaque équipe ; révision 4e approuvée le 2026-11-27).
+   svg(t, year, level) : t(clé) = libellé (card.as_1 / card.as_2 dans le logo, card.as_league, card.as_awards ; texte alternatif card.hon_as1 / card.hon_as2 + année) ;
+   year = année de fin de saison (2049 pour 2048-49), facultative ; level = 1 ou 2. Mêmes couleurs pour toutes les équipes : aucune couleur d'équipe. */
+(function (root) {
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function svg(t, year, level) {
+    var full = t(level === 2 ? 'card.as_2' : 'card.as_1'), lines = full.split(' '), alt = t(level === 2 ? 'card.hon_as2' : 'card.hon_as1') + (year ? ' ' + year : '');
+    if (lines.length > 3) lines = [lines.slice(0, 2).join(' '), lines.slice(2).join(' ')];
+    var gold = '#D9B45A', gold2 = '#F3DC94', y0 = 112, fs = lines.some(function (l) { return l.length > 9; }) ? 13 : 16, gid = 'asg' + level + (year || 'x');
+    return '<svg class="fc-as" viewBox="0 0 120 170" role="img" aria-label="' + esc(alt) + '"><defs><linearGradient id="' + gid + '" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="' + gold2 + '"/><stop offset="1" stop-color="' + gold + '"/></linearGradient></defs>' +
+      '<rect width="120" height="170" rx="8" fill="#0A0A0A"/><g stroke="' + gold + '" stroke-opacity=".22" stroke-width=".7" fill="none"><path d="M0 0 60 60 120 0M0 170 60 110 120 170M0 60 60 0 120 60M0 110 60 170 120 110"/></g>' +
+      '<path d="M60 8 102 50 60 92 18 50z" fill="#0A0A0A" stroke="url(#' + gid + ')" stroke-width="2.4"/><path d="M60 16 94 50 60 84 26 50z" fill="none" stroke="' + gold + '" stroke-opacity=".45" stroke-width=".8"/>' +
+      '<path d="M60 26 70 30v8c0 5-4 8.5-10 11-6-2.5-10-6-10-11v-8z" fill="none" stroke="#fff" stroke-width="1.4"/><text x="60" y="41" text-anchor="middle" font-size="6.4" font-weight="800" fill="#fff" font-family="system-ui,sans-serif">' + esc(t('card.as_league')) + '</text>' +
+      '<text x="60" y="61" text-anchor="middle" font-size="8.5" font-weight="800" fill="#fff" font-family="system-ui,sans-serif">' + esc(t('card.as_awards')) + '</text>' +
+      (year ? '<text x="60" y="74" text-anchor="middle" font-size="10" font-weight="700" fill="' + gold2 + '" font-family="system-ui,sans-serif">' + esc(year) + '</text>' : '') +
+      lines.map(function (l, i) { return '<text x="60" y="' + (y0 + i * (fs + 2)) + '" text-anchor="middle" font-size="' + fs + '" font-weight="900" fill="url(#' + gid + ')" font-family="system-ui,sans-serif">' + esc(l) + '</text>'; }).join('') + '</svg>';
+  }
+  var api = { svg: svg };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.FTALLSTAR = api;
 })(typeof window !== 'undefined' ? window : this);
 
 ;/* Fiches (cards.html, phase 4e ; maquette docs/maquettes/4e_fiches.*, approuvée les 2026-11-24 et 2026-11-26).
@@ -187,6 +215,8 @@
   function contrast(a, b) { var x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); }
   function mixHex(a, b, p) { var x = parseInt(a.slice(1), 16), y = parseInt(b.slice(1), 16); return '#' + [16, 8, 0].map(function (s) { var v = Math.round(p * (x >> s & 255) + (1 - p) * (y >> s & 255)); return (v < 16 ? '0' : '') + v.toString(16); }).join('').toUpperCase(); }
   var IC = {
+    help: '<svg class="help-ic" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8.4" fill="none" stroke="currentColor" stroke-width="1.6"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M7.6 7.7a2.5 2.5 0 1 1 3.4 2.3c-.7.3-1 .8-1 1.5v.6"/><circle cx="10" cy="14.4" r="1.1" fill="currentColor"/></svg>',
+    chev: '<svg class="help-chev" viewBox="0 0 10 10" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" d="M1.5 3.5 5 7l3.5-3.5"/></svg>',
     up: '<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M5 1.5 9 8H1z" fill="currentColor"/></svg>',
     down: '<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M5 8.5 1 2h8z" fill="currentColor"/></svg>',
     ok: '<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.2" d="m3 8.5 3.2 3L13 4.5"/></svg>',
@@ -197,7 +227,7 @@
     empty: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 13.5h12M3.5 11V9M7 11V6.5M10.5 11V8M14 11V4.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-dasharray="2 2"/></svg>',
     radar: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8 14 6.2 11.7 13.4H4.3L2 6.2z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="2.2 1.8"/></svg>'
   };
-  var SECS = ['overview', 'contract', 'honors', 'stats'];
+  var SECS = ['overview', 'contract', 'draft', 'honors', 'stats'];   // Repêchage : section à part après Contrat (décision du 2026-11-27)
   var DET_KEY = 'ft_card_team_details_v1';
 
   function makeApp(DATA, store) {
@@ -206,6 +236,24 @@
     var detailsSaved = null; try { detailsSaved = store && store.get ? store.get(DET_KEY) : null; } catch (e) { detailsSaved = null; }
     var state = { lang: 'fr', view: 'player', gt: 'RS', scope: 'all', pid: CC.defaultPlayer(M, 'S'), cmp: null, gid: CC.defaultPlayer(M, 'G'), gcmp: null, mode: 'abs', season: null, details: detailsSaved !== '0' };
     var CH = [];
+    // choix des fiches gardés d'une visite à l'autre (décision du 2026-11-27) : type de match, portée de la fiche Équipe, mode du tableau,
+    // patineur, gardien et comparaisons ; jamais la saison affichée (une nouvelle saison saisie s'affiche sans action). Une clé par franchise
+    // (identifiants de joueurs propres à la franchise) ; une valeur inconnue ou un joueur absent est ignoré.
+    var CHO_KEY = 'ft_cards_v1_f' + ((DATA.franchise || {}).id || 0), CHO = ['gt', 'scope', 'mode', 'pid', 'cmp', 'gid', 'gcmp'];
+    // portées de la fiche Équipe (migration 87, v_season_scope ; décision du 2026-11-27) : [valeur, libellé] dans l'ordre du menu
+    var TEAM_SCOPES = [['all', 'rec.scope_all'], ['founding', 'card.era.founding'], ['original6', 'card.era.original6'], ['expansion', 'card.era.expansion'], ['deadpuck', 'card.era.deadpuck'], ['modern', 'card.era.modern'], ['franchise', 'rec.scope_franchise']];
+    var SCOPES = TEAM_SCOPES.map(function (x) { return x[0]; });
+    (function () {
+      var o = null; try { o = JSON.parse(store && store.get ? store.get(CHO_KEY) || 'null' : 'null'); } catch (e) { o = null; }
+      if (!o || typeof o !== 'object') return;
+      if (o.gt === 'RS' || o.gt === 'PO') state.gt = o.gt;
+      if (SCOPES.indexOf(o.scope) >= 0) state.scope = o.scope;
+      if (['abs', 'gp', '60'].indexOf(o.mode) >= 0) state.mode = o.mode;
+      ['pid', 'gid'].forEach(function (k) { if (o[k] != null && M.byId[o[k]]) state[k] = o[k]; });
+      ['cmp', 'gcmp'].forEach(function (k) { if (o[k] === null || M.byId[o[k]]) state[k] = o[k]; });
+    })();
+    function saveChoices() { var o = {}; CHO.forEach(function (k) { o[k] = state[k]; }); try { if (store && store.set) store.set(CHO_KEY, JSON.stringify(o)); } catch (e) { /* stockage bloqué : les choix valent pour la visite */ } }
+    var PS = 'all';   // fiches Patineur et Gardien : portée fixe « Toute l'histoire » (filtre retiré, décision du 2026-11-27) ; state.scope ne sert qu'à la fiche Équipe
 
     // ---------- libellés et mise en forme (aucun calcul de statistique) ----------
     function raw(k) { var e = (DATA.labels || {})[k]; if (!e) return null; return e[state.lang] || e.fr || e.en || null; }
@@ -245,7 +293,7 @@
     // ---------- barre de fiche ----------
     function seg(ctl, label, opts, cur) { return '<div class="fc-fld"><span id="lb-' + ctl + '">' + esc(label) + '</span><div class="seg page" role="group" aria-labelledby="lb-' + ctl + '">' + opts.map(function (o) { return '<button type="button" data-ctl="' + ctl + '" data-v="' + o[0] + '" aria-pressed="' + (o[0] === cur) + '">' + esc(o[1]) + '</button>'; }).join('') + '</div></div>'; }
     function sel(ctl, label, opts, cur, cls) { return '<label class="fc-fld"><span>' + esc(label) + '</span><select class="fc-sel' + (cls ? ' ' + cls : '') + '" data-ctl="' + ctl + '">' + opts.map(function (o) { return '<option value="' + o[0] + '"' + (String(o[0]) === String(cur) ? ' selected' : '') + '>' + esc(o[1]) + '</option>'; }).join('') + '</select></label>'; }
-    function commonSegs() { return seg('gt', t('card.game_type'), [['RS', t('ui.regular_season')], ['PO', t('ui.playoffs', true)]], state.gt) + seg('scope', t('card.scope'), [['all', t('rec.scope_all')], ['franchise', t('rec.scope_franchise')]], state.scope); }
+    function commonSegs() { return seg('gt', t('card.game_type'), [['RS', t('ui.regular_season')], ['PO', t('ui.playoffs', true)]], state.gt); }   // portée : menu des ères de la fiche Équipe seulement (décision du 2026-11-27)
     function secNav(list) { return '<nav class="fc-secnav" aria-label="' + esc(t('card.sections')) + '"><ul>' + list.map(function (s, i) { return '<li><button type="button" data-sec="' + s + '"' + (i === 0 ? ' aria-current="true"' : '') + '>' + esc(t('card.sec.' + s)) + '</button></li>'; }).join('') + '</ul></nav>'; }
     function whoKey(p, c) { return '<span class="fc-who" aria-hidden="true"><i></i>' + esc(p) + (c ? ' <i class="s2"></i>' + esc(c) : '') + '</span>'; }
     function pickOpts(list) { return list.map(function (p) { return [p.id, p.name]; }); }
@@ -315,13 +363,21 @@
         '<div class="rw tot" role="row"><div role="cell"><b>' + esc(t('card.dr_total')) + '</b></div><div role="cell"></div><div role="cell">' + note(dr.rating_total, dr.benchmark_total, mxT) + '</div></div></div>' +
         legend([['c1', t('card.dr_lg_got')], ['dexp', t('card.dr_lg_exp')], ['dref', t('card.dr_lg_ref')]]);
     }
-    function draftBlock(pid, isG) {
-      var dr = CC.one(M, 'v_player_draft_result', pid), cls = isG ? 's8' : 's12';
-      if (!dr || dr.draft_status === 'unknown') return '';   // repêchage inconnu (joueur d'avant la franchise) : pas de carte
+    // « Comment lire » : composant d'aide commun (connect/ft_help.js), fermé par défaut, état ft_help_card_draft (maquette 4e_revision, approuvée le 2026-11-27)
+    function howTo() {
+      var H = root.FTHELP, open = H ? H.state('card_draft', { open: false }).open : false, keys = ['band', 'rate', 'stats', 'role', 'final', 'rating', 'bar', 'good'];
+      var txt = function (k) { return H ? H.text(t('card.dr_how_' + k), esc, true) : esc(t('card.dr_how_' + k)); };
+      return '<div class="help" data-help="card_draft"><div class="help-bar"><button type="button" class="help-tg" data-help-tg="open" aria-expanded="' + open + '" aria-controls="help-card_draft">' + IC.help + '<span class="help-tl">' + esc(t('card.dr_how')) + '</span>' + IC.chev + '</button></div>' +
+        '<section class="help-body" id="help-card_draft" aria-label="' + esc(t('card.dr_how')) + '"' + (open ? '' : ' hidden') + '><ul>' + keys.map(function (k) { return '<li>' + txt(k) + '</li>'; }).join('') + '</ul></section></div>';
+    }
+    function hasDraft(pid) { var dr = CC.one(M, 'v_player_draft_result', pid); return !!(dr && dr.draft_status !== 'unknown'); }   // repêchage inconnu (joueur d'avant la franchise) : pas de section
+    function draftBlock(pid) {
+      var dr = CC.one(M, 'v_player_draft_result', pid), cls = 's12 fc-draft';
+      if (!dr || dr.draft_status === 'unknown') return '';
       if (dr.draft_status !== 'drafted') return '<section class="card ' + cls + '">' + cardHead(t('card.dr_title_un'), t('card.dr_none')) + '</section>';
       var band = dr.pick_from == null ? t('card.undrafted') : dr.pick_to == null ? t('card.dr_band_open', [dr.pick_from]) : t('card.dr_band', [dr.pick_from, dr.pick_to]);
       var rowsT = [['regular', 'card.dr_regular'], ['impact', 'card.dr_impact'], ['star', 'card.dr_star']];
-      return '<section class="card ' + cls + '" data-card="draft">' + cardHead(t('ui.draft')) + draftLine(dr) + draftResults(dr) + '<p class="fc-note">' + esc(t('card.dr_rates', [band])) + ' · ' + esc(t('card.dr_sub')) + '</p>' +
+      return '<section class="card ' + cls + '" data-card="draft">' + howTo() + draftLine(dr) + draftResults(dr) + '<p class="fc-note">' + esc(t('card.dr_rates', [band])) + ' · ' + esc(t('card.dr_sub')) + '</p>' +
         '<details class="fc-drtbl"><summary>' + esc(t('card.dr_show_table')) + '</summary><div class="ft-scroll" style="max-height:none"><table class="ft-stats"><thead><tr><th>' + esc(t('ui.level')) + '</th>' +
         ['card.dr_rate', 'card.dr_stats', 'card.dr_role', 'card.dr_final', 'card.dr_rating', 'card.dr_bench'].map(function (k, i) { return '<th class="' + (i >= 3 ? 'ro' : '') + '">' + ab(k) + '</th>'; }).join('') + '</tr></thead><tbody>' +
         rowsT.map(function (r) { return '<tr><td>' + esc(t(r[1])) + '</td><td>' + pf(dr['rate_' + r[0]], 1) + '</td><td>' + check(dr['stats_' + r[0]]) + '</td><td>' + check(dr['role_' + r[0]]) + '</td><td class="ro">' + check(dr['final_' + r[0]]) + '</td><td class="ro">' + nf(dr['rating_' + r[0]], 2) + '</td><td class="ro">' + nf(dr['benchmark_' + r[0]], 2) + '</td></tr>'; }).join('') +
@@ -375,22 +431,11 @@
           series: [{ name: t('card.streak_axis'), type: 'bar', key: 'c1b', data: st.map(function (r) { return r.cumul_streak; }), hl: [bsi] }] };
         h += '<section class="card s8">' + cardHead(title4, t('card.streak_sub')) + chartBox(spec4, 'short') + legend([['c1b', t('card.streak_axis')], ['mark', t('card.streak_best')]]) + '</section>';
       }
-      return h + draftBlock(pid, isG);
+      return h;
     }
 
     // ---------- vitrine des trophées ----------
-    function allStarSVG(year, level) {
-      var full = t(level === 2 ? 'card.as_2' : 'card.as_1'), lines = full.split(' ');
-      if (lines.length > 3) lines = [lines.slice(0, 2).join(' '), lines.slice(2).join(' ')];
-      var gold = '#D9B45A', gold2 = '#F3DC94', y0 = 112, fs = lines.some(function (l) { return l.length > 9; }) ? 13 : 16, gid = 'asg' + level + (year || 'x');   // noir et or pour toutes les équipes (décision du 2026-11-26)
-      return '<svg class="fc-as" viewBox="0 0 120 170" role="img" aria-label="' + esc(full + (year ? ' ' + year : '')) + '"><defs><linearGradient id="' + gid + '" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="' + gold2 + '"/><stop offset="1" stop-color="' + gold + '"/></linearGradient></defs>' +
-        '<rect width="120" height="170" rx="8" fill="#0A0A0A"/><g stroke="' + gold + '" stroke-opacity=".22" stroke-width=".7" fill="none"><path d="M0 0 60 60 120 0M0 170 60 110 120 170M0 60 60 0 120 60M0 110 60 170 120 110"/></g>' +
-        '<path d="M60 8 102 50 60 92 18 50z" fill="#0A0A0A" stroke="url(#' + gid + ')" stroke-width="2.4"/><path d="M60 16 94 50 60 84 26 50z" fill="none" stroke="' + gold + '" stroke-opacity=".45" stroke-width=".8"/>' +
-        '<path d="M60 26 70 30v8c0 5-4 8.5-10 11-6-2.5-10-6-10-11v-8z" fill="none" stroke="#fff" stroke-width="1.4"/><text x="60" y="41" text-anchor="middle" font-size="6.4" font-weight="800" fill="#fff" font-family="system-ui,sans-serif">' + esc(t('card.as_league')) + '</text>' +
-        '<text x="60" y="61" text-anchor="middle" font-size="8.5" font-weight="800" fill="#fff" font-family="system-ui,sans-serif">' + esc(t('card.as_awards')) + '</text>' +
-        (year ? '<text x="60" y="74" text-anchor="middle" font-size="10" font-weight="700" fill="' + gold2 + '" font-family="system-ui,sans-serif">' + esc(year) + '</text>' : '') +
-        lines.map(function (l, i) { return '<text x="60" y="' + (y0 + i * (fs + 2)) + '" text-anchor="middle" font-size="' + fs + '" font-weight="900" fill="url(#' + gid + ')" font-family="system-ui,sans-serif">' + esc(l) + '</text>'; }).join('') + '</svg>';
-    }
+    function allStarSVG(year, level) { return (root.FTALLSTAR || require('../connect/ft_allstar.js')).svg(t, year, level); }   // logo noir et or : module commun avec Honneurs › Étoiles (connect/ft_allstar.js)
     // année inconnue : la phrase sur les Coupes ne vaut que pour la Coupe Stanley (clé proposée card.hon_year_unknown_cup ; card.hon_year_unknown à réduire à la 1re phrase)
     function yearUnknown(code) { return code === 'stanley_cup' && raw('card.hon_year_unknown_cup') ? t('card.hon_year_unknown_cup') : t('card.hon_year_unknown'); }
     function trophyName(c) { return c === 'stanley_cup' ? t('card.hon_cup') : c === 'all_star_1' ? t('card.hon_as1') : c === 'all_star_2' ? t('card.hon_as2') : c === 'hall_of_fame' ? t('card.hon_hof') : t('award.' + c); }
@@ -449,20 +494,21 @@
         c('pim', 'stat.pim', { gs: 1 }), c('g', 'stat.g'), c('a', 'stat.a', { pk: 'a' }), c('pts', 'stat.pts', { ro: 1 }),
         { k: 'oa', l: 'col.rating', gs: 1, pk: 'rating', pm: 'abs', v: function (r) { return r.oa; }, f: I }, { k: 'role', l: 'card.col_role', tl: 1, v: function (r) { return r.role; }, f: roleTxt }, { k: 'capt', l: 'card.col_capt', tl: 1, v: function (r) { return r.capt; }, f: captTxt }];
     }
-    function detKey(extra) { return '<p class="fc-key"><span><span class="best">123</span> ' + esc(t('card.det_key_best')) + '</span><span><span class="ro">' + esc(t('card.det_key_ro')) + '</span></span><span>' + esc(t('ui.dash_hint')) + '</span>' + (extra ? '<span>' + esc(extra) + '</span>' : '') + '</p>'; }
+    function detKey(extra, bestKey) { return '<p class="fc-key"><span><span class="best">123</span> ' + esc(t(bestKey || 'card.det_key_best')) + '</span><span><span class="ro">' + esc(t('card.det_key_ro')) + '</span></span><span>' + esc(t('ui.dash_hint')) + '</span>' + (extra ? '<span>' + esc(extra) + '</span>' : '') + '</p>'; }
     function sections(pid, kind, hasRows, overview) {
-      var list = CC.showcase(M, pid, state.scope), h = '';
+      var list = CC.showcase(M, pid, PS), h = '';
       h += '<h2 class="fc-h" id="sec-contract" tabindex="-1">' + esc(t('card.sec.contract')) + (state.gt === 'PO' ? ' <small>' + esc(t('card.rs_only')) + '</small>' : '') + '</h2><div class="fc-grid">' + contractBlock(pid, kind) + '</div>';
+      var dft = hasDraft(pid); if (dft) h += '<h2 class="fc-h" id="sec-draft" tabindex="-1">' + esc(t('card.sec.draft')) + '</h2><div class="fc-grid">' + draftBlock(pid) + '</div>';
       if (list.length) h += '<h2 class="fc-h" id="sec-honors" tabindex="-1">' + esc(t('card.sec.honors')) + '</h2>' + honors(list);
-      return { html: h, nav: SECS.filter(function (x) { return (x !== 'honors' || list.length) && (x !== 'stats' || hasRows); }) };
+      return { html: h, nav: SECS.filter(function (x) { return (x !== 'honors' || list.length) && (x !== 'stats' || hasRows) && (x !== 'draft' || dft); }) };
     }
 
     // ---------- profil par poste (maquettes carriere_par_poste.html et radar_par_poste.html) : joueur qui a joué aux deux postes ----------
     // en-tête du poste, chiffres de carrière à ce poste (v_skater_career, position_group F / D), bande des saisons (v_skater_season par saison
     // et position_group : hauteur = MJ de la saison, en couleur les saisons à ce poste), mention « petit échantillon » si un minimum est donné
     function groupPanel(p, g) {
-      var c = CC.one(M, 'v_skater_career', p.id, function (r) { return r.game_type === state.gt && r.scope === state.scope && r.position_group === g; });
-      var all = CC.rows(M, 'v_skater_season', p.id).filter(function (r) { return r.game_type === state.gt && (state.scope === 'all' || r.origin === 'franchise'); });
+      var c = CC.one(M, 'v_skater_career', p.id, function (r) { return r.game_type === state.gt && r.scope === PS && r.position_group === g; });
+      var all = CC.rows(M, 'v_skater_season', p.id).filter(function (r) { return r.game_type === state.gt && (PS === 'all' || r.origin === 'franchise'); });
       var mx = Math.max.apply(null, all.map(function (r) { return r.gp || 0; }).concat([1])), min = c ? c.profile_min_gp : null, small = !!(c && c.small_sample === 1);   // seuil et verdict lus dans v_skater_career (record_threshold profile_gp)
       var name = t('pos.' + g), meta = c ? t('ui.season_range', [sl(c.first_season), sl(c.last_season)]) + ', ' + t(c.seasons_played === 1 ? 'ui.n_season_one' : 'ui.n_seasons', [c.seasons_played]) : '';
       var strip = '<div class="gstrip" role="img" aria-label="' + esc(t('ui.seasons') + ' (' + name + ') : ' + all.filter(function (r) { return r.position_group === g; }).map(function (r) { return sl(r.season); }).join(', ')) + '">' +
@@ -477,33 +523,31 @@
     // ---------- fiche Joueur ----------
     function playerView() {
       if (!M.skaters.length) return emptyView('sk');
-      var p = M.byId[state.pid] || M.skaters[0], c = state.cmp && state.cmp !== p.id ? M.byId[state.cmp] : null, rows = CC.skaterSeasons(M, p.id, state.gt, state.scope), cr = CC.skaterCareer(M, p.id, state.gt, state.scope);
+      var p = M.byId[state.pid] || M.skaters[0], c = state.cmp && state.cmp !== p.id ? M.byId[state.cmp] : null, rows = CC.skaterSeasons(M, p.id, state.gt, PS), cr = CC.skaterCareer(M, p.id, state.gt, PS);
       var line = cr ? careerLine(careerLead(cr), [['stat.gp', nf(cr.gp)], ['stat.g', nf(cr.g)], ['stat.a', nf(cr.a)], ['stat.pts', nf(cr.pts)], ['stat.plus_minus', sg(cr.plus_minus)], ['stat.pim', nf(cr.pim)]]) : '';
       var h = '<h2 class="fc-h" id="sec-overview" tabindex="-1">' + esc(t('card.sec.overview')) + '</h2>' + identity(p, 'S', line);
-      var allRows = CC.skaterSeasons(M, p.id, state.gt, 'all');
-      if (!rows.length && allRows.length) h += '<div class="ft-empty" role="status">' + IC.empty + '<p class="lead">' + esc(t('card.noscope_lead', [p.name])) + '</p><p>' + esc(t('card.noscope_body')) + '</p><button type="button" class="btn" data-ctl="scope" data-v="all">' + esc(t('card.noscope_go')) + '</button></div>';
-      else if (!rows.length) h += '<div class="ft-empty" role="status">' + IC.empty + '<p class="lead">' + esc(t('card.nogp_lead', [p.name])) + '</p><p>' + esc(t('card.nogp_body')) + '</p><button type="button" class="btn" data-act="focus-pick">' + esc(t('card.nogp_pick')) + '</button></div>';
+      if (!rows.length) h += '<div class="ft-empty" role="status">' + IC.empty + '<p class="lead">' + esc(t('card.nogp_lead', [p.name])) + '</p><p>' + esc(t('card.nogp_body')) + '</p><button type="button" class="btn" data-act="focus-pick">' + esc(t('card.nogp_pick')) + '</button></div>';
       else {
-        var last = p.last || p.name, pk = CC.peaks(M, p.id, 'S', state.gt, state.scope).row('abs', 'pts'), n100 = cr ? cr.seasons_100p : 0;   // sommet (v_player_season_peak), saisons de 100 points (v_skater_career)
-        var cmpBy = {}; if (c) CC.skaterSeasons(M, c.id, state.gt, state.scope).forEach(function (r) { cmpBy[r.season] = r.pts; });   // une ligne par saison (clé unique de skater_season_stats)
+        var last = p.last || p.name, pk = CC.peaks(M, p.id, 'S', state.gt, PS).row('abs', 'pts'), n100 = cr ? cr.seasons_100p : 0;   // sommet (v_player_season_peak), saisons de 100 points (v_skater_career)
+        var cmpBy = {}; if (c) CC.skaterSeasons(M, c.id, state.gt, PS).forEach(function (r) { cmpBy[r.season] = r.pts; });   // une ligne par saison (clé unique de skater_season_stats)
         var gaT = !pk ? t('card.axis_cumul') : n100 ? t('card.ga_title', [last, n100, nf(pk.peak_value), sl(pk.season)]) : t('card.ga_title_peak', [last, nf(pk.peak_value), sl(pk.season)]);
         var spec1 = { id: 'ga', kind: 'xy', title: gaT, cats: rows.map(function (r) { return sls(r.season); }), tip: rows.map(function (r) { return sl(r.season) + ' (' + nf(r.gp) + ' ' + t('stat.gp', true) + ')'; }), y: [{ name: t('stat.pts'), fmt: I }],
           series: [{ name: t('stat.g'), type: 'bar', stack: 'p', key: 'c1', data: rows.map(function (r) { return r.g; }) }, { name: t('stat.a'), type: 'bar', stack: 'p', key: 'c1b', data: rows.map(function (r) { return r.a; }) }]
             .concat(c ? [{ name: t('card.cmp_pts', [c.name]), type: 'line', key: 'ink2', data: rows.map(function (r) { return cmpBy[r.season] == null ? null : cmpBy[r.season]; }) }] : []) };
-        var cum = function (k) { return rows.map(function (r) { return r.rates ? r.rates[state.scope === 'all' ? k + '_cumul' : k + '_cumul_franchise'] : null; }); };
+        var cum = function (k) { return rows.map(function (r) { return r.rates ? r.rates[PS === 'all' ? k + '_cumul' : k + '_cumul_franchise'] : null; }); };
         var cumT = cr ? t('card.cum_title', [nf(cr.pts), nf(cr.g), nf(cr.a)]) : t('card.axis_cumul');
         var spec2 = { id: 'cum', kind: 'xy', title: cumT, cats: spec1.cats, tip: spec1.tip, y: [{ name: t('card.axis_cumul'), fmt: I }],
           series: [{ name: t('stat.pts'), type: 'line', key: 'ink1', data: cum('pts') }, { name: t('stat.g'), type: 'line', key: 'ref', data: cum('g') }, { name: t('stat.a'), type: 'line', key: 'ref2', data: cum('a') }] };
         h += '<div class="fc-grid"><section class="card s6">' + cardHead(gaT) + chartBox(spec1) + legend([['c1', t('stat.g')], ['c1b', t('stat.a')]].concat(c ? [['line2', t('card.cmp_pts', [c.name])]] : [])) + '</section>' +
           '<section class="card s6">' + cardHead(cumT) + chartBox(spec2) + legend([['line1', t('stat.pts')], ['ref', t('stat.g')], ['ref2', t('stat.a')]]) + '</section>';
-        var R = CC.record(M, 'S', p.id, state.gt, state.scope), CR = c ? CC.record(M, 'S', c.id, state.gt, state.scope) : null;
+        var R = CC.record(M, 'S', p.id, state.gt, PS), CR = c ? CC.record(M, 'S', c.id, state.gt, PS) : null;
         if (R) {
           var defs = [['gp', 'stat.gp', I], ['g', 'stat.g', I], ['a', 'stat.a', I], ['pts', 'stat.pts', I]];
           var t1 = R.pts_holder === R.player_id ? t('card.rec_career_title_own', [nf(R.pts)]) : t('card.rec_career_title', [pf(R.pts_pct, 0), nm(R.pts_holder), nf(R.pts_record)]);
           var t2 = R.best_pts_holder === R.player_id ? t('card.rec_best_title_own', [nf(R.best_pts)]) : t('card.rec_best_title', [nf(R.best_pts), nf(Math.abs(R.best_pts_gap)), nm(R.best_pts_holder), nf(R.best_pts_record)]);   // écart au record : best_pts_gap de la vue (valeur − record), affiché sans signe
           h += '<section class="card s6" data-card="rec-career">' + cardHead(t1, t('card.rec_career_sub')) + recRows(R, defs, CR, false) + '</section><section class="card s6" data-card="rec-best">' + cardHead(t2, t('card.rec_best_sub')) + recRows(R, defs, CR, true) + '</section>';
         }
-        var rads = CC.skaterRadars(M, p.id, state.gt, state.scope), crad = c ? CC.skaterRadars(M, c.id, state.gt, state.scope) : [];
+        var rads = CC.skaterRadars(M, p.id, state.gt, PS), crad = c ? CC.skaterRadars(M, c.id, state.gt, PS) : [];
         var multi = rads.length > 1;   // joueur qui a joué aux deux postes : un profil par poste (décision du 2026-11-14, gardée le 2026-11-26)
         rads.forEach(function (rd) {
           var sfx = multi ? '-' + rd.grp : '';
@@ -514,7 +558,7 @@
           var axR = [['ev_ppg', 'card.ax.ev_ppg'], ['pp_share', 'card.ax.pp_share'], ['shp_per_gp', 'card.ax.shp'], ['vor', 'card.ax.vor'], ['xg', 'card.ax.xg'], ['a_per_60', 'card.ax.a60']];
           var mk = function (ax) { return ax.map(function (a) { var th = rd.thr[a[0]] || {}; return { short: t(a[1], true), long: plain(a[1]), tip: axTip(a[0], vf(a[0], rd.row[a[0]]), rd.row[a[0] + '_score'], th.n, t('card.grp_' + rd.grp)), vals: [vf(a[0], rd.row[a[0]])].concat(rc ? [vf(a[0], rc.row[a[0]])] : []) }; }); };
           var ser = function (ax, r, k, nmx) { return { name: nmx, key: k, data: ax.map(function (a) { return r.row[a[0] + '_score']; }) }; };
-          var sub = t('card.radar_sub', [t('card.grp_' + rd.grp), t(state.scope === 'all' ? 'rec.scope_all' : 'rec.scope_franchise')]);
+          var sub = t('card.radar_sub', [t('card.grp_' + rd.grp), t(PS === 'all' ? 'rec.scope_all' : 'rec.scope_franchise')]);
           var lg = [['c1', p.name]].concat(rc ? [['line2', c.name]] : []).concat([['ref', t('card.ring_p50')], ['ref2', t('card.ring_p90')]]);
           h += '<div class="s6">' + radarCard('rp' + sfx, radarTitle(t('card.radar_profile'), axP.map(function (a) { return rd.row[a[0] + '_score']; })), sub, mk(axP), ser(axP, rd, 'p1', p.name), rc ? ser(axP, rc, 'p2', c.name) : null, lg) + '</div>' +
             '<div class="s6">' + radarCard('rr' + sfx, radarTitle(t('card.radar_role'), axR.map(function (a) { return rd.row[a[0] + '_score']; })), sub, mk(axR), ser(axR, rd, 'p1', p.name), rc ? ser(axR, rc, 'p2', c.name) : null, lg) + '</div>' +
@@ -527,7 +571,7 @@
       h += sx.html;
       if (rows.length) h += '<h2 class="fc-h" id="sec-stats" tabindex="-1">' + esc(t('card.sec.stats')) + '</h2><section class="card" data-card="stats"><div class="fc-tblbar"><h3 style="margin:0">' + esc(t('card.det_title')) + '</h3>' +
         seg('mode', t('card.mode'), [['abs', t('card.mode_abs')], ['gp', t('card.mode_gp')], ['60', t('card.mode_60')]], state.mode) + '</div>' + detKey(state.mode !== 'abs' ? t('card.det_rate_note') : null) +
-        detTable(rows, skCols(), state.mode === 'abs' ? cr : CC.one(M, 'v_skater_career_rates', p.id, function (r) { return r.game_type === state.gt && r.scope === state.scope && r.position_group === 'all'; }), CC.peaks(M, p.id, 'S', state.gt, state.scope)) + '</section>';
+        detTable(rows, skCols(), state.mode === 'abs' ? cr : CC.one(M, 'v_skater_career_rates', p.id, function (r) { return r.game_type === state.gt && r.scope === PS && r.position_group === 'all'; }), CC.peaks(M, p.id, 'S', state.gt, PS)) + '</section>';
       var tools = '<div class="fc-tools"><div class="fc-row">' + sel('pid', t('nav.t.cards.player'), pickOpts(M.skaters), p.id) + sel('cmp', t('ui.compare_with'), [['', t('card.compare_none')]].concat(pickOpts(M.skaters.filter(function (x) { return x.id !== p.id; }))), c ? c.id : '') +
         commonSegs() + whoKey(p.name, c && c.name) + '</div>' + secNav(['overview'].concat(sx.nav.slice(1))) + '</div>';
       return tools + h;
@@ -536,14 +580,12 @@
     // ---------- fiche Gardien ----------
     function goalieView() {
       if (!M.goalies.length) return emptyView('g');
-      var p = M.byId[state.gid] || M.goalies[0], c = state.gcmp && state.gcmp !== p.id ? M.byId[state.gcmp] : null, rows = CC.goalieSeasons(M, p.id, state.gt, state.scope), cr = CC.goalieCareer(M, p.id, state.gt, state.scope);
+      var p = M.byId[state.gid] || M.goalies[0], c = state.gcmp && state.gcmp !== p.id ? M.byId[state.gcmp] : null, rows = CC.goalieSeasons(M, p.id, state.gt, PS), cr = CC.goalieCareer(M, p.id, state.gt, PS);
       var line = cr ? careerLine(careerLead(cr), [['stat.gp', nf(cr.gp)], ['stat.w', nf(cr.w)], ['stat.l', nf(cr.l)], ['stat.otl', nf(cr.otl)], ['stat.so', nf(cr.so)], ['stat.sv_pct', pf(cr.sv_pct, 1)], ['stat.gaa', nf(cr.gaa, 2)]]) : '';
       var h = '<h2 class="fc-h" id="sec-overview" tabindex="-1">' + esc(t('card.sec.overview')) + '</h2>' + identity(p, 'G', line);
-      var allRows = CC.goalieSeasons(M, p.id, state.gt, 'all');
-      if (!rows.length && allRows.length) h += '<div class="ft-empty" role="status">' + IC.empty + '<p class="lead">' + esc(t('card.noscope_lead', [p.name])) + '</p><p>' + esc(t('card.noscope_body')) + '</p><button type="button" class="btn" data-ctl="scope" data-v="all">' + esc(t('card.noscope_go')) + '</button></div>';
-      else if (!rows.length) h += '<div class="ft-empty" role="status">' + IC.empty + '<p class="lead">' + esc(t('card.nogp_lead', [p.name])) + '</p><p>' + esc(t('card.nogp_body')) + '</p><button type="button" class="btn" data-act="focus-pick">' + esc(t('card.nogp_pick')) + '</button></div>';
+      if (!rows.length) h += '<div class="ft-empty" role="status">' + IC.empty + '<p class="lead">' + esc(t('card.nogp_lead', [p.name])) + '</p><p>' + esc(t('card.nogp_body')) + '</p><button type="button" class="btn" data-act="focus-pick">' + esc(t('card.nogp_pick')) + '</button></div>';
       else {
-        var PK = CC.peaks(M, p.id, 'G', state.gt, state.scope), last = p.last || p.name, pk = PK.row('abs', 'w'), mn = CC.peakMin(M, 'G', state.gt, 'sv_pct');   // minimum d'une saison : record_threshold (via v_player_season_peak)
+        var PK = CC.peaks(M, p.id, 'G', state.gt, PS), last = p.last || p.name, pk = PK.row('abs', 'w'), mn = CC.peakMin(M, 'G', state.gt, 'sv_pct');   // minimum d'une saison : record_threshold (via v_player_season_peak)
         var spec1 = { id: 'wl', kind: 'xy', title: pk ? t('card.wl_title', [last, nf(cr.w), nf(cr.gp), nf(pk.peak_value), sl(pk.season)]) : t('stat.w'), cats: rows.map(function (r) { return sls(r.season); }), tip: rows.map(function (r) { return sl(r.season) + ' (' + nf(r.gp) + ' ' + t('stat.gp', true) + ')'; }), y: [{ name: t('stat.gp'), fmt: I }],
           series: [{ name: t('stat.w'), type: 'bar', stack: 'd', key: 'c1', data: rows.map(function (r) { return r.w; }) }, { name: t('stat.l'), type: 'bar', stack: 'd', key: 'empty', data: rows.map(function (r) { return r.l; }) }, { name: t('stat.otl'), type: 'bar', stack: 'd', key: 'hatch', data: rows.map(function (r) { return r.otl; }) }] };
         var bsv = PK.row('abs', 'sv_pct'), shown = function (r) { return mn == null || r.gp >= mn; };   // saisons sous le minimum : hors de la courbe
@@ -552,7 +594,7 @@
           series: [{ name: t('stat.sv_pct'), type: 'line', key: 'ink1', data: rows.map(function (r) { return shown(r) ? r.sv_pct : null; }) }, { name: t('stat.gaa'), type: 'line', key: 'ink2', axis: 1, data: rows.map(function (r) { return shown(r) ? r.gaa : null; }) }] };
         h += '<div class="fc-grid"><section class="card s6">' + cardHead(spec1.title) + chartBox(spec1) + legend([['c1', t('stat.w')], ['empty', t('stat.l')], ['hatch', t('stat.otl')]]) + '</section>' +
           '<section class="card s6">' + cardHead(spec2.title, t('card.sv_sub', [mn])) + chartBox(spec2) + legend([['line1', t('stat.sv_pct')], ['line2', t('stat.gaa')]]) + '</section>';
-        var R = CC.record(M, 'G', p.id, state.gt, state.scope), CR = c ? CC.record(M, 'G', c.id, state.gt, state.scope) : null;
+        var R = CC.record(M, 'G', p.id, state.gt, PS), CR = c ? CC.record(M, 'G', c.id, state.gt, PS) : null;
         if (R) {
           var defs = [['gp', 'stat.gp', I], ['w', 'stat.w', I], ['so', 'stat.so', I], ['sv_pct', 'stat.sv_pct', function (v) { return pf(v, 1); }], ['gaa', 'stat.gaa', D2, 1], ['pts_pct', 'stat.pts_pct', function (v) { return pf(v, 1); }]];
           var t1 = R.w_holder === R.player_id ? t('card.rec_g_career_title_own', [nf(R.w)]) : t('card.rec_g_career_title', [nf(Math.abs(R.w_gap)), nm(R.w_holder), nf(R.w_record)]);
@@ -560,8 +602,8 @@
           h += '<section class="card s6" data-card="rec-career">' + cardHead(t1, t('card.rec_career_sub')) + recRows(R, defs, CR, false) + '</section><section class="card s6" data-card="rec-best">' + cardHead(t2, t('card.rec_best_sub')) + recRows(R, defs, CR, true) +
             '<p class="fc-note">' + esc(t('card.rec_g_min', [nf(CC.radarMinGp(M, 'RS')), nf(CC.peakMin(M, 'G', 'RS', 'sv_pct')), nf(CC.radarMinGp(M, 'PO')), nf(CC.peakMin(M, 'G', 'PO', 'sv_pct'))])) + '</p></section>';
         }
-        var g = CC.goalieRadar(M, p.id, state.gt, state.scope), gc = c ? CC.goalieRadar(M, c.id, state.gt, state.scope) : null;
-        var sub = t('card.radar_g_sub', [t(state.scope === 'all' ? 'rec.scope_all' : 'rec.scope_franchise')]);
+        var g = CC.goalieRadar(M, p.id, state.gt, PS), gc = c ? CC.goalieRadar(M, c.id, state.gt, PS) : null;
+        var sub = t('card.radar_g_sub', [t(PS === 'all' ? 'rec.scope_all' : 'rec.scope_franchise')]);
         if (!g.val || !g.score) {
           var below = '<div class="fc-below">' + IC.radar + '<p style="margin:0"><b>' + esc(t('card.radar_below', [g.minGp, t(state.gt === 'PO' ? 'ui.playoffs' : 'ui.regular_season').toLowerCase(), p.name, nf(cr.gp)])) + '</b></p><p class="muted" style="margin:0">' + esc(t('card.radar_below_hint')) + '</p></div>';
           h += '<section class="card s6" data-card="radar-below">' + cardHead(t('card.radar_perf'), sub) + below + '</section><section class="card s6">' + cardHead(t('card.radar_role'), sub) + below + '</section>';
@@ -581,7 +623,7 @@
       var sx = sections(p.id, 'G', rows.length);
       h += sx.html;
       if (rows.length) h += '<h2 class="fc-h" id="sec-stats" tabindex="-1">' + esc(t('card.sec.stats')) + '</h2><section class="card" data-card="stats"><div class="fc-tblbar"><h3 style="margin:0">' + esc(t('card.det_title')) + '</h3></div>' +
-        detKey(t('card.col_gaa_min', [nf(CC.peakMin(M, 'G', state.gt, 'sv_pct'))])) + detTable(rows, gkCols(), cr, CC.peaks(M, p.id, 'G', state.gt, state.scope)) + '</section>';
+        detKey(t('card.col_gaa_min', [nf(CC.peakMin(M, 'G', state.gt, 'sv_pct'))])) + detTable(rows, gkCols(), cr, CC.peaks(M, p.id, 'G', state.gt, PS)) + '</section>';
       var tools = '<div class="fc-tools"><div class="fc-row">' + sel('gid', t('nav.t.cards.goalie'), pickOpts(M.goalies), p.id) + sel('gcmp', t('ui.compare_with'), [['', t('card.compare_none')]].concat(pickOpts(M.goalies.filter(function (x) { return x.id !== p.id; }))), c ? c.id : '') +
         commonSegs() + whoKey(p.name, c && c.name) + '</div>' + secNav(sx.nav) + '</div>';
       return tools + h;
@@ -608,12 +650,21 @@
         (avg != null ? '<line class="avg" x1="0" x2="' + W + '" y1="' + y(avg).toFixed(1) + '" y2="' + y(avg).toFixed(1) + '"/>' : '') + (rec != null ? '<line class="rec" x1="0" x2="' + W + '" y1="' + y(rec).toFixed(1) + '" y2="' + y(rec).toFixed(1) + '"/>' : '') + '</svg>';
     }
     function detailsSwitch() { return '<div class="fc-fld fc-sw-f"><span id="lb-details">' + esc(t('card.details')) + '</span><button type="button" class="fc-switch" role="switch" data-act="details" aria-checked="' + state.details + '" aria-labelledby="lb-details"><i></i></button></div>'; }
+    // saisons du record d'une mesure de l'historique du club : toutes les saisons à égalité (record_seasons, migration 88, décision du 2026-11-27) ; plus de 3 : les 3 premières et « +n »
+    function recSeasons(m) {
+      var l = m.record_seasons != null && String(m.record_seasons) !== '' ? String(m.record_seasons).split(',').map(Number) : [m.record_season];
+      return l.slice(0, 3).map(sl).join(', ') + (l.length > 3 ? ' +' + (l.length - 3) : '');
+    }
     function teamView() {
       var gt = state.gt, T = CC.team(M, gt, state.scope), rows = T.seasons; if (!(M.teamSeason.RS || []).length) return emptyView('tm');
-      var seasons = rows.map(function (r) { return r.season; }); if (!seasons.length) return emptyView('tm');
+      var seasons = rows.map(function (r) { return r.season; });
+      var scopeSel = sel('scope', t('card.scope'), TEAM_SCOPES.map(function (x) { return [x[0], t(x[1])]; }), state.scope, 'era'), isEra = state.scope !== 'all' && state.scope !== 'franchise';
+      var eraHint = isEra ? '<p class="fc-erahint">' + esc(t('card.era_hint')) + '</p>' : '';
+      if (!seasons.length) return '<div class="fc-team">' + '<div class="fc-tools"><div class="fc-row">' + commonSegs() + scopeSel + '</div></div>' + eraHint +   // ère sans saison : pas de menu de saison vide
+        '<div class="ft-empty" role="status" data-state="noera">' + IC.empty + '<p class="lead">' + esc(t('card.t_noera_lead')) + '</p><p>' + esc(t('card.t_noera_body')) + '</p><button type="button" class="btn" data-ctl="scope" data-v="all">' + esc(t('card.noscope_go')) + '</button></div></div>';
       if (seasons.indexOf(state.season) < 0) state.season = seasons[seasons.length - 1];
       var lc = M.league[state.season], rsRow = (M.teamSeason.RS || []).filter(function (x) { return x.season === state.season; })[0], poRow = (M.teamSeason.PO || []).filter(function (x) { return x.season === state.season; })[0], r = rows.filter(function (x) { return x.season === state.season; })[0];
-      var tools = '<div class="fc-tools"><div class="fc-row">' + sel('season', t('card.t_season'), seasons.slice().reverse().map(function (y) { return [y, sl(y)]; }), state.season, 'short') + commonSegs() + detailsSwitch() + '</div></div>';
+      var tools = '<div class="fc-tools"><div class="fc-row">' + sel('season', t('card.t_season'), seasons.slice().reverse().map(function (y) { return [y, sl(y)]; }), state.season, 'short') + commonSegs() + scopeSel + detailsSwitch() + '</div></div>' + eraHint;
       var res = poRow && poRow.result ? t('result.' + poRow.result).toLowerCase() : t('card.t_nopo');
       var h = '<p class="fc-hero">' + esc(gt === 'RS' ? (rsRow ? t('card.t_hero', [sl(state.season), rsRow.overall_rank == null ? '—' : ord(rsRow.overall_rank), nf(rsRow.points), res]) : sl(state.season)) : t('card.t_hero_po', [sl(state.season), nf(r.w), res])) + '</p>';
       var tile = function (tipk, title, v, body) { var tp = tipk && raw('card.tip.' + tipk) ? ' tabindex="0" data-tip="' + esc(t('card.tip.' + tipk)) + '"' : ''; return '<div class="fc-kpi"' + tp + '><h4>' + esc(title) + '</h4><div class="v">' + v + '</div>' + (body ? '<div class="fc-kd">' + body + '</div>' : '') + '</div>'; };
@@ -628,38 +679,42 @@
           cmpT('rank', t('ui.rank'), lc.overall_rank == null ? '—' : esc(ord(lc.overall_rank)), nf(lc.league_rank, 1), nf(lc.division_rank, 1), lc.rank_vs_league, lc.rank_vs_division, f1, true) + '</div></section>';
       }
       var hist = CC.histOf(M, gt, state.scope, state.season), n = hist.length ? hist[0].n : 0;
-      var sc = t(state.scope === 'all' ? 'rec.scope_all' : 'rec.scope_franchise').toLowerCase(), lastSeason = seasons[seasons.length - 1];
+      var sc = t(TEAM_SCOPES.filter(function (x) { return x[0] === state.scope; })[0][1], true).toLowerCase(), lastSeason = seasons[seasons.length - 1];
       h += '<section data-card="history">' + secHead('card.t_sec_stats', 'card.t_sec_stats_sub', t('card.t_band_hist_sub', [n, sc]).split('. ')[0].replace(/\.+$/, '') + '.') + '<h4 class="fc-band3">' + esc(t('card.t_rank_title')) + '</h4><div class="fc-kpis">';
       hist.forEach(function (m) {
         var d = MEAS[m.measure]; if (!d || (gt === 'PO' && d[3])) return;
         var body = '';
         if (m.value != null) {
           var upto = state.season > lastSeason - 25 ? null : state.season + 12, series = CC.histSeries(M, gt, state.scope, m.measure, upto);   // 25 dernières saisons au plus, la saison affichée comprise
-          body = '<dl class="fc-hist"><div><dt>' + esc(t('card.rank')) + '</dt><dd>' + (m.rank == null ? '—' : esc(t('card.hist_rank2', [ord(m.rank), m.n]))) + '</dd></div><div><dt>' + esc(t('card.hist_avg2')) + '</dt><dd>' + esc(d[1](m.hist_avg)) + '</dd></div><div><dt>' + esc(t('card.hist_rec')) + '</dt><dd>' + esc(m.record == null ? '—' : d[1](m.record)) + (m.record_season != null ? ' <small>' + esc(sl(m.record_season)) + '</small>' : '') + '</dd></div></dl>' + bands(series, state.season, m.hist_avg, m.record);
+          body = '<dl class="fc-hist"><div><dt>' + esc(t('card.rank')) + '</dt><dd>' + (m.rank == null ? '—' : esc(t('card.hist_rank2', [ord(m.rank), m.n]))) + '</dd></div><div><dt>' + esc(t('card.hist_avg2')) + '</dt><dd>' + esc(d[1](m.hist_avg)) + '</dd></div><div><dt>' + esc(t('card.hist_rec')) + '</dt><dd>' + esc(m.record == null ? '—' : d[1](m.record)) + (m.record_season != null ? ' <small>' + esc(recSeasons(m)) + '</small>' : '') + '</dd></div></dl>' + bands(series, state.season, m.hist_avg, m.record);
         }
         h += tile(d[2], plain(d[0]), m.value == null ? '—' : esc(d[1](m.value)), body);
       });
       if (gt === 'PO') h += tile('po_res', t('card.t_po_res'), esc(poRow && poRow.result ? t('result.' + poRow.result) : t('card.t_nopo')), '');
       h += '</div>' + legend([['b1', t('card.lg_sel')], ['b0', t('card.lg_other')], ['kavg', t('card.hist_avg2')], ['krec', t('card.hist_rec')]]).replace('fc-legend', 'fc-legend fc-kd') + '</section>';
-      var rsAll = (M.teamSeason.RS || []).filter(function (x) { return state.scope === 'all' || x.origin === 'franchise'; }), lastS = rsAll.length ? rsAll[rsAll.length - 1].season : null, topR = lastS == null ? null : CC.histOf(M, 'RS', state.scope, lastS).filter(function (x) { return x.measure === 'avg_rating'; })[0];   // record de la cote moyenne et sa saison (v_team_season_hist)
-      var cats = rsAll.map(function (x) { return sls(x.season); }), tips = rsAll.map(function (x) { return sl(x.season); });
-      var specE = { id: 'ev', kind: 'xy', title: topR ? t('card.t_ev_title2', [sl(topR.record_season), nf(topR.record, 1)]) : t('card.m.rating'), cats: cats, tip: tips,
+      var rsAll = CC.team(M, 'RS', state.scope).seasons, cats = rsAll.map(function (x) { return sls(x.season); }), tips = rsAll.map(function (x) { return sl(x.season); });
+      // Cote moyenne : toujours les saisons du mode franchise seulement, quel que soit le filtre (décision du 2026-11-27) ; record et saison du record de la portée franchise (v_team_season_hist)
+      var rsF = (M.teamSeason.RS || []).filter(function (x) { return x.origin === 'franchise'; }), lastS = rsF.length ? rsF[rsF.length - 1].season : null, topR = lastS == null ? null : CC.histOf(M, 'RS', 'franchise', lastS).filter(function (x) { return x.measure === 'avg_rating'; })[0];
+      var specE = { id: 'ev', kind: 'xy', title: topR ? t('card.t_ev_title2', [sl(topR.record_season), nf(topR.record, 1)]) : t('card.m.rating'), cats: rsF.map(function (x) { return sls(x.season); }), tip: rsF.map(function (x) { return sl(x.season); }),
         y: [{ name: t('card.m.rating'), fmt: function (v) { return nf(v, 0); }, scale: true, gap: 34 }, { name: t('card.axis_rank'), fmt: Ib, inverse: true, min: 1 }],
-        series: [{ name: t('card.m.rating'), type: 'line', key: 'ink1', data: rsAll.map(function (x) { return x.avg_rating; }), fmt: D1b }, { name: t('card.t_ev_rank'), type: 'line', key: 'ink2', axis: 1, data: rsAll.map(function (x) { return x.overall_rank; }) }] };
+        series: [{ name: t('card.m.rating'), type: 'line', key: 'ink1', data: rsF.map(function (x) { return x.avg_rating; }), fmt: D1b }, { name: t('card.t_ev_rank'), type: 'line', key: 'ink2', axis: 1, data: rsF.map(function (x) { return x.overall_rank; }) }] };
       var specP = { id: 'pts', kind: 'xy', title: t('ui.team_points_by_season'), cats: cats, tip: tips, y: [{ name: t('stat.pts'), fmt: Ib }],
-        series: [{ name: t('stat.pts'), type: 'bar', key: 'c1', data: rsAll.map(function (x) { return x.points; }), hl: [rsAll.map(function (x) { return x.season; }).indexOf(state.season)] },
+        series: [{ name: t('stat.pts'), type: 'bar', key: 'c1', data: rsAll.map(function (x) { return x.points; }), hl: [rsAll.map(function (x) { return x.season; }).indexOf(state.season)], hlKey: 'sel' },
           { name: t('card.lg_avg'), type: 'line', key: 'ref', data: rsAll.map(function (x) { return M.league[x.season] ? M.league[x.season].league_pts : null; }), fmt: D1b },
           { name: t('card.div_avg'), type: 'line', key: 'ref2', data: rsAll.map(function (x) { return M.league[x.season] ? M.league[x.season].division_pts : null; }), fmt: D1b }] };
-      h += '<div class="fc-grid" style="margin-top:16px"><section class="card s6">' + cardHead(specE.title) + chartBox(specE) + legend([['line1', t('card.m.rating')], ['line2', t('card.t_ev_rank')]]) + '</section>' +
-        '<section class="card s6">' + cardHead(specP.title) + chartBox(specP) + legend([['c1', t('stat.pts')], ['mark', sl(state.season)], ['ref', t('card.lg_avg')], ['ref2', t('card.div_avg')]]) + '</section></div>';
+      h += '<div class="fc-grid" style="margin-top:16px"><section class="card ' + (gt === 'PO' ? 's12' : 's6') + '">' + cardHead(specE.title) + chartBox(specE) + legend([['line1', t('card.m.rating')], ['line2', t('card.t_ev_rank')]]) + '</section>' +
+        (gt === 'PO' ? '' : '<section class="card s6">' + cardHead(specP.title) + chartBox(specP) + legend([['c1', t('stat.pts')], ['sel', sl(state.season)], ['ref', t('card.lg_avg')], ['ref2', t('card.div_avg')]]) + '</section>') + '</div>';
       var cols = [['ui.season'], ['stat.gp'], ['stat.w'], ['stat.l'], ['stat.otl'], ['stat.pts', 1], ['stat.pts_pct', 1], ['stat.gf'], ['stat.ga'], ['stat.pp_pct', 1], ['stat.pk_pct', 1], ['stat.fo_pct', 1], ['stat.shot_pct', 1], ['card.t_5v5', 1], ['ui.rank'], ['col.rating', 1], ['ui.result']];
+      // statistique de v_team_season_peak de chaque cellule (même ordre que cells) ; 5 c. 5 : deux nombres, un record chacun
+      var PKS = ['gp', 'w', 'l', 'otl', 'points', 'pts_pct', 'gf', 'ga', 'pp_pct', 'pk_pct', 'fo_pct', 'shot_pct', ['gf_5v5', 'ga_5v5'], 'overall_rank', 'avg_rating'];
+      var bst = function (stat, season, txt) { return CC.teamPeak(M, gt, state.scope, stat, season) ? '<span class="best">' + esc(txt) + '</span>' : esc(txt); };
       var body2 = rows.slice().reverse().map(function (x) {
         var po = (M.teamSeason.PO || []).filter(function (q2) { return q2.season === x.season; })[0];
-        var cells = [nf(x.gp), nf(x.w), nf(x.l), nf(x.otl), nf(x.points), pf(x.pts_pct, 1), nf(x.gf), nf(x.ga), pf(x.pp_pct, 1), pf(x.pk_pct, 1), pf(x.fo_pct, 1), pf(x.shot_pct, 1), nf(x.gf_5v5) + '-' + nf(x.ga_5v5), nf(x.overall_rank), nf(x.avg_rating, 1)];
+        var cells = [nf(x.gp), nf(x.w), nf(x.l), nf(x.otl), nf(x.points), pf(x.pts_pct, 1), nf(x.gf), nf(x.ga), pf(x.pp_pct, 1), pf(x.pk_pct, 1), pf(x.fo_pct, 1), pf(x.shot_pct, 1), [nf(x.gf_5v5), nf(x.ga_5v5)], nf(x.overall_rank), nf(x.avg_rating, 1)];
         return '<tr data-season="' + x.season + '"' + (x.season === state.season ? ' class="sel" aria-current="true"' : '') + '><td><button type="button" class="fc-rowbtn" data-ctl="season-row" data-v="' + x.season + '" aria-label="' + esc(t('card.t_sel_season', [sl(x.season)])) + '">' + sl(x.season) + '</button></td>' +
-          cells.map(function (v, i) { return '<td class="' + (cols[i + 1][1] ? 'ro' : '') + '">' + esc(v) + '</td>'; }).join('') + '<td class="tl">' + esc(po && po.result ? t('result.' + po.result, true) : '—') + '</td></tr>';
+          cells.map(function (v, i) { var k = PKS[i]; return '<td class="' + (cols[i + 1][1] ? 'ro' : '') + '">' + (Array.isArray(v) ? bst(k[0], x.season, v[0]) + '-' + bst(k[1], x.season, v[1]) : bst(k, x.season, v)) + '</td>'; }).join('') + '<td class="tl">' + esc(po && po.result ? t('result.' + po.result, true) : '—') + '</td></tr>';
       }).join('');
-      h += '<section class="card" data-card="seasons">' + cardHead(t('card.t_tbl'), t('card.t_tbl_sub')) + detKey() + '<div class="ft-scroll fc-det-wrap" tabindex="0" role="region" aria-label="' + esc(t('card.t_tbl')) + '"><table class="ft-stats fc-det"><thead><tr>' +
+      h += '<section class="card" data-card="seasons">' + cardHead(t('card.t_tbl'), t('card.t_tbl_sub')) + detKey(null, 'card.t_det_key_best') + '<div class="ft-scroll fc-det-wrap" tabindex="0" role="region" aria-label="' + esc(t('card.t_tbl')) + '"><table class="ft-stats fc-det"><thead><tr>' +
         cols.map(function (c, i) { return '<th class="' + (c[1] ? 'ro' : '') + (i === cols.length - 1 ? ' tl' : '') + '">' + (i ? ab(c[0]) : esc(t(c[0]))) + '</th>'; }).join('') + '</tr></thead><tbody>' + body2 + '</tbody></table></div></section>';
       return '<div class="fc-team' + (state.details ? '' : ' nodet') + '">' + tools + h + '</div>';
     }
@@ -691,11 +746,13 @@
     function act(ds) {
       var c = ds.ctl, v = ds.v;
       if (c === 'season-row') { state.season = +v; return '[data-ctl="season-row"][data-v="' + v + '"]'; }
-      if (c === 'gt' || c === 'scope' || c === 'mode') { state[c] = v; return '[data-ctl="' + c + '"][data-v="' + v + '"]'; }
+      if (c === 'gt' || c === 'scope' || c === 'mode') { state[c] = v; saveChoices(); return '[data-ctl="' + c + '"][data-v="' + v + '"]'; }
       if (ds.act === 'details') { state.details = !state.details; try { if (store && store.set) store.set(DET_KEY, state.details ? '1' : '0'); } catch (e) { /* stockage bloqué : l'état vaut pour la page */ } return '[data-act="details"]'; }
       return null;
     }
-    function choose(ctl, value) { if (['pid', 'cmp', 'gid', 'gcmp', 'season'].indexOf(ctl) < 0) return null; state[ctl] = value === '' || value == null ? null : +value; return 'select[data-ctl="' + ctl + '"]'; }
+    function choose(ctl, value) {
+      if (ctl === 'scope') { if (SCOPES.indexOf(value) < 0) return null; state.scope = value; saveChoices(); return 'select[data-ctl="scope"]'; }   // menu des ères de la fiche Équipe
+      if (['pid', 'cmp', 'gid', 'gcmp', 'season'].indexOf(ctl) < 0) return null; state[ctl] = value === '' || value == null ? null : +value; if (ctl !== 'season') saveChoices(); return 'select[data-ctl="' + ctl + '"]'; }
     return { sync: sync, state: state, view: view, act: act, choose: choose, t: t, charts: function () { return CH; }, M: M, allStarSVG: allStarSVG, chartData: { mixHex: mixHex, contrast: contrast, HEX: HEX } };
   }
 
@@ -740,7 +797,7 @@
         yAxis: s.y.map(function (y, i) { return { type: 'value', name: y.name, nameLocation: 'middle', nameGap: y.gap || 40, nameTextStyle: { color: P.muted, fontStyle: 'italic' }, min: y.min, max: y.max, scale: !!y.scale, inverse: !!y.inverse, position: i ? 'right' : 'left', splitLine: { show: !i, lineStyle: { color: P.line } }, axisLine: { show: false }, axisLabel: { color: P.muted, formatter: y.fmt } }; }),
         series: s.series.map(function (x) {
           var o = { name: x.name, type: x.type, yAxisIndex: x.axis || 0, stack: x.stack || undefined, emphasis: { disabled: true } };
-          if (x.type === 'bar') { o.barMaxWidth = 26; o.itemStyle = itemStyle(x); o.data = x.data.map(function (v, i) { return x.hl && x.hl.indexOf(i) >= 0 ? { value: v, itemStyle: { color: P.ink1, borderColor: P.ink1 } } : v; }); if (x.labels) o.label = { show: true, position: 'top', color: P.fg, fontWeight: 600, fontSize: 11, formatter: function (p) { return x.labels[p.dataIndex] || ''; } }; }
+          if (x.type === 'bar') { o.barMaxWidth = 26; o.itemStyle = itemStyle(x); o.data = x.data.map(function (v, i) { return x.hl && x.hl.indexOf(i) >= 0 ? { value: v, itemStyle: x.hlKey === 'sel' ? { color: P.ksel, borderColor: P.fg, borderWidth: 1.5 } : { color: P.ink1, borderColor: P.ink1 } } : v; }); if (x.labels) o.label = { show: true, position: 'top', color: P.fg, fontWeight: 600, fontSize: 11, formatter: function (p) { return x.labels[p.dataIndex] || ''; } }; }
           else { o.data = x.data; o.lineStyle = lineStyle(x); o.itemStyle = { color: lineStyle(x).color }; o.symbol = x.key === 'ink1' ? 'circle' : 'none'; o.symbolSize = 5; o.connectNulls = false; }
           return o;
         }) }));
@@ -783,7 +840,7 @@
           x.data.forEach(function (val, i) {
             if (val == null) return; var b0 = x.stack ? (stackTop[x.stack + i] || 0) : 0, b1 = b0 + val; if (x.stack) stackTop[x.stack + i] = b1;
             var y0 = sc.y(b0), y1 = sc.y(b1), xx = Lm + i * bw + bw * 0.2, w = Math.max(bw * 0.6, 1);
-            var st = x.hl && x.hl.indexOf(i) >= 0 ? 'fill="var(--ink1)" stroke="var(--ink1)"' : x.key === 'c1' ? 'fill="var(--c1)" stroke="var(--ink1)"' : x.key === 'c1b' ? 'fill="color-mix(in srgb,var(--c1) 40%,var(--panel))" stroke="var(--ink1)"' : x.key === 'hatch' ? 'fill="url(#fc-hatch)" stroke="var(--fg)"' : 'fill="var(--panel)" stroke="var(--field-line)"';
+            var st = x.hl && x.hl.indexOf(i) >= 0 ? (x.hlKey === 'sel' ? 'fill="var(--ksel,var(--ink2))" stroke="var(--fg)" stroke-width="1.5"' : 'fill="var(--ink1)" stroke="var(--ink1)"') : x.key === 'c1' ? 'fill="var(--c1)" stroke="var(--ink1)"' : x.key === 'c1b' ? 'fill="color-mix(in srgb,var(--c1) 40%,var(--panel))" stroke="var(--ink1)"' : x.key === 'hatch' ? 'fill="url(#fc-hatch)" stroke="var(--fg)"' : 'fill="var(--panel)" stroke="var(--field-line)"';
             g += '<rect x="' + xx.toFixed(1) + '" y="' + Math.min(y0, y1).toFixed(1) + '" width="' + w.toFixed(1) + '" height="' + Math.abs(y1 - y0).toFixed(1) + '" ' + st + ' stroke-width="1"><title>' + esc(s.tip[i] + ' : ' + x.name + ' ' + (x.fmt || sc.fmt)(val)) + '</title></rect>';
             if (x.labels && x.labels[i]) g += '<text class="lbl" x="' + (xx + w / 2).toFixed(1) + '" y="' + (Math.min(y0, y1) - 4).toFixed(1) + '" text-anchor="middle">' + esc(x.labels[i]) + '</text>';
           });
@@ -805,7 +862,11 @@
       var panel = resolve('--panel'), dark = lum(panel) < 0.2, th = function (hex) { return hex && HEX.test(hex) ? (dark ? mixHex(hex.toUpperCase(), '#FFFFFF', 0.72) : hex.toUpperCase()) : null; };
       var c = [th(colors[0]), th(colors[1]), th(colors[2])], bw = contrast('#FFFFFF', panel) >= contrast('#000000', panel) ? '#FFFFFF' : '#000000';
       var pick = function (order, not) { for (var i = 0; i < order.length; i++) { var v = order[i]; if (v && v !== not && contrast(v, panel) >= 3) return v; } return bw !== not ? bw : (bw === '#FFFFFF' ? '#BBBBBB' : '#444444'); };
-      var k1 = pick([c[0], c[1], c[2]]); return { k1: k1, k2: pick([c[1], c[2], c[0]], k1) };
+      var k1 = pick([c[0], c[1], c[2]]), bars = resolve('--c1');
+      // saison affichée de « Points par saison » : couleur 2 telle que le thème l'affiche ; sous 3:1 avec le panneau → couleur 3, puis noir ou blanc ; jamais la couleur
+      // des autres bandes ; trop proche d'elles (< 1,5:1) → noir ou blanc (maquette 4e_revision, approuvée le 2026-11-27) ; la bande garde un contour --fg
+      var ksel = pick([c[1], c[2]], bars); if (contrast(ksel, bars) < 1.5) ksel = bw;
+      return { k1: k1, k2: pick([c[1], c[2], c[0]], k1), ksel: ksel };
     }
     var TIP = null, TIPKEY = false;
     function tipShow(txt, el, x, y, byKey) {
@@ -822,8 +883,9 @@
     function draw0(rootEl, app) {
       EC.forEach(function (c) { try { c.dispose(); } catch (e) { /* ignore */ } }); EC = []; tipHide();
       var lib = typeof root.echarts !== 'undefined', P = lib ? palette() : null;
+      var tm = rootEl.querySelector('.fc-team'), f = app.M.franchise; if (tm && f && f.colors) { var ink = chartInks(f.colors); tm.style.setProperty('--k1', ink.k1); tm.style.setProperty('--k2', ink.k2); tm.style.setProperty('--ksel', ink.ksel); if (P) P.ksel = ink.ksel; }
+      if (P && !P.ksel) P.ksel = P.ink2;
       (app.charts() || []).forEach(function (s) { var el = rootEl.querySelector('#ch-' + s.id); if (!el) return; if (lib) { try { ecDraw(el, s, P); return; } catch (e) { if (root.console) console.error(e); } } svgDraw(el, s); });
-      var tm = rootEl.querySelector('.fc-team'), f = app.M.franchise; if (tm && f && f.colors) { var ink = chartInks(f.colors); tm.style.setProperty('--k1', ink.k1); tm.style.setProperty('--k2', ink.k2); }
       var h = doc.querySelector('header.top'), b = rootEl.querySelector('.fc-tools'); if (b) doc.documentElement.style.setProperty('--fc-tools-h', (b.getBoundingClientRect().height + 12) + 'px');
       spy(rootEl);
     }
@@ -872,6 +934,7 @@
     ['mouseout', 'focusout'].forEach(function (ev) { rootEl.addEventListener(ev, function (e) { var el = e.target.closest && e.target.closest('[data-tip]'); if (el && !(e.relatedTarget && el.contains(e.relatedTarget))) B.tipHide(); }); });
     if (window.addEventListener) window.addEventListener('scroll', function () { if (!B.tipByKey()) B.tipHide(); }, { passive: true });   // focus au clavier : le défilement automatique ne ferme pas l'infobulle
     var rT = null; if (window.addEventListener) window.addEventListener('resize', function () { clearTimeout(rT); rT = setTimeout(function () { var a = app(); if (a) B.draw(rootEl, a); }, 150); });
+    if (root.FTHELP) root.FTHELP.bind(rootEl);   // « Comment lire » de la section Repêchage : ouvre et ferme sans redessiner (connect/ft_help.js)
     host.start();
     // lien direct vers une section : cards.html?sec=contract#player (décision du 2026-11-26)
     try { var sec = /[?&]sec=([a-z]+)/.exec(location.search); if (sec && SECS.indexOf(sec[1]) >= 0) setTimeout(function () { B.goSec(sec[1], false); }, 300); } catch (e) { /* ignore */ }

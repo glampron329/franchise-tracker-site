@@ -2424,6 +2424,28 @@
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.FTG = api;
 })(typeof window !== 'undefined' ? window : this);
 
+;/* Logo noir et or des équipes d'étoiles (décision du 2026-11-26), commun aux fiches (cards/cards_ui.js, vitrine des trophées)
+   et à la saisie Honneurs › Étoiles (season/screens_cfg.js, titre de chaque équipe ; révision 4e approuvée le 2026-11-27).
+   svg(t, year, level) : t(clé) = libellé (card.as_1 / card.as_2 dans le logo, card.as_league, card.as_awards ; texte alternatif card.hon_as1 / card.hon_as2 + année) ;
+   year = année de fin de saison (2049 pour 2048-49), facultative ; level = 1 ou 2. Mêmes couleurs pour toutes les équipes : aucune couleur d'équipe. */
+(function (root) {
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function svg(t, year, level) {
+    var full = t(level === 2 ? 'card.as_2' : 'card.as_1'), lines = full.split(' '), alt = t(level === 2 ? 'card.hon_as2' : 'card.hon_as1') + (year ? ' ' + year : '');
+    if (lines.length > 3) lines = [lines.slice(0, 2).join(' '), lines.slice(2).join(' ')];
+    var gold = '#D9B45A', gold2 = '#F3DC94', y0 = 112, fs = lines.some(function (l) { return l.length > 9; }) ? 13 : 16, gid = 'asg' + level + (year || 'x');
+    return '<svg class="fc-as" viewBox="0 0 120 170" role="img" aria-label="' + esc(alt) + '"><defs><linearGradient id="' + gid + '" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="' + gold2 + '"/><stop offset="1" stop-color="' + gold + '"/></linearGradient></defs>' +
+      '<rect width="120" height="170" rx="8" fill="#0A0A0A"/><g stroke="' + gold + '" stroke-opacity=".22" stroke-width=".7" fill="none"><path d="M0 0 60 60 120 0M0 170 60 110 120 170M0 60 60 0 120 60M0 110 60 170 120 110"/></g>' +
+      '<path d="M60 8 102 50 60 92 18 50z" fill="#0A0A0A" stroke="url(#' + gid + ')" stroke-width="2.4"/><path d="M60 16 94 50 60 84 26 50z" fill="none" stroke="' + gold + '" stroke-opacity=".45" stroke-width=".8"/>' +
+      '<path d="M60 26 70 30v8c0 5-4 8.5-10 11-6-2.5-10-6-10-11v-8z" fill="none" stroke="#fff" stroke-width="1.4"/><text x="60" y="41" text-anchor="middle" font-size="6.4" font-weight="800" fill="#fff" font-family="system-ui,sans-serif">' + esc(t('card.as_league')) + '</text>' +
+      '<text x="60" y="61" text-anchor="middle" font-size="8.5" font-weight="800" fill="#fff" font-family="system-ui,sans-serif">' + esc(t('card.as_awards')) + '</text>' +
+      (year ? '<text x="60" y="74" text-anchor="middle" font-size="10" font-weight="700" fill="' + gold2 + '" font-family="system-ui,sans-serif">' + esc(year) + '</text>' : '') +
+      lines.map(function (l, i) { return '<text x="60" y="' + (y0 + i * (fs + 2)) + '" text-anchor="middle" font-size="' + fs + '" font-weight="900" fill="url(#' + gid + ')" font-family="system-ui,sans-serif">' + esc(l) + '</text>'; }).join('') + '</svg>';
+  }
+  var api = { svg: svg };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.FTALLSTAR = api;
+})(typeof window !== 'undefined' ? window : this);
+
 ;/* Configuration des écrans « Début de saison » et « Saison morte » pour le moteur de grilles. */
 (function (root) {
   var S = root.FTS || (typeof require !== 'undefined' ? require('./season_core.js') : null);
@@ -2431,6 +2453,7 @@
   var DV = root.FTDV || (typeof require !== 'undefined' ? require('./draft_views.js') : null);   // onglets de consultation du repêchage (phase 4d)
   var HO = root.FTHOMO || (typeof require !== 'undefined' ? require('../connect/homonym_ui.js') : null);   // joueurs homonymes (migration 71)
   var FTLOGOS = root.FTLOGOS || (function () { try { return typeof require !== 'undefined' ? require('./logos.js') : null; } catch (e) { return null; } })() || { div: {}, conf: {}, po: {} };
+  var FTAS = root.FTALLSTAR || (typeof require !== 'undefined' ? require('../connect/ft_allstar.js') : null);   // logo noir et or des équipes d'étoiles (commun avec les fiches)
   var FTTROPHY = root.FTTROPHY || (function () { try { return typeof require !== 'undefined' ? require('./trophy_images.js') : {}; } catch (e) { return {}; } })();
   var POSOPT = ['C', 'LW', 'RW', 'LD', 'RD', 'G'].map(function (p) { return [p, 'pc.' + p]; });
   function pcode(t, c) { var k = 'pc.' + c, v = t ? t(k) : k; return v === k ? c : v; }   // code de poste affiché dans la langue (en français : A, AD, AG, DG, DD)
@@ -2801,13 +2824,14 @@
       b.forEach(function (x) { var g = (x[2] || '').charAt(0); if (pool[x[0]] && pool[x[0]][g]) pool[x[0]][g].push(x); });
       return S.ALLSTAR.map(function (a, i) { var n = S.ALLSTAR.slice(0, i).filter(function (z) { return z[0] === a[0] && z[1] === a[1]; }).length, x = pool[a[0]][a[1]][n]; return { lvl: a[0], pos: a[1], name: x ? splitKey(x[2])[1] : '', team: x ? x[3] || '' : '' }; });
     },
-    // alignement : trois attaquants, deux défenseurs et un gardien par équipe d'étoiles ; l'équipe du joueur et son logo
+    // alignement : trois attaquants, deux défenseurs et un gardien par équipe d'étoiles ; l'équipe du joueur et son logo ;
+    // titre de chaque équipe = logo noir et or des fiches (connect/ft_allstar.js, révision 4e du 2026-11-27), texte alternatif « 1re équipe d'étoiles 2049 »
     layout: function (rows, al, api) {
-      var H = api.H, t = api.t;
+      var H = api.H, t = api.t, yEnd = H.season != null && H.season !== '' ? +H.season + 1 : null;   // logo : année de fin de saison (2049 pour 2048-49), comme la vitrine des fiches
       function slot(ri, lbl) { var r = rows[ri]; return '<div class="slot' + (r.name ? '' : ' empty') + '"><div class="slbl">' + esc(lbl) + '</div>' + api.cell(ri, 'name') + '<div class="steam">' + api.cell(ri, 'team') + (r.team ? '<span class="tl" title="' + esc(H.teamLabel(r.team)) + '">' + H.logo(r.team) + '</span>' : '') + '</div></div>'; }
       function lineup(lvl) {
         var b = (lvl - 1) * 6, f = t('pc.F');
-        return '<section class="lineup l' + lvl + '"><h4>' + esc(t('asl.' + lvl)) + '</h4><div class="lrow f3">' + slot(b, f + '1') + slot(b + 1, f + '2') + slot(b + 2, f + '3') + '</div><div class="lrow d2">' + slot(b + 3, 'D1') + slot(b + 4, 'D2') + '</div><div class="lrow g1">' + slot(b + 5, 'G') + '</div></section>';
+        return '<section class="lineup l' + lvl + '"><h4 class="as-logo">' + FTAS.svg(t, yEnd, lvl) + '</h4><div class="lrow f3">' + slot(b, f + '1') + slot(b + 1, f + '2') + slot(b + 2, f + '3') + '</div><div class="lrow d2">' + slot(b + 3, 'D1') + slot(b + 4, 'D2') + '</div><div class="lrow g1">' + slot(b + 5, 'G') + '</div></section>';
       }
       return '<div class="lineups">' + lineup(1) + lineup(2) + '</div>';
     },

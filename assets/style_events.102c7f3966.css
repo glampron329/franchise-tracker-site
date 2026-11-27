@@ -443,3 +443,7 @@ table.grid.ev.standings td.ro.own svg{width:11px;height:11px;flex:none;color:var
 /* phase 4d : colonne Poste secondaire dans Sélections ; les 13 colonnes tiennent dans la largeur */
 table.grid.ev.picks select.cell[data-c="pos"],table.grid.ev.picks select.cell[data-c="pos2"]{min-width:52px;max-width:60px}table.grid.ev.picks select.cell[data-c="ptype"],table.grid.ev.picks input.cell[data-c="ptype"]{min-width:140px;max-width:150px}table.grid.ev.picks th{white-space:normal;hyphens:auto}
 .trlist .trc.focus{outline:2px solid var(--ink1);outline-offset:2px}
+/* Onglet Étoiles : le logo noir et or des fiches (connect/ft_allstar.js) remplace le titre texte de chaque équipe ; texte alternatif sur le SVG (role=img).
+   72 px de large (décision de Gabriel, révision 4e approuvée le 2026-11-27 ; maquette docs/maquettes/4e_revision.css, section 6, à 60 px) */
+.lineup h4.as-logo{display:flex;justify-content:center;margin:0 0 10px;line-height:0}
+.lineup h4.as-logo .fc-as{width:72px;height:auto;filter:drop-shadow(0 2px 3px rgba(0,0,0,.3))}

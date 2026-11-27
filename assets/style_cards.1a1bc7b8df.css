@@ -86,6 +86,14 @@ main.fc{display:block;max-width:1280px;margin:0;padding:var(--sp-4) var(--sp-5) 
 .fc-legend i.k-ref{height:0;border-top:2px dashed var(--muted);border-radius:0}
 .fc-legend i.k-ref2{height:0;border-top:2px dotted var(--muted);border-radius:0}
 .fc-legend i.k-mark{width:10px;height:10px;border-radius:50%;background:var(--ink1)}
+.fc-legend i.k-sel{width:12px;height:12px;border-radius:2px;background:var(--ksel,var(--ink2));box-shadow:inset 0 0 0 1.5px var(--fg)}
+/* révision 4e (maquette 4e_revision, approuvée le 2026-11-27) : menu des ères, mention de l'ère, section Repêchage et « Comment lire » */
+.fc-sel.era{min-width:260px}
+.fc-erahint{margin:calc(-1 * var(--sp-2)) 0 var(--sp-3);font-size:var(--fs-1);color:var(--muted);max-width:90ch}
+.fc-draft .help{margin:0 0 var(--sp-3)}
+.fc-draft .help-bar .help-tg{margin-left:0}
+.fc-draft .help-body ul{columns:2 320px;column-gap:var(--sp-5)}
+.fc-draft .help-body li{break-inside:avoid}
 .fc-note{margin:var(--sp-2) 0 0;font-size:var(--fs-1);color:var(--muted);max-width:90ch}
 
 /* ---------- 5. Radars côte à côte ; gardien sous le minimum : message à la place du radar ---------- */
@@ -149,7 +157,8 @@ table.ft-stats tr.sel .fc-rowbtn{color:var(--fg);text-decoration:none}
 table.ft-stats tr.sel>td:first-child{box-shadow:inset 3px 0 0 var(--ink1),inset -1px 0 0 var(--line-strong)}
 .fc-tblbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:var(--sp-2) var(--sp-4);margin:0 0 var(--sp-2)}
 .fc-key{display:flex;flex-wrap:wrap;gap:4px var(--sp-4);font-size:var(--fs-1);color:var(--muted)}
-.fc-key .best{font-weight:var(--w-bold);color:var(--fg);text-decoration:underline 2px var(--ink1);text-underline-offset:4px}
+/* légende du sommet ou du record : même style que la cellule (table.ft-stats .best, prototype/style.css ; jeton --best-bg) */
+.fc-key .best{display:inline-block;min-width:2ch;margin-right:2px;padding:0 6px;border-radius:3px;background:var(--best-bg);box-shadow:inset 0 -2px 0 var(--ink1);color:var(--fg);font-weight:var(--w-bold);line-height:22px;text-decoration:none}
 .fc-key .ro{font-style:italic;padding:0 4px;background:var(--panel-2);border-radius:var(--r-1);color:var(--fg)}
 
 /* ---------- 11. Honneurs ---------- */

@@ -51,6 +51,11 @@
   --c1:color-mix(in srgb,var(--base1) 72%,#fff);--c2:color-mix(in srgb,var(--base2) 40%,#fff);--on-c1:var(--on-c1-dark,#fff);
   --ink1:color-mix(in srgb,var(--base1) 45%,#fff);--ink2:color-mix(in srgb,var(--base2) 45%,#fff);--focus:color-mix(in srgb,var(--base1) 45%,#fff);
   --tint1:color-mix(in srgb,var(--c1) 14%,var(--panel))}
+/* --best-bg : fond des sommets personnels et records d'équipe (révision 4e, approuvée le 2026-11-27) : --ink1 à 18 % sur le panneau en clair, 28 % en sombre ;
+   texte --fg 6,8:1 et plus pour les 32 équipes, filet --ink1 3,3:1 et plus contre ce fond (calcul de la maquette docs/maquettes/4e_revision.css, section 5). */
+:root{--best-bg:color-mix(in srgb,var(--ink1) 18%,var(--panel))}
+:root[data-theme="dark"]{--best-bg:color-mix(in srgb,var(--ink1) 28%,var(--panel))}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--best-bg:color-mix(in srgb,var(--ink1) 28%,var(--panel))}}
 /* Navigateurs récents : texte sur une couleur = blanc si la clarté oklch est sous 0,58, noir sinon (sécurité du premier affichage ;
    onColor, posé en style en ligne par le JS, l'emporte). Encre : vraie couleur de l'équipe tant qu'elle est assez foncée (clair) ou claire (sombre). */
 @supports (color:oklch(from red l c h)){
@@ -445,7 +450,7 @@ td.na{background:repeating-linear-gradient(135deg,transparent 0 5px,var(--hatch)
 /* ===================================================================================================
    Coquille de navigation (phase 4b ; maquettes docs/maquettes/nav_*.html, docs/NAVIGATION.md).
    Sélecteurs produits par connect/ft_shell.js : nav#ft-side.ft-side, a.ft-side-t[data-g][data-t], div.ft-ptitle, button.ft-menu, a.ft-pend, .ft-empty, footer.ft-foot,
-   main.ft-index, p.ft-redirect. Aucune couleur d'équipe en dur : aplat --base1 / --on-base1 (groupe actif), encre --ink1, focus commun.
+   main.ft-home (accueil en bento), button.ft-side-gb (groupe repliable), p.ft-redirect. Aucune couleur d'équipe en dur : aplat --base1 / --on-base1 (groupe actif), encre --ink1, focus commun.
    =================================================================================================== */
 
 /* Compteur global de saisies en attente (dans header.top) : caché à 0 ; le texte dit le nombre (pas la couleur seule) */
@@ -482,7 +487,7 @@ td.na{background:repeating-linear-gradient(135deg,transparent 0 5px,var(--hatch)
 .ft-side-sec{margin-top:var(--sp-3);padding-top:var(--sp-3);border-top:1px solid var(--line)}
 .ft-side-sec>h2{display:flex;align-items:center;gap:6px;margin:0 0 var(--sp-1);padding:0 var(--sp-2);font-size:var(--fs-1);font-weight:var(--w-bold);color:var(--muted)}
 .ft-side-sec>h2 .ic{width:14px;height:14px}
-/* groupe : nom (non cliquable : ses onglets le sont), toujours déplié */
+/* groupe : nom ; celui de la page ouverte est un titre simple, toujours déplié ; les autres sont des boutons repliables (button.ft-side-gb, plus bas) */
 .ft-side-g{margin:var(--sp-2) 0 0}
 .ft-side-gn{display:flex;align-items:center;gap:6px;margin:0;padding:2px var(--sp-2);font-size:var(--fs-2);font-weight:var(--w-bold);color:var(--fg)}
 .ft-side-g.soon .ft-side-gn{color:var(--muted);font-weight:var(--w-semi)}
@@ -533,34 +538,59 @@ a.ft-side-t:hover .ic{color:var(--ink1)}
 .ft-foot>span{display:inline-flex;align-items:center;gap:6px}
 .ft-foot a{font-weight:var(--w-semi)}
 
-/* Index (sommaire en deux sections : Saisir, Consulter). Structure : main.ft-index > section.ft-isec[data-sec] > h2, p.ft-isub, div.ft-irow (enfants directs).
-   Ligne : nom du groupe (.ft-iname, lien ou texte) dans une colonne de 200 px, liens d'onglets (a.ft-ilink) et « à venir » (span.ft-isoon) dans la 2e colonne. */
-main.ft-index{display:grid;grid-template-columns:minmax(0,1fr);gap:var(--sp-5);max-width:1280px;margin:0 auto;padding:var(--sp-5) var(--sp-5) var(--sp-4)}
-@media (min-width:1360px){main.ft-index{grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);align-items:start}}
-.ft-isec{min-width:0}
-.ft-isec>h2{display:flex;align-items:center;gap:var(--sp-2);margin:0 0 2px;font-size:var(--fs-4);font-weight:var(--w-bold);line-height:1.3}
-.ft-isec>h2 .ic{width:20px;height:20px;color:var(--ink1)}
-.ft-isub{margin:0 0 var(--sp-3);color:var(--muted);font-size:var(--fs-2);max-width:70ch}
-.ft-irow{position:relative;display:flex;flex-wrap:wrap;align-items:baseline;gap:2px var(--sp-4);min-height:44px;padding:11px var(--sp-4) 11px calc(200px + 2 * var(--sp-4));
-  background:var(--panel);border:1px solid var(--line);border-top:0;font-size:var(--fs-2)}
-.ft-isec>.ft-irow:first-of-type{border-top:1px solid var(--line);border-radius:var(--r-3) var(--r-3) 0 0}
-.ft-isec>.ft-irow:last-of-type{border-radius:0 0 var(--r-3) var(--r-3)}
-.ft-isec>.ft-irow:only-of-type{border-radius:var(--r-3)}
-.ft-iname{position:absolute;left:var(--sp-4);top:9px;width:200px;display:inline-flex;align-items:center;gap:6px;font-size:var(--fs-3);font-weight:var(--w-bold);line-height:1.4;color:var(--fg);text-decoration:none}
-a.ft-iname:hover{color:var(--ink1);text-decoration:underline;text-underline-offset:3px}
-.ft-irow.soon .ft-iname{color:var(--muted);font-weight:var(--w-semi)}
-.ft-ilink{color:var(--fg);font-weight:var(--w-semi);line-height:1.6;text-decoration:underline 1px var(--line-strong);text-underline-offset:4px;white-space:nowrap}
-.ft-ilink:hover{color:var(--ink1);text-decoration-color:var(--ink1)}
-.ft-isoon{display:inline-flex;align-items:center;gap:5px;color:var(--muted);line-height:1.6}
-.ft-isoon .ic{width:13px;height:13px}
-main.ft-index+.ft-foot,main.ft-index>.ft-foot{margin-top:var(--sp-2)}
-main.ft-index>.ft-foot{grid-column:1/-1;max-width:none;margin-left:0;margin-right:0;padding-left:0;padding-right:0}
+/* ---------- Accueil en bento (décision du 2026-11-27, maquette docs/maquettes/4e_revision.css, section 1) : une grande boîte « Saisir », une grande boîte « Consulter » ; une sous-boîte par groupe ----------
+   Structure : main.ft-home > section.ft-box[data-sec=enter|view] > h2 + div.ft-cells > section.ft-cell[data-g] > h3 + ul > li > a.ft-hl[data-g][data-t]
+   Hiérarchie des rayons : boîte --r-3, sous-boîte --r-2, lien --r-1. Les sous-boîtes coulent en colonnes (ordre du DOM = ordre de lecture, de haut en bas). */
+.ft-homewrap{container-type:inline-size}
+main.ft-home{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:var(--sp-4);align-items:start;max-width:1320px;margin:0;padding:var(--sp-5)}
+.ft-box{min-width:0;padding:var(--sp-3) var(--sp-4) var(--sp-4);background:var(--panel);border:1px solid var(--line);border-radius:var(--r-3);box-shadow:inset 0 4px 0 var(--base1)}
+.ft-box[data-sec=view]{box-shadow:inset 0 4px 0 var(--base2)}
+.ft-box>h2{display:flex;align-items:center;gap:var(--sp-2);margin:var(--sp-1) 0 var(--sp-3);font-size:var(--fs-4);font-weight:var(--w-bold);line-height:1.3}
+.ft-box>h2 .ic{width:20px;height:20px;color:var(--ink1)}
+.ft-cells{columns:3 205px;column-gap:var(--sp-3)}
+.ft-box[data-sec=view] .ft-cells{columns:2 190px}
+.ft-cell{break-inside:avoid;display:block;margin:0 0 var(--sp-3);padding:var(--sp-2) var(--sp-2) var(--sp-1);background:var(--bg);border:1px solid var(--line);border-radius:var(--r-2)}
+.ft-cell>h3{display:flex;align-items:center;gap:6px;margin:0 0 2px;padding:2px 6px;font-size:var(--fs-3);font-weight:var(--w-bold);line-height:1.35}
+.ft-cell>h3 a{color:var(--fg);text-decoration:none}
+.ft-cell>h3 a:hover{color:var(--ink1);text-decoration:underline;text-underline-offset:3px}
+.ft-cell.soon>h3{color:var(--muted);font-weight:var(--w-semi)}
+.ft-cell ul{margin:0;padding:0;list-style:none}
+.ft-hl{display:flex;align-items:center;gap:var(--sp-2);min-height:30px;padding:3px 6px;border-radius:var(--r-1);color:var(--fg);font-size:var(--fs-2);text-decoration:none;line-height:1.25}
+.ft-hl .tile{display:grid;place-items:center;flex:none;width:24px;height:24px;border-radius:var(--r-1);background:var(--panel);box-shadow:inset 0 0 0 1px var(--line);color:var(--ink1)}
+.ft-hl .tile .ic{width:16px;height:16px}
+.ft-hl .nm{flex:1 1 auto;min-width:0}
+a.ft-hl:hover{background:var(--panel)}
+a.ft-hl:hover .nm{text-decoration:underline;text-underline-offset:3px}
+.ft-hl[aria-disabled=true]{color:var(--muted);cursor:default}
+.ft-hl[aria-disabled=true] .tile{color:var(--muted);background:transparent;box-shadow:inset 0 0 0 1px var(--line),inset 0 0 0 30px var(--panel-2)}
+.ft-hl .ft-soon{flex:none;font-size:10px;padding:0 5px;white-space:nowrap}
+:is(.ft-hl,.ft-cell>h3 a):focus-visible{outline:2px solid var(--focus);outline-offset:1px;box-shadow:0 0 0 4px var(--focus-halo)}
+@container (max-width:1060px){main.ft-home{grid-template-columns:minmax(0,1fr)}.ft-box[data-sec=view] .ft-cells{columns:3 200px}}
+@container (max-width:560px){main.ft-home{padding:var(--sp-3)}.ft-cells,.ft-box[data-sec=view] .ft-cells{columns:1}}
+
+/* ---------- Barre de navigation : groupes repliables (décision du 2026-11-27, maquette docs/maquettes/4e_revision.css, section 2) ----------
+   button.ft-side-gb[data-g][aria-expanded][aria-controls=ft-side-ul-<g>] ; le groupe de la page ouverte garde son titre simple (p.ft-side-gn), toujours déplié.
+   État mémorisé : localStorage ft_nav_fold_v1 = {"<groupe>": true (replié)}. */
+.ft-side-gb{display:flex;align-items:center;gap:6px;width:100%;min-height:28px;margin:0;padding:2px 6px 2px var(--sp-2);border:0;border-radius:var(--r-2);background:transparent;color:var(--fg);
+  font:inherit;font-size:var(--fs-2);font-weight:var(--w-bold);text-align:left;cursor:pointer}
+.ft-side-gb:hover{background:var(--panel-2)}
+.ft-side-gb .gnm{flex:1 1 auto;min-width:0}
+.ft-side-gb .chev{width:12px;height:12px;flex:none;color:var(--muted);transition:transform .15s ease}
+.ft-side-gb[aria-expanded=false] .chev{transform:rotate(-90deg)}
+.ft-side-gb[aria-expanded=false]{color:var(--muted)}
+.ft-side-gb[aria-expanded=false]:hover{color:var(--fg)}
+.ft-side-g.soon .ft-side-gb{color:var(--muted);font-weight:var(--w-semi)}
+.ft-side-gb:focus-visible{outline:2px solid var(--focus);outline-offset:-2px;box-shadow:inset 0 0 0 4px var(--focus-halo)}
+.ft-side-g ul[hidden]{display:none}
+/* groupe de la page ouverte : titre simple, filet à gauche (il ne se replie pas) */
+.ft-side-g.on>.ft-side-gn{box-shadow:inset 3px 0 0 var(--ink1);border-radius:0}
+@media (prefers-reduced-motion:reduce){.ft-side-gb .chev{transition:none}}
+
 
 /* Écran étroit */
 @media (max-width:640px){
-  main.ft-index,.ft-foot{padding-left:var(--sp-3);padding-right:var(--sp-3)}
-  .ft-redirect{margin-left:var(--sp-3);margin-right:var(--sp-3);max-width:calc(100% - 2 * var(--sp-3))}
-  .ft-irow{padding-left:var(--sp-4)}.ft-iname{position:static;width:100%}}
+  .ft-foot{padding-left:var(--sp-3);padding-right:var(--sp-3)}
+  .ft-redirect{margin-left:var(--sp-3);margin-right:var(--sp-3);max-width:calc(100% - 2 * var(--sp-3))}}
 
 /* ===== Composants communs du système de design (docs/maquettes/design_system.css) prêts pour les phases suivantes ===== */
 /* Messages : bord gauche + icône + mot en gras ; l'état ne repose jamais sur la couleur seule */
@@ -579,7 +609,7 @@ main.ft-index>.ft-foot{grid-column:1/-1;max-width:none;margin-left:0;margin-righ
 .ft-team .tl{width:22px;height:22px;flex:none;border-radius:50%;background:var(--o1,var(--muted));box-shadow:inset 0 0 0 3px var(--o2,var(--line)),0 0 0 1px var(--line)}
 .ft-team .tl.logo{background:var(--logo-bg);padding:2px;box-shadow:0 0 0 1px var(--line)}.ft-team .tl img{width:100%;height:100%;object-fit:contain;display:block}
 .ft-team .code{font-size:var(--fs-1);color:var(--muted);font-weight:var(--w-reg)}
-/* Tableau de statistiques (consultation) : lignes de 30 px, chiffres tabulaires à droite, en-tête et 1re colonne collants, meilleure valeur soulignée en --ink1 */
+/* Tableau de statistiques (consultation) : lignes de 30 px, chiffres tabulaires à droite, en-tête et 1re colonne collants, meilleure valeur sur fond --best-bg */
 .ft-scroll{position:relative;overflow:auto;max-height:420px;border:1px solid var(--line);border-radius:var(--r-2)}
 table.ft-stats{border-collapse:separate;border-spacing:0;width:100%;font-size:var(--fs-2);font-variant-numeric:tabular-nums}
 table.ft-stats th,table.ft-stats td{height:var(--row-h);padding:0 10px;border-bottom:1px solid var(--line);white-space:nowrap;text-align:right}
@@ -590,7 +620,11 @@ table.ft-stats thead th:first-child{z-index:3;background:var(--panel-2)}
 table.ft-stats tbody tr:hover>*{background:color-mix(in srgb,var(--fg) 3.5%,var(--panel))}
 table.ft-stats tr.sel>*{background:var(--tint1)}
 table.ft-stats th.ro{font-style:italic}
-table.ft-stats .best{font-weight:var(--w-bold);text-decoration:underline 2px var(--ink1);text-underline-offset:4px}
+/* meilleure valeur (sommet personnel, record d'équipe ; révision 4e, 2026-11-27) : fond --best-bg, gras, filet bas --ink1 ; la marge négative garde le chiffre aligné à droite */
+table.ft-stats .best:not(td){display:inline-block;min-width:2ch;margin-right:-6px;padding:0 6px;border-radius:3px;background:var(--best-bg);box-shadow:inset 0 -2px 0 var(--ink1);
+  color:var(--fg);font-weight:var(--w-bold);line-height:22px;text-decoration:none}
+/* cellule entière marquée (Repêchage › Sélections, td.best) : ancien style gardé, un td ne peut pas devenir une pastille */
+table.ft-stats td.best{font-weight:var(--w-bold);text-decoration:underline 2px var(--ink1);text-underline-offset:4px}
 table.ft-stats td.nil{color:var(--muted)}
 table.ft-stats tfoot td{font-weight:var(--w-bold);border-top:2px solid var(--line-strong);border-bottom:0;background:var(--panel)}
 
@@ -713,21 +747,23 @@ table.grid.ev.scale td.ci .rk{display:none}
 .ft-factline .ro{display:inline-flex;gap:6px;align-items:center;padding:3px 10px;border-radius:var(--r-1);background:var(--panel-2);font-style:italic}
 table.grid.ev.r0 td.ro.calc{font-style:italic;color:var(--fg);background:var(--panel-2)!important;min-width:84px}
 table.grid.ev.r0 th.ro{font-style:italic}
+/* Effectif de départ : prénom et nom entiers, sans coupure (décision du 2026-11-27, maquette docs/maquettes/4e_revision.css, section 7) :
+   largeur du TEXTE en ch (Prénom ~14 caractères, Nom ~18), plus le rembourrage et le contour de input.cell (6 + 6 + 2 × 1 px, input en border-box) */
+table.grid.ev.r0 input.cell[data-c="first"]{width:calc(14ch + 14px);min-width:calc(14ch + 14px)}
+table.grid.ev.r0 input.cell[data-c="last"]{width:calc(18ch + 14px);min-width:calc(18ch + 14px)}
 table.grid.ev.r0 tr.new>td,table.grid.ev.r0 tr.new>th{background:color-mix(in srgb,var(--st-warn) 8%,transparent)}
 table.grid.ev.r0 tr.new>td.na{background:repeating-linear-gradient(135deg,transparent 0 5px,var(--hatch) 5px 6px),color-mix(in srgb,var(--st-warn) 8%,transparent)}
 table.grid.ev.r0 tr.npx-row>td{height:auto;padding:4px 3px 10px 8px}
-/* Effectif de départ : profil complet + contrat (34 colonnes) ; Prénom et Nom collés à gauche au défilement horizontal */
-.r0-wrap{max-height:none}
-table.grid.ev.r0{border-collapse:separate;border-spacing:0}
-table.grid.ev.r0 thead tr.grp th{height:24px;padding:0 8px;font-size:var(--fs-1);font-weight:var(--w-semi);color:var(--muted);text-align:left;border-bottom:1px solid var(--line-strong);background:var(--panel-2)}
-table.grid.ev.r0 thead tr.grp th.g{border-left:1px solid var(--line-strong)}table.grid.ev.r0 thead tr.grp th.st12{border-left:0;box-shadow:inset -1px 0 0 var(--line-strong)}
-table.grid.ev.r0 :is(th,td).cs{border-left:2px solid var(--line-strong)}
-table.grid.ev.r0 :is(th,td).st1,table.grid.ev.r0 :is(th,td).st2,table.grid.ev.r0 th.st12{position:sticky;z-index:3;background:var(--panel)}
-table.grid.ev.r0 :is(th,td).st1,table.grid.ev.r0 th.st12{left:0}
-table.grid.ev.r0 :is(th,td).st2{left:112px;box-shadow:inset -1px 0 0 var(--line-strong)}
-table.grid.ev.r0 thead :is(th.st1,th.st2,th.st12){z-index:4;background:var(--panel-2)}
-table.grid.ev.r0 tr.new>td.st1,table.grid.ev.r0 tr.new>td.st2{background:color-mix(in srgb,var(--st-warn) 8%,var(--panel))}
-table.grid.ev.r0 select.cell{min-width:0}table.grid.ev.r0 input.cell[data-c="fn"]{width:104px}table.grid.ev.r0 input.cell[data-c="ln"]{width:122px}
+/* Effectif de départ : profil complet + contrat (32 colonnes) ; Prénom et Nom (1re et 2e colonnes du moteur, data-c="first" / "last") collés à gauche au défilement horizontal.
+   Décalage de la 2e colonne = largeur de la 1re (case Prénom + 2 × 4 px de rembourrage de la cellule), calculé une fois sur le tableau (police de la grille)
+   puis hérité tel quel par l'en-tête, dont la police est plus petite (@property : longueur calculée, pas recalculée en ch). */
+@property --r0-c1{syntax:'<length>';inherits:true;initial-value:144px}
+table.grid.ev.r0{border-collapse:separate;border-spacing:0;--r0-c1:calc(14ch + 14px + 8px)}
+table.grid.ev.r0 tbody tr[data-row]>td:is(:nth-child(1),:nth-child(2)){position:sticky;z-index:3;background:var(--panel)}
+table.grid.ev.r0 thead th:is(:nth-child(1),:nth-child(2)){position:sticky;top:0;z-index:5;background:var(--panel)}
+table.grid.ev.r0 :is(tbody tr[data-row]>td,thead th):nth-child(1){left:0}
+table.grid.ev.r0 :is(tbody tr[data-row]>td,thead th):nth-child(2){left:var(--r0-c1);box-shadow:inset -1px 0 0 var(--line-strong)}
+table.grid.ev.r0 select.cell{min-width:0}
 table.grid.ev.r0 select.cell:is([data-c="pos"],[data-c="pos2"]){width:62px}table.grid.ev.r0 input.cell[data-c="no"]{width:44px;text-align:center}
 table.grid.ev.r0 input.cell:is([data-c="ht"],[data-c="wt"]){width:56px;text-align:right}table.grid.ev.r0 input.cell[data-c="birth"]{width:104px}
 table.grid.ev.r0 select.cell[data-c="hand"]{width:84px}table.grid.ev.r0 select.cell[data-c="ptype"]{width:168px}
@@ -738,7 +774,7 @@ table.grid.ev.r0 select.cell[data-c="ev"]{width:222px}table.grid.ev.r0 select.ce
 table.grid.ev.r0 select.cell[data-c="years"]{width:52px}table.grid.ev.r0 select.cell[data-c="fs"]{width:86px}
 table.grid.ev.r0 input.cell[data-c="aav"]{width:104px;text-align:right}table.grid.ev.r0 select.cell[data-c^="cl"]{width:92px;font-size:12px}
 table.grid.ev.r0 td.ci.ed :is(input,select).cell{border-color:var(--st-warn);font-weight:var(--w-bold)}
-table.grid.ev.r0 td.ci.st1>.gi-tip,table.grid.ev.r0 td.ci.st2>.gi-tip{left:0;transform:none}
+table.grid.ev.r0 tr[data-row]>td.ci:is(:nth-child(1),:nth-child(2))>.gi-tip{left:0;transform:none}
 
 /* Choix de départ : années × rondes ; case « ton choix » cochée par défaut ; choix d'autres équipes : une liste d'abréviations par choix,
    « + équipe » ajoute une ligne sous l'année pour un 2e choix dans la même ronde */

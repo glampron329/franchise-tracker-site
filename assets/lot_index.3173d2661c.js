@@ -8,8 +8,8 @@
     { id: 'franchise', sec: 'enter', store: null, tabs: [{ id: 'franchise', pane: 'setup' }, { id: 'history_fix', pane: 'hist' }] },
     { id: 'start', sec: 'enter', tabs: [{ id: 'roster0', app: 'roster0' }, { id: 'picks0', app: 'picks0' }] },
     { id: 'preseason', sec: 'enter', store: 'ft_pre_v1', tabs: [{ id: 'cap', app: 'cap' }, { id: 'lineup', app: 'roles' }, { id: 'ratings', app: 'ratings' }, { id: 'schedule', app: 'schedule' }] },
-    { id: 'stats', sec: 'enter', store: 'ft_entries_v1', tabs: [{ id: 'skaters', app: 'sk' }, { id: 'goalies', app: 'gk' }, { id: 'team', app: 'tm' }] },
     { id: 'roster', sec: 'enter', store: 'ft_events_v1', tabs: [{ id: 'injuries', app: 'inj' }, { id: 'moves', app: 'mv' }, { id: 'trades', app: 'tr' }, { id: 'contracts', app: 'ct' }, { id: 'offers', app: 'os' }, { id: 'positions', app: 'pc' }, { id: 'players', app: 'pl' }] },
+    { id: 'stats', sec: 'enter', store: 'ft_entries_v1', tabs: [{ id: 'skaters', app: 'sk' }, { id: 'goalies', app: 'gk' }, { id: 'team', app: 'tm' }] },
     { id: 'results', sec: 'enter', store: 'ft_results_v1', tabs: [{ id: 'standings', app: 'standings' }, { id: 'series', app: 'series' }, { id: 'cup', app: 'cup' }] },
     { id: 'honors', sec: 'enter', store: 'ft_honors_v1', tabs: [{ id: 'awards', app: 'awards' }, { id: 'allstar', app: 'allstar' }, { id: 'retire', app: 'retire' }] },
     { id: 'draft', sec: 'enter', store: 'ft_draft_v1', tabs: [{ id: 'owned', app: 'owned', kind: 'view' }, { id: 'lottery', app: 'lottery' }, { id: 'ranks', app: 'ranks', kind: 'view' }, { id: 'top3', app: 'top3' }, { id: 'picks', app: 'picks' }, { id: 'board', app: 'board', kind: 'view' }] },
@@ -84,7 +84,7 @@
 })(typeof window !== 'undefined' ? window : this);
 
 ;/* Coquille de navigation (phase 4b, docs/NAVIGATION.md ; barre verticale décidée le 2026-11-26, maquette docs/maquettes/4e_nav.js) : barre verticale
-   (Accueil, Saisir, Consulter, groupes dépliés et leurs onglets), titre de la page, compteur de saisies en attente,
+   (Accueil, Saisir, Consulter, groupes repliables et leurs onglets, 2026-11-27), titre de la page, compteur de saisies en attente,
    onglets « À venir », onglet dans l'URL (#onglet), volets d'une page (Franchise : deux applications), pied de page.
    La page déclare window.FT_PAGE = { group, panes: ['main'] | ['setup', 'hist'], attr: 'tab' | 'view', index, connect }.
    live_mount.js appelle decorate() à chaque dessin d'un volet ; les applications gardent leur état (state.tab ou state.view). */
@@ -162,16 +162,26 @@
     'analysis.opening': 'puck', 'analysis.depth': 'layers', 'analysis.contracts': 'money', 'analysis.evolution': 'trend', 'analysis.makeup': 'pie', 'analysis.trades': 'swapLens'
   };
   function icon(name) { return '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' + (ICONS[name] || ICONS.list) + '</g></svg>'; }
-  // Barre verticale (décision du 2026-11-26) : Accueil, puis Saisir et Consulter, groupes toujours dépliés avec leurs onglets dessous.
+  // Barre verticale (décision du 2026-11-26 ; groupes repliables, décision du 2026-11-27, maquette docs/maquettes/4e_revision.js) : Accueil, puis Saisir et Consulter,
+  // chaque groupe avec ses onglets dessous. Le titre d'un groupe est un bouton qui replie ou déplie sa liste ; le groupe de la page ouverte garde un titre simple, toujours déplié.
   // gid : groupe de la page ('index' pour l'accueil) ; cur : onglet affiché ; pane / attr : volet affiché et attribut lu par son application
-  // (les onglets du groupe courant portent data-navtab, et data-<attr> quand l'application du volet les sert elle-même) ; q : paramètres gardés.
-  function side(L, gid, cur, pane, attr, pend, q, index) {
+  // (les onglets du groupe courant portent data-navtab, et data-<attr> quand l'application du volet les sert elle-même) ; q : paramètres gardés ;
+  // fold : groupes repliés { groupe: true } (localStorage ft_nav_fold_v1, lu par foldState) ; absent : tout déplié.
+  var FOLD_KEY = 'ft_nav_fold_v1';
+  var CHEV = '<svg class="chev" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 4.2 6 7.8l3.5-3.6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  function foldState(get) { try { var o = JSON.parse((get && get(FOLD_KEY)) || '{}'); return o && typeof o === 'object' && !Array.isArray(o) ? o : {}; } catch (e) { return {}; } }
+  function foldTitle(L, closed, gn) { return fill(lbl(L, closed ? 'nav.fold_open' : 'nav.fold_close'), [gn]); }
+  function side(L, gid, cur, pane, attr, pend, q, index, fold) {
+    var F = fold || {};
     function sec(id) {
       return '<section class="ft-side-sec" aria-labelledby="ft-side-' + id + '"><h2 id="ft-side-' + id + '">' + icon(id === 'enter' ? 'pen' : 'view') + esc(lbl(L, 'nav.sec.' + id)) + '</h2>' +
         NAV.GROUPS.filter(function (g) { return g.sec === id; }).map(function (g) {
           var here = g.id === gid, n = pend && pend[g.id] ? pend[g.id].total : 0, counts = pend && pend[g.id] && pend[g.id].tabs ? pend[g.id].tabs : {};
+          var closed = !here && !!F[g.id], gn = lbl(L, 'nav.g.' + g.id), ulid = 'ft-side-ul-' + g.id;
           var cnt = n ? '<span class="ft-cnt" title="' + esc(fill(lbl(L, n === 1 ? 'nav.pending_group_one' : 'nav.pending_group_other'), [n])) + '">' + n + '</span>' : '';
-          return '<div class="ft-side-g' + (NAV.ready(g) ? '' : ' soon') + (here ? ' on' : '') + '" data-g="' + g.id + '"><p class="ft-side-gn">' + esc(lbl(L, 'nav.g.' + g.id)) + cnt + '</p><ul>' +
+          var head = here ? '<p class="ft-side-gn">' + esc(gn) + cnt + '</p>'
+            : '<button type="button" class="ft-side-gb" data-g="' + g.id + '" aria-expanded="' + !closed + '" aria-controls="' + ulid + '" title="' + esc(foldTitle(L, closed, gn)) + '"><span class="gnm">' + esc(gn) + '</span>' + cnt + CHEV + '</button>';
+          return '<div class="ft-side-g' + (NAV.ready(g) ? '' : ' soon') + (here ? ' on' : '') + '" data-g="' + g.id + '">' + head + '<ul id="' + ulid + '"' + (closed ? ' hidden' : '') + '>' +
             g.tabs.map(function (x) {
               var name = esc(lbl(L, 'nav.t.' + g.id + '.' + x.id, true)), full = lbl(L, 'nav.t.' + g.id + '.' + x.id), c = counts[x.id] || 0;
               var nav = here ? ' data-navtab="' + x.id + '" data-kind="' + x.kind + '"' + (!x.soon && x.app && x.pane === pane ? ' data-' + attr + '="' + x.app + '"' : '') : '';
@@ -204,7 +214,7 @@
   function movedMsg(L, gid, tid) { return '<p class="ft-redirect" role="status">' + esc(fill(lbl(L, 'nav.redirect'), [lbl(L, 'nav.g.' + gid) + ' › ' + lbl(L, 'nav.t.' + gid + '.' + tid)])) + '</p>'; }
 
   // ---- état de la page ----
-  var S = { menu: false, page: null, tab: null, soon: null, pane: null, hosts: {}, mounts: {}, mounted: {}, moved: null, fid: null, leaving: false, store: null };
+  var S = { L: null, menu: false, page: null, tab: null, soon: null, pane: null, hosts: {}, mounts: {}, mounted: {}, moved: null, fid: null, leaving: false, store: null };
   function P() { return S.page; }
   function lsGet(k) { try { return root.localStorage ? root.localStorage.getItem(k) : null; } catch (e) { return null; } }
   function lsSet(k, v) { try { if (root.localStorage) root.localStorage.setItem(k, v); } catch (e) { /* ignore */ } }
@@ -265,7 +275,7 @@
   function decorate(html, c) {
     if (!S.page) return html;
     if (c.fid != null) S.fid = c.fid;
-    var gid = S.page.group, L = c.L, pend = pendNow(), qs = q();
+    var gid = S.page.group, L = c.L, pend = pendNow(), qs = q(); S.L = L;
     if (c.pane === S.pane && !S.soon && c.app && c.app.state) {   // l'application a changé d'onglet d'elle-même : l'URL suit
       var x = NAV.tabOfApp(gid, c.pane, c.app.state[attr()]);
       if (x && x.id !== S.tab) { S.tab = x.id; lsSet('ft_tab_' + gid, x.id); try { root.history.replaceState(null, '', root.location.pathname + root.location.search + '#' + x.id); } catch (e) { /* ignore */ } }
@@ -277,7 +287,7 @@
     if (S.soon) html = html.replace(/<main[\s\S]*<\/main>/, soonMain(L, gid, S.soon));
     var hi = html.indexOf('</header>'), head = hi >= 0 ? html.slice(0, hi + 9) : '', body = hi >= 0 ? html.slice(hi + 9) : html;
     if (top) body = /<main[^>]*>/.test(body) ? body.replace(/<main[^>]*>/, function (m) { return m + top; }) : top + body;
-    var out = head + '<div class="ft-layout">' + side(L, gid, S.tab, c.pane, attr(), pend, qs, S.page.index) + '<div class="ft-content">' + body + footer(L, S.page.connect) + '</div></div>';
+    var out = head + '<div class="ft-layout">' + side(L, gid, S.tab, c.pane, attr(), pend, qs, S.page.index, foldState(lsGet)) + '<div class="ft-content">' + body + footer(L, S.page.connect) + '</div></div>';
     return S.menu ? out.replace('class="ft-menu" aria-controls="ft-side" aria-expanded="false"', 'class="ft-menu" aria-controls="ft-side" aria-expanded="true"').replace('<nav class="ft-side" id="ft-side"', '<nav class="ft-side open" id="ft-side"').replace('<div class="ft-side-scrim" hidden>', '<div class="ft-side-scrim">') : out;
   }
 
@@ -290,12 +300,21 @@
     if (focus) { if (v) { var cur = sd.querySelector('[aria-current=page]') || sd.querySelector('a'); if (cur) { cur.focus(); if (cur.scrollIntoView) cur.scrollIntoView({ block: 'center' }); } } else b.focus(); }
   }
   function menu(v) { S.menu = !!v; menuApply(true); }
-  // bouton Menu, voile et Échap : sur toutes les pages, accueil compris (index_ui.js l'appelle aussi)
+  // groupe replié ou déplié (bouton du titre) : attributs changés sur place, sans redessiner (le focus reste sur le bouton) ; état enregistré dans ft_nav_fold_v1
+  function toggleFold(b) {
+    var doc = root.document, g = b.getAttribute('data-g'), closed = b.getAttribute('aria-expanded') === 'true', ul = doc.getElementById(b.getAttribute('aria-controls')), F = foldState(lsGet);
+    b.setAttribute('aria-expanded', String(!closed)); if (ul) ul.hidden = closed;
+    var gn = b.querySelector('.gnm'); if (S.L) b.setAttribute('title', foldTitle(S.L, closed, gn ? gn.textContent : g));
+    if (closed) F[g] = true; else delete F[g]; lsSet(FOLD_KEY, JSON.stringify(F));
+  }
+  // bouton Menu, voile, Échap et titres de groupes repliables : sur toutes les pages, accueil compris (index_ui.js l'appelle aussi, avec ses libellés)
   var menuWired = false;
-  function wireMenu() {
+  function wireMenu(L) {
+    if (L) S.L = L;
     if (menuWired || !root.document) return; menuWired = true; var doc = root.document;
     on(doc, 'click', function (e) {
       var t = e.target && e.target.closest ? e.target : null; if (!t) return;
+      var fb = t.closest('button.ft-side-gb'); if (fb) { e.preventDefault(); toggleFold(fb); return; }
       if (t.closest('.ft-menu')) { e.preventDefault(); menu(doc.querySelector('.ft-menu').getAttribute('aria-expanded') !== 'true'); return; }
       if (t.closest('.ft-side-scrim')) menu(false);
     });
@@ -331,7 +350,7 @@
   }
 
   var api = { init: init, mount: mount, addHost: addHost, applyTo: applyTo, decorate: decorate, go: go, state: function () { return S; }, page: P,
-              side: side, pageTitle: pageTitle, wireMenu: wireMenu, menuButton: menuButton, menuApply: menuApply, TAB_IC: TAB_IC, icon: icon, soonMain: soonMain, pendBadge: pendBadge, footer: footer, IC: IC, esc: esc, fill: fill };
+              side: side, foldState: foldState, FOLD_KEY: FOLD_KEY, pageTitle: pageTitle, wireMenu: wireMenu, menuButton: menuButton, menuApply: menuApply, TAB_IC: TAB_IC, icon: icon, soonMain: soonMain, pendBadge: pendBadge, footer: footer, IC: IC, esc: esc, fill: fill };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.FTSHELL = api;
   if (typeof window !== 'undefined' && root.FT_PAGE && root.document) init(root.FT_PAGE);
 })(typeof window !== 'undefined' ? window : this);
@@ -600,7 +619,7 @@
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.FTLM = api;
 })(typeof window !== 'undefined' ? window : this);
 
-;/* Index de navigation (phase 4b) : deux sections, Saisir puis Consulter, construites depuis connect/ft_nav.js ; Outils en pied de page.
+;/* Index de navigation (phase 4b ; accueil en bento, décision du 2026-11-27) : deux boîtes, Saisir puis Consulter, construites depuis connect/ft_nav.js ; Outils en pied de page.
    Libellés : table label (fichier partagé FT_LABELS) ; couleurs, logo, langue et thème mémorisés par les pages (ft_colors, ft_team, ft_lang, ft_theme).
    Aucune connexion : le compteur de saisies en attente lit le stockage du navigateur pour la franchise active (ft_franchise). */
 (function (root) {
@@ -622,27 +641,30 @@
       if (/^#[0-9A-Fa-f]{6}$/.test(c[0] || '') && root.FTLM) { st.setProperty('--on-base1', root.FTLM.onColor(c[0], c[2])); st.setProperty('--on-c1-dark', root.FTLM.onColor(root.FTLM.mixHex(c[0], '#FFFFFF', 0.72), c[2])); }
     } catch (e) { /* ignore */ }
   }
-  function row(gr, pend) {
-    var ready = NAV.ready(gr), name = esc(L('nav.g.' + gr.id)), n = pend[gr.id] ? pend[gr.id].total : 0;
+  // Accueil en bento (décision du 2026-11-27, maquette docs/maquettes/4e_revision.js) : une boîte Saisir, une boîte Consulter ; une sous-boîte par groupe,
+  // chaque onglet avec son icône (FTSHELL.TAB_IC) et son nom long ; onglets « À venir » grisés, sans lien. Aucune phrase d'explication.
+  function cell(gr, pend) {
+    var ready = NAV.ready(gr), gn = esc(L('nav.g.' + gr.id)), n = pend[gr.id] ? pend[gr.id].total : 0;
     var cnt = n ? '<span class="ft-cnt" title="' + esc(fill(L(n === 1 ? 'nav.pending_group_one' : 'nav.pending_group_other'), [n])) + '">' + n + '</span>' : '';
-    var links = gr.tabs.filter(function (x) { return !x.soon; }).map(function (x) { return '<a class="ft-ilink" href="' + NAV.href(gr.id, x.id) + '">' + esc(L('nav.t.' + gr.id + '.' + x.id)) + '</a>'; }).join('');
-    var soon = gr.tabs.filter(function (x) { return x.soon; }).map(function (x) { return L('nav.t.' + gr.id + '.' + x.id); });
-    return '<div class="ft-irow' + (ready ? '' : ' soon') + '" data-g="' + gr.id + '">' +
-      (ready ? '<a class="ft-iname" href="' + NAV.href(gr.id) + '">' + name + cnt + '</a>' : '<span class="ft-iname" aria-disabled="true">' + name + '</span>') +
-      links + (soon.length ? '<span class="ft-isoon">' + SH.IC.clock + esc(fill(L('nav.soon_list'), [soon.join(', ')])) + '</span>' : '') + '</div>';
+    return '<section class="ft-cell' + (ready ? '' : ' soon') + '" data-g="' + gr.id + '"><h3>' + (ready ? '<a href="' + NAV.href(gr.id) + '">' + gn + '</a>' : gn) + cnt + '</h3><ul>' +
+      gr.tabs.map(function (x) {
+        var nm = esc(L('nav.t.' + gr.id + '.' + x.id)), inner = '<span class="tile">' + SH.icon(SH.TAB_IC[gr.id + '.' + x.id]) + '</span><span class="nm">' + nm + '</span>';
+        return '<li>' + (x.soon ? '<span class="ft-hl" data-g="' + gr.id + '" data-t="' + x.id + '" aria-disabled="true" title="' + esc(L('nav.soon_hint')) + '">' + inner + '<span class="ft-soon">' + esc(L('nav.soon')) + '</span></span>'
+          : '<a class="ft-hl" data-g="' + gr.id + '" data-t="' + x.id + '" href="' + NAV.href(gr.id, x.id) + '">' + inner + '<span class="vh">, ' + esc(L(x.kind === 'view' ? 'nav.kind_view' : 'nav.kind_enter')) + '</span></a>') + '</li>';
+      }).join('') + '</ul></section>';
   }
   function view() {
     var pend = NAV.pending(g, +g('ft_franchise') || null), cur = theme();
-    var sec = function (id, icon) {
-      return '<section class="ft-isec" data-sec="' + id + '"><h2>' + icon + esc(L('nav.sec.' + id)) + '</h2><p class="ft-isub">' + esc(L('nav.sec.' + id + '_sub')) + '</p><div class="ft-ilist">' +
-        NAV.GROUPS.filter(function (x) { return x.sec === id; }).map(function (x) { return row(x, pend); }).join('') + '</div></section>';
+    var box = function (id, icon) {
+      return '<section class="ft-box" data-sec="' + id + '" aria-labelledby="ft-box-' + id + '"><h2 id="ft-box-' + id + '">' + icon + esc(L('nav.sec.' + id)) + '</h2><div class="ft-cells">' +
+        NAV.GROUPS.filter(function (x) { return x.sec === id; }).map(function (x) { return cell(x, pend); }).join('') + '</div></section>';
     };
     return '<header class="top"><div class="brand">' + crest() + '<div><div class="fr">Franchise Tracker</div><div class="sub">' + esc(L('nav.index')) + '</div></div></div>' +
       '<div class="ctl">' + SH.menuButton(L) + SH.pendBadge(L, pend, '') +
       '<div class="seg" role="group" aria-label="' + esc(L('ui.language')) + '"><button data-lang="fr" aria-pressed="' + (lang === 'fr') + '">FR</button><button data-lang="en" aria-pressed="' + (lang === 'en') + '">EN</button></div>' +
       '<div class="seg" role="group" data-themeseg="1" aria-label="' + esc(L('ui.theme')) + '"><button data-theme-set="light" aria-pressed="' + (cur === 'light') + '">' + esc(L('ui.theme_light')) + '</button><button data-theme-set="dark" aria-pressed="' + (cur === 'dark') + '">' + esc(L('ui.theme_dark')) + '</button></div></div></header>' +
-      '<div class="ft-layout">' + SH.side(L, 'index', null, null, 'tab', pend, '', 'index.html') + '<div class="ft-content">' +   // barre verticale, comme les autres pages (2026-11-26)
-      '<main class="ft-index"><p class="ft-iintro">' + esc(L('nav.intro')) + '</p>' + sec('enter', SH.IC.pen) + sec('view', SH.IC.view) + '</main>' + SH.footer(L, LINKS.connect) + '</div></div>';
+      '<div class="ft-layout">' + SH.side(L, 'index', null, null, 'tab', pend, '', 'index.html', SH.foldState(g)) + '<div class="ft-content">' +   // barre verticale, comme les autres pages (2026-11-26)
+      '<div class="ft-homewrap"><main class="ft-home" aria-label="' + esc(L('nav.home_label')) + '"><h1 class="vh">' + esc(L('nav.index')) + '</h1>' + box('enter', SH.IC.pen) + box('view', SH.IC.view) + '</main></div>' + SH.footer(L, LINKS.connect) + '</div></div>';
   }
   function draw() { D.documentElement.lang = lang; D.getElementById('app').innerHTML = view(); }
   D.addEventListener('click', function (e) {
@@ -651,5 +673,5 @@
     else if (b.getAttribute('data-theme-set')) { var t = b.getAttribute('data-theme-set'); sv('ft_theme', t); D.documentElement.setAttribute('data-theme', t); draw(); }
   });
   root.addEventListener('storage', function () { draw(); });
-  SH.wireMenu(); colors(); draw();
+  SH.wireMenu(L); colors(); draw();
 })(typeof window !== 'undefined' ? window : this);
