@@ -593,9 +593,11 @@
       return '<span class="d">' + (d === 0 ? '' : good ? IC.up : IC.down) + esc(fmt(d)) + '<span class="vh"> (' + esc(t(good ? 'card.d_better' : 'card.d_worse')) + ')</span></span>';
     }
     // mesures de v_team_season_hist : libellé et infobulle ; format ; masquée en séries
+    // clé proposée (ux-writer), repli sur l'ancienne tant qu'elle n'est pas dans la table label ; tip : clé sans le préfixe card.tip.
+    function lk(k, fb, tip) { var x = raw(k) ? k : fb; return tip ? x.replace('card.tip.', '') : x; }
     var D2b = function (v) { return nf(v, 2); }, P1b = function (v) { return pf(v, 1); }, Ib = function (v) { return nf(v); }, D1b = function (v) { return nf(v, 1); };
-    var MEAS = { gf_per_gp: ['stat.gf_pg', D2b, 'gf_per_gp'], ga_per_gp: ['stat.ga_pg', D2b, 'ga_per_gp'], pp_pct: ['stat.pp_pct', P1b, 'pp_pct'], pk_pct: ['stat.pk_pct', P1b, 'pk_pct'], gf_5v5: ['card.m.gf_5v5', Ib, 'gf_5v5'], ga_5v5: ['card.m.ga_5v5', Ib, 'ga_5v5'],
-      gf: ['stat.gf', Ib, null], ga: ['stat.ga', Ib, null], fo_pct: ['stat.fo_pct', P1b, 'fo_pct'], shot_pct: ['stat.shot_pct', P1b, 'shot_pct'], avg_rating: ['card.m.rating', D1b, 'rating'], rw: ['stat.rw', Ib, 'rw', 1], ot_games: ['card.m.mjpr', Ib, 'mjpr', 1], ot_win_pct: ['card.m.ot_w_pct', P1b, 'ot_w_pct', 1],
+    var MEAS = { gf_per_gp: ['stat.gf_pg', D2b, 'gf_per_gp'], ga_per_gp: ['stat.ga_pg', D2b, 'ga_per_gp'], pp_pct: ['stat.pp_pct', P1b, 'pp_pct'], pk_pct: ['stat.pk_pct', P1b, 'pk_pct'], gf_5v5_per_gp: [lk('card.m.gf_5v5_pg', 'card.m.gf_5v5'), D2b, lk('card.tip.gf_5v5_pg', 'card.tip.gf_5v5', 1)], ga_5v5_per_gp: [lk('card.m.ga_5v5_pg', 'card.m.ga_5v5'), D2b, lk('card.tip.ga_5v5_pg', 'card.tip.ga_5v5', 1)],   // par match (décision du 2026-11-27)
+      fo_pct: ['stat.fo_pct', P1b, 'fo_pct'], shot_pct: ['stat.shot_pct', P1b, 'shot_pct'], avg_rating: ['card.m.rating', D1b, 'rating'], rw: ['stat.rw', Ib, 'rw', 1], ot_games: ['card.m.mjpr', Ib, 'mjpr', 1], ot_win_pct: ['card.m.ot_w_pct', P1b, 'ot_w_pct', 1],
       special_teams_pct: ['card.m.st_pct', P1b, 'st_pct'], pp_net_pct: ['card.m.pp_net', P1b, 'pp_net'], pk_net_pct: ['card.m.pk_net', P1b, 'pk_net'], special_teams_net: ['card.m.st_net', P1b, 'st_net'], shots_against_per_gp: ['card.m.sa_pg', D1b, 'sa_pg'],
       team_sv_pct: ['stat.sv_pct', P1b, 'sv_pct'], hits_per_gp: ['card.m.hits_pg', D1b, 'hits_pg'], blocks_per_gp: ['card.m.blocks_pg', D1b, 'blocks_pg'], giveaways_per_gp: ['card.m.gv_pg', D1b, 'gv_pg'], takeaways_per_gp: ['card.m.tk_pg', D1b, 'tk_pg'] };
     function bands(series, sel2, avg, rec) {
