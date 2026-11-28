@@ -641,7 +641,14 @@
     var MEAS = { gf_per_gp: ['stat.gf_pg', D2b, 'gf_per_gp'], ga_per_gp: ['stat.ga_pg', D2b, 'ga_per_gp'], pp_pct: ['stat.pp_pct', P1b, 'pp_pct'], pk_pct: ['stat.pk_pct', P1b, 'pk_pct'], gf_5v5_per_gp: [lk('card.m.gf_5v5_pg', 'card.m.gf_5v5'), D2b, lk('card.tip.gf_5v5_pg', 'card.tip.gf_5v5', 1)], ga_5v5_per_gp: [lk('card.m.ga_5v5_pg', 'card.m.ga_5v5'), D2b, lk('card.tip.ga_5v5_pg', 'card.tip.ga_5v5', 1)],   // par match (décision du 2026-11-27)
       fo_pct: ['stat.fo_pct', P1b, 'fo_pct'], shot_pct: ['stat.shot_pct', P1b, 'shot_pct'], avg_rating: ['card.m.rating', D1b, 'rating'], rw: ['stat.rw', Ib, 'rw', 1], ot_games: ['card.m.mjpr', Ib, 'mjpr', 1], ot_win_pct: ['card.m.ot_w_pct', P1b, 'ot_w_pct', 1],
       special_teams_pct: ['card.m.st_pct', P1b, 'st_pct'], pp_net_pct: ['card.m.pp_net', P1b, 'pp_net'], pk_net_pct: ['card.m.pk_net', P1b, 'pk_net'], special_teams_net: ['card.m.st_net', P1b, 'st_net'], shots_against_per_gp: ['card.m.sa_pg', D1b, 'sa_pg'],
-      team_sv_pct: ['stat.sv_pct', P1b, 'sv_pct'], hits_per_gp: ['card.m.hits_pg', D1b, 'hits_pg'], blocks_per_gp: ['card.m.blocks_pg', D1b, 'blocks_pg'], giveaways_per_gp: ['card.m.gv_pg', D1b, 'gv_pg'], takeaways_per_gp: ['card.m.tk_pg', D1b, 'tk_pg'] };
+      team_sv_pct: ['stat.sv_pct', P1b, 'sv_pct'], hits_per_gp: ['card.m.hits_pg', D1b, 'hits_pg'], blocks_per_gp: ['card.m.blocks_pg', D1b, 'blocks_pg'], giveaways_per_gp: ['card.m.gv_pg', D1b, 'gv_pg'], takeaways_per_gp: ['card.m.tk_pg', D1b, 'tk_pg'],
+      shots_per_gp: ['card.m.shots_pg', D1b, 'shots_pg'], reg_games_pct: ['card.m.reg_games_pct', P1b, 'reg_games_pct', 1], reg_win_pct: ['card.m.reg_win_pct', P1b, 'reg_win_pct', 1] };   // migration 89 ; [3] = 1 : absente en séries
+    // tuiles de l'historique du club en 5 sections, dans l'ordre de Gabriel (maquette 4e_equipe_sections, approuvée le 2026-11-28) ; VR, MJPR et Cote moyenne ne sont plus des tuiles
+    var GROUPS = [['goals', 'card.t_grp_goals', ['gf_per_gp', 'ga_per_gp', 'gf_5v5_per_gp', 'ga_5v5_per_gp']],
+      ['special', 'card.t_grp_special', ['pp_pct', 'pk_pct', 'special_teams_pct', 'pp_net_pct', 'pk_net_pct', 'special_teams_net']],
+      ['eff', 'card.t_grp_eff', ['fo_pct', 'shots_per_gp', 'shot_pct', 'shots_against_per_gp', 'team_sv_pct']],
+      ['phys', 'card.t_grp_phys', ['hits_per_gp', 'blocks_per_gp', 'giveaways_per_gp', 'takeaways_per_gp']],
+      ['results', 'card.t_grp_results', ['reg_games_pct', 'reg_win_pct', 'ot_win_pct']]];
     function bands(series, sel2, avg, rec) {
       var vals = series.map(function (r) { return r.value; }).filter(function (v) { return v != null; }); if (!vals.length) return '';
       var all = vals.concat([avg, rec].filter(function (v) { return v != null; })), lo = Math.min.apply(null, all), hi = Math.max.apply(null, all), W = 250, H = 46, pad = 2, base = lo - (hi - lo) * 0.35;
@@ -667,12 +674,12 @@
       var tools = '<div class="fc-tools"><div class="fc-row">' + sel('season', t('card.t_season'), seasons.slice().reverse().map(function (y) { return [y, sl(y)]; }), state.season, 'short') + commonSegs() + scopeSel + detailsSwitch() + '</div></div>' + eraHint;
       var res = poRow && poRow.result ? t('result.' + poRow.result).toLowerCase() : t('card.t_nopo');
       var h = '<p class="fc-hero">' + esc(gt === 'RS' ? (rsRow ? t('card.t_hero', [sl(state.season), rsRow.overall_rank == null ? '—' : ord(rsRow.overall_rank), nf(rsRow.points), res]) : sl(state.season)) : t('card.t_hero_po', [sl(state.season), nf(r.w), res])) + '</p>';
-      var tile = function (tipk, title, v, body) { var tp = tipk && raw('card.tip.' + tipk) ? ' tabindex="0" data-tip="' + esc(t('card.tip.' + tipk)) + '"' : ''; return '<div class="fc-kpi"' + tp + '><h4>' + esc(title) + '</h4><div class="v">' + v + '</div>' + (body ? '<div class="fc-kd">' + body + '</div>' : '') + '</div>'; };
+      var tile = function (tipk, title, v, body, lvl, meas) { var tp = tipk && raw('card.tip.' + tipk) ? ' tabindex="0" data-tip="' + esc(t('card.tip.' + tipk)) + '"' : '', hl = lvl || 'h4'; return '<div class="fc-kpi"' + (meas ? ' data-m="' + meas + '"' : '') + tp + '><' + hl + '>' + esc(title) + '</' + hl + '><div class="v">' + v + '</div>' + (body ? '<div class="fc-kd">' + body + '</div>' : '') + '</div>'; };   // titre en h5 dans les sections de l'historique
       var cmpT = function (tipk, title, v, lv, dv, dl, dd, fmt, low) { return tile(tipk, title, v, '<dl class="fc-cmp"><dt>' + esc(t('card.vs_league')) + '</dt><dd>' + esc(lv) + '</dd><dd>' + delta(dl, low, fmt) + '</dd><dt>' + esc(t('card.vs_div')) + '</dt><dd>' + esc(dv) + '</dd><dd>' + delta(dd, low, fmt) + '</dd></dl>'); };
       var secHead = function (a, b, sub) { return '<h3 class="fc-band2"><span>' + esc(t(a)) + '</span><span class="bar" aria-hidden="true">|</span><span class="b">' + esc(t(b)) + '</span></h3>' + (sub ? '<p class="fc-band2-sub">' + esc(sub) + '</p>' : ''); };
       var f1 = function (d) { return sg(d, 1); };
       if (gt === 'RS' && lc) {
-        h += '<section data-card="results">' + secHead('card.t_sec_results', 'card.t_sec_results_sub', t('card.t_band_league_sub', [lc.league_rivals, lc.division_rivals])) + '<div class="fc-kpis">' +
+        h += '<section data-card="results">' + secHead('card.t_sec_results', 'card.t_sec_results_sub', t('card.t_band_league_sub', [lc.league_rivals, lc.division_rivals])) + '<div class="fc-kpis" data-n="4">' +   // 2 × 2 à 900 px (décision du 2026-11-28)
           cmpT('pts', t('stat.pts'), nf(lc.pts), nf(lc.league_pts, 1), nf(lc.division_pts, 1), lc.pts_vs_league, lc.pts_vs_division, f1) +
           cmpT('pts_pct', plain('stat.pts_pct'), pf(lc.standing_pts_pct, 1), pf(lc.league_standing_pts_pct, 1), pf(lc.division_standing_pts_pct, 1), lc.standing_pts_pct_vs_league == null ? null : lc.standing_pts_pct_vs_league * 100, lc.standing_pts_pct_vs_division == null ? null : lc.standing_pts_pct_vs_division * 100, f1) +
           cmpT('w', t('stat.w'), nf(lc.w), nf(lc.league_w, 1), nf(lc.division_w, 1), lc.w_vs_league, lc.w_vs_division, f1) +
@@ -680,18 +687,29 @@
       }
       var hist = CC.histOf(M, gt, state.scope, state.season), n = hist.length ? hist[0].n : 0;
       var sc = t(TEAM_SCOPES.filter(function (x) { return x[0] === state.scope; })[0][1], true).toLowerCase(), lastSeason = seasons[seasons.length - 1];
-      h += '<section data-card="history">' + secHead('card.t_sec_stats', 'card.t_sec_stats_sub', t('card.t_band_hist_sub', [n, sc]).split('. ')[0].replace(/\.+$/, '') + '.') + '<h4 class="fc-band3">' + esc(t('card.t_rank_title')) + '</h4><div class="fc-kpis">';
-      hist.forEach(function (m) {
-        var d = MEAS[m.measure]; if (!d || (gt === 'PO' && d[3])) return;
+      // légende commune une fois, en haut, avec « Positionnement de la saison affichée » (masquée avec les Détails : plus de bandes)
+      h += '<section data-card="history">' + secHead('card.t_sec_stats', 'card.t_sec_stats_sub', t('card.t_band_hist_sub', [n, sc]).split('. ')[0].replace(/\.+$/, '') + '.') +
+        '<div class="fc-histkey fc-kd"><p class="fc-histlead">' + esc(t('card.t_rank_title')) + '</p>' + legend([['b1', t('card.lg_sel')], ['b0', t('card.lg_other')], ['kavg', t('card.hist_avg2')], ['krec', t('card.hist_rec')]]) + '</div>';
+      var byM = {}; hist.forEach(function (m) { byM[m.measure] = m; });
+      var na = '<div class="na" aria-hidden="true"><dt>&nbsp;</dt><dd>&nbsp;</dd></div>';
+      var histTile = function (code) {
+        var m = byM[code], d = MEAS[code]; if (!m || !d || (gt === 'PO' && d[3])) return '';
         var body = '';
         if (m.value != null) {
           var upto = state.season > lastSeason - 25 ? null : state.season + 12, series = CC.histSeries(M, gt, state.scope, m.measure, upto);   // 25 dernières saisons au plus, la saison affichée comprise
-          body = '<dl class="fc-hist"><div><dt>' + esc(t('card.rank')) + '</dt><dd>' + (m.rank == null ? '—' : esc(t('card.hist_rank2', [ord(m.rank), m.n]))) + '</dd></div><div><dt>' + esc(t('card.hist_avg2')) + '</dt><dd>' + esc(d[1](m.hist_avg)) + '</dd></div><div><dt>' + esc(t('card.hist_rec')) + '</dt><dd>' + esc(m.record == null ? '—' : d[1](m.record)) + (m.record_season != null ? ' <small>' + esc(recSeasons(m)) + '</small>' : '') + '</dd></div></dl>' + bands(series, state.season, m.hist_avg, m.record);
+          var noRank = m.rank == null && m.record == null && m.lower_is_better == null;   // mesure sans rang ni record (% des matchs en temps réglementaire) : la moyenne seule, à sa place
+          body = '<dl class="fc-hist">' + (noRank ? na : '<div><dt>' + esc(t('card.rank')) + '</dt><dd>' + (m.rank == null ? '—' : esc(t('card.hist_rank2', [ord(m.rank), m.n]))) + '</dd></div>') + '<div><dt>' + esc(t('card.hist_avg2')) + '</dt><dd>' + esc(d[1](m.hist_avg)) + '</dd></div>' +
+            (noRank ? na : '<div><dt>' + esc(t('card.hist_rec')) + '</dt><dd>' + esc(m.record == null ? '—' : d[1](m.record)) + (m.record_season != null ? ' <small>' + esc(recSeasons(m)) + '</small>' : '') + '</dd></div>') + '</dl>' + bands(series, state.season, m.hist_avg, noRank ? null : m.record);
         }
-        h += tile(d[2], plain(d[0]), m.value == null ? '—' : esc(d[1](m.value)), body);
+        return tile(d[2], plain(d[0]), m.value == null ? '—' : esc(d[1](m.value)), body, 'h5', code);
+      };
+      GROUPS.forEach(function (g) {
+        var tiles = g[2].map(histTile).filter(Boolean);
+        if (g[0] === 'results' && gt === 'PO') tiles.push(tile('po_res', t('card.t_po_res'), esc(poRow && poRow.result ? t('result.' + poRow.result) : t('card.t_nopo')), '', 'h5', 'po_res'));
+        if (!tiles.length) return;   // section sans tuile : cachée
+        h += '<section class="fc-grp" data-grp="' + g[0] + '" aria-labelledby="grp-' + g[0] + '"><h4 class="fc-grp-h" id="grp-' + g[0] + '">' + esc(t(g[1])) + '</h4><div class="fc-kpis" data-n="' + tiles.length + '">' + tiles.join('') + '</div></section>';
       });
-      if (gt === 'PO') h += tile('po_res', t('card.t_po_res'), esc(poRow && poRow.result ? t('result.' + poRow.result) : t('card.t_nopo')), '');
-      h += '</div>' + legend([['b1', t('card.lg_sel')], ['b0', t('card.lg_other')], ['kavg', t('card.hist_avg2')], ['krec', t('card.hist_rec')]]).replace('fc-legend', 'fc-legend fc-kd') + '</section>';
+      h += '</section>';
       var rsAll = CC.team(M, 'RS', state.scope).seasons, cats = rsAll.map(function (x) { return sls(x.season); }), tips = rsAll.map(function (x) { return sl(x.season); });
       // Cote moyenne : toujours les saisons du mode franchise seulement, quel que soit le filtre (décision du 2026-11-27) ; record et saison du record de la portée franchise (v_team_season_hist)
       var rsF = (M.teamSeason.RS || []).filter(function (x) { return x.origin === 'franchise'; }), lastS = rsF.length ? rsF[rsF.length - 1].season : null, topR = lastS == null ? null : CC.histOf(M, 'RS', 'franchise', lastS).filter(function (x) { return x.measure === 'avg_rating'; })[0];

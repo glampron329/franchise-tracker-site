@@ -364,6 +364,7 @@
   // Fiches (phase 4e, migrations 85 à 87 ; décision du 2026-11-24 : aucune formule en JS) : vues lues seulement par la page Fiches
   // (cards). [vue, clé de tri unique (JS et cards/build_cards_data.py), grande, filtre PostgREST facultatif « col=eq.valeur » (la fiche ne
   // lit que ces lignes)]. Seule liste : build_cards_data.py la relit ici.
+  // v_player_season_peak : portée « all » seulement (fiches Patineur et Gardien sans filtre de portée depuis le 2026-11-27 ; deux fois moins de lignes)
   var CARD_VIEWS = [
     ['v_skater_season', 'player_id,game_type,season,position_group', 1], ['v_skater_season_rates', 'player_id,game_type,season,position_group', 1], ['v_skater_career', 'player_id,game_type,scope,position_group', 1],
     ['v_skater_career_rates', 'player_id,game_type,scope,position_group', 1, 'position_group=eq.all'], ['v_goalie_season', 'player_id,game_type,season', 0],
@@ -376,7 +377,7 @@
     ['v_player_role_summary', 'player_id,role_code', 0], ['v_player_draft_result', 'player_id', 1], ['v_player_awards', 'player_id,scope,award_code', 0],
     ['v_player_season_profile', 'player_id,kind,season,game_type', 1], ['v_team_season', 'game_type,season', 0], ['v_team_career', 'game_type,scope', 0],
     ['v_team_league_compare', 'season', 0], ['v_team_season_hist', 'game_type,scope,season,measure', 1],
-    ['v_player_season_peak', 'player_id,kind,game_type,scope,mode,stat,season', 1], ['v_team_season_peak', 'game_type,scope,stat,season', 0]];   // 87 : records d'équipe du tableau détaillé
+    ['v_player_season_peak', 'player_id,kind,game_type,scope,mode,stat,season', 1, 'scope=eq.all'], ['v_team_season_peak', 'game_type,scope,stat,season', 0]];   // 87 : records d'équipe du tableau détaillé
   CARD_VIEWS.forEach(function (v) { OPTIONAL.push([v[0], 'select=*' + (v[3] ? '&' + v[3] : '') + '&order=' + v[1], v[2], ['cards']]); });
   var FTSBX = (function () { var S = typeof FTSB !== 'undefined' ? FTSB : (typeof require === 'function' ? require('./sb.js') : null); if (!S) return null; var set = {}; S.SCOPED.concat(Object.keys(S.CHILD), ['team']).forEach(function (t) { set[t] = 1; }); set.team = 0; return { isScoped: function (t) { return !!set[t]; } }; })();
   function pspan(n) { var P = typeof FTPERF !== 'undefined' ? FTPERF : root.FTPERF; return P ? P.span(n) : function () {}; }
@@ -1289,13 +1290,16 @@
     function merge(base, fresh) { var R = Object.assign({}, base || {}); Object.keys(fresh).forEach(function (k) { R[k] = fresh[k]; }); return R; }
     function save(fid) { if (cache && RAW) { var d = pspan('cache:écriture'); var t = {}; Object.keys(RAW).forEach(function (k) { if (k !== '__franchise_id') t[k] = RAW[k]; }); cache.write(userId(), fid, t, VERS).then(function () { d(); }); } }
     async function versions(fid) { var d = pspan('versions'); try { var v = await FTLIVE.loadVersions(client, fid); d(v ? Object.keys(v).length + ' tables' : 'absent'); return v; } catch (e) { d('erreur'); return null; } }
+    // lecture facultative en échec (délai dépassé, droit manquant) : sa version n'est pas gardée, donc le cache ne garde pas la liste vide
+    // et la table est relue au prochain chargement (révision 4e, 2026-11-27 : sommets personnels restés vides après un échec)
+    function forgetFailed(R) { if (VERS && R && R.__optional_errors) R.__optional_errors.forEach(function (e) { delete VERS[e.name]; }); }
     // relit les tables dont la version a changé (toutes si data_version est absente) ; retourne le nombre de tables relues
     async function refresh(fid, fresh, label) {
       // tables de CETTE page seulement (les vues des fiches ne sont lues que par la page Fiches) ; les versions des autres tables restent
       // celles du cache, pour que la page qui les lit les relise si elles ont changé entre-temps
       var pg = pageName(), names = FTLIVE.tableDefs().filter(function (x) { return !x.pages || x.pages.indexOf(pg) >= 0; }).map(function (x) { return x.name; }), need = CACHE ? CACHE.changed(VERS, fresh, names) : names;
       if (fresh) { var next = Object.assign({}, VERS || {}); names.forEach(function (n) { if (n in fresh) next[n] = fresh[n]; else delete next[n]; }); VERS = next; } else VERS = fresh;
-      if (need.length) { var R2 = await FTLIVE.loadAll(client, null, { page: pageName(), only: need }); RAW = merge(RAW, R2); RAW.__franchise_id = fid; apply(RAW, 'sb.cache_updated', [need.length]); report(label); }
+      if (need.length) { var R2 = await FTLIVE.loadAll(client, null, { page: pageName(), only: need }); RAW = merge(RAW, R2); RAW.__franchise_id = fid; forgetFailed(R2); apply(RAW, 'sb.cache_updated', [need.length]); report(label); }
       else { if (app) { app.sync.msg = fmt('sb.cache_fresh'); app.sync.level = 'ok'; app.sync.busy = false; } draw(); }
       save(fid); return need.length;
     }
@@ -1322,7 +1326,7 @@
         else {
           vp = fid == null ? Promise.resolve(null) : versions(fid);
           var R = await FTLIVE.loadAll(client, function (i, n) { ui.progress = i + '/' + n; if (!app) draw(); }, { page: page });
-          RAW = R; VERS = await vp; if (VERS) { var vk = {}; Object.keys(VERS).forEach(function (n) { if (n in R) vk[n] = VERS[n]; }); VERS = vk; }   apply(R, 'sb.connected'); report(page); save(fid);   // versions gardées : celles des tables lues seulement (une autre page lira les siennes)
+          RAW = R; VERS = await vp; if (VERS) { var vk = {}; Object.keys(VERS).forEach(function (n) { if (n in R) vk[n] = VERS[n]; }); VERS = vk; } forgetFailed(R);   apply(R, 'sb.connected'); report(page); save(fid);   // versions gardées : celles des tables lues seulement (une autre page lira les siennes)
         }
       } catch (e) {
         ui.errKey = e.ftKey || null; ui.error = e.ftKey ? e.message : T('sb.failed', [e.message]); if (app) { app.sync.msg = ui.error; app.sync.level = 'bad'; app.sync.busy = false; }
